@@ -24,7 +24,14 @@ export interface ICompany extends Document {
         sharesClass: string;
         numberOfShares: number;
     }>;
+    officers: Array<{
+        name: string;
+        title: string;
+        appointedDate: Date;
+        resignedDate?: Date;
+    }>;
     fiscalYearEnd?: string; // e.g., "12-31"
+    deletedAt?: Date | null;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -58,7 +65,16 @@ const companySchema: Schema = new Schema(
                 numberOfShares: Number,
             },
         ],
+        officers: [
+            {
+                name: String,
+                title: String,
+                appointedDate: Date,
+                resignedDate: Date,
+            },
+        ],
         fiscalYearEnd: { type: String },
+        deletedAt: { type: Date, default: null },
     },
     { timestamps: true }
 );

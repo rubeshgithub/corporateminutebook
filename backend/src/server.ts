@@ -25,12 +25,14 @@ import authRoutes from './routes/authRoutes';
 import companyRoutes from './routes/companyRoutes';
 import documentRoutes from './routes/documentRoutes';
 import registryRoutes from './routes/registryRoutes';
+import activityRoutes from './routes/activityRoutes';
 
 // Basic Route
 app.use('/api/auth', authRoutes);
 app.use('/api/companies', companyRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/registry', registryRoutes);
+app.use('/api/activity', activityRoutes);
 
 app.get('/api/health', (req: Request, res: Response) => {
     res.status(200).json({ status: 'ok', message: 'Corporate Minute Book API is running' });

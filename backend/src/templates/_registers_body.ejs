@@ -1,0 +1,99 @@
+<div class="register-title">A. Register of Directors</div>
+<div class="register-subtitle">Required pursuant to the applicable corporate legislation.</div>
+<% if (company.directors && company.directors.length > 0) { %>
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Residential Address</th>
+                <th>Date Appointed</th>
+                <th>Date Resigned</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% company.directors.forEach(function(d) { %>
+                <tr>
+                    <td><%= d.name %></td>
+                    <td><%= d.address %></td>
+                    <td><%= d.appointedDate ? new Date(d.appointedDate).toLocaleDateString() : '' %></td>
+                    <td><%= d.resignedDate ? new Date(d.resignedDate).toLocaleDateString() : '—' %></td>
+                </tr>
+            <% }); %>
+        </tbody>
+    </table>
+<% } else { %>
+    <div class="empty">No directors recorded.</div>
+<% } %>
+
+<div class="register-title">B. Register of Officers</div>
+<div class="register-subtitle">Officers appointed by the Board of Directors.</div>
+<% if (company.officers && company.officers.length > 0) { %>
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Office Held</th>
+                <th>Date Appointed</th>
+                <th>Date Resigned</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% company.officers.forEach(function(o) { %>
+                <tr>
+                    <td><%= o.name %></td>
+                    <td><%= o.title %></td>
+                    <td><%= o.appointedDate ? new Date(o.appointedDate).toLocaleDateString() : '' %></td>
+                    <td><%= o.resignedDate ? new Date(o.resignedDate).toLocaleDateString() : '—' %></td>
+                </tr>
+            <% }); %>
+        </tbody>
+    </table>
+<% } else { %>
+    <div class="empty">No officers recorded.</div>
+<% } %>
+
+<div class="register-title">C. Securities Register / Shareholders' Ledger</div>
+<div class="register-subtitle">Record of issued and outstanding shares of the Corporation.</div>
+<% if (company.shareholders && company.shareholders.length > 0) { %>
+    <table>
+        <thead>
+            <tr>
+                <th>Holder</th>
+                <th>Class of Shares</th>
+                <th>Number of Shares</th>
+                <th>Certificate No.</th>
+                <th>Date of Issue</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% company.shareholders.forEach(function(s, idx) { %>
+                <tr>
+                    <td><%= s.name %></td>
+                    <td><%= s.sharesClass %></td>
+                    <td><%= s.numberOfShares %></td>
+                    <td><%= idx + 1 %></td>
+                    <td><%= company.incorporationDate ? new Date(company.incorporationDate).toLocaleDateString() : '' %></td>
+                </tr>
+            <% }); %>
+        </tbody>
+    </table>
+    <%
+        var byClass = {};
+        company.shareholders.forEach(function(s){
+            byClass[s.sharesClass] = (byClass[s.sharesClass] || 0) + (s.numberOfShares || 0);
+        });
+    %>
+    <div style="margin-top: 18px; font-weight: bold;">Summary of Issued and Outstanding Shares</div>
+    <table style="margin-top: 4px; width: 50%;">
+        <thead>
+            <tr><th>Class</th><th>Total Issued</th></tr>
+        </thead>
+        <tbody>
+            <% Object.keys(byClass).forEach(function(cls){ %>
+                <tr><td><%= cls %></td><td><%= byClass[cls] %></td></tr>
+            <% }); %>
+        </tbody>
+    </table>
+<% } else { %>
+    <div class="empty">No securities issued.</div>
+<% } %>

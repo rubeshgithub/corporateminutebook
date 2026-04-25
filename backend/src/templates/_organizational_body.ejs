@@ -1,0 +1,77 @@
+<div class="section-block">
+    <div class="section-block-title">1. Confirmation of Incorporation</div>
+    <div class="clause">RESOLVED THAT the Articles of Incorporation of the Corporation, dated <%= incorpDate %>, are hereby received and acknowledged.</div>
+</div>
+
+<div class="section-block">
+    <div class="section-block-title">2. Registered Office</div>
+    <div class="clause">RESOLVED THAT the registered office of the Corporation is established at <%= company.registeredOfficeAddress.street %>, <%= company.registeredOfficeAddress.city %>, <%= company.registeredOfficeAddress.province %> <%= company.registeredOfficeAddress.postalCode %>.</div>
+</div>
+
+<div class="section-block">
+    <div class="section-block-title">3. Adoption of By-Law No. 1</div>
+    <div class="clause">RESOLVED THAT By-Law No. 1 of the Corporation, being a by-law relating generally to the transaction of the business and affairs of the Corporation, in the form annexed to these resolutions, is hereby made, enacted, confirmed and approved as a by-law of the Corporation.</div>
+</div>
+
+<div class="section-block">
+    <div class="section-block-title">4. Appointment of Officers</div>
+    <div class="clause">RESOLVED THAT the following persons are hereby appointed as officers of the Corporation, to hold office at the pleasure of the Board:</div>
+    <table>
+        <thead>
+            <tr><th>Name</th><th>Office</th><th>Effective Date</th></tr>
+        </thead>
+        <tbody>
+            <% (company.officers || []).forEach(function(o) { %>
+                <tr>
+                    <td><%= o.name %></td>
+                    <td><%= o.title %></td>
+                    <td><%= o.appointedDate ? new Date(o.appointedDate).toLocaleDateString() : '' %></td>
+                </tr>
+            <% }); %>
+            <% if (!company.officers || company.officers.length === 0) { %>
+                <tr><td colspan="3"><em>No officers appointed at this time.</em></td></tr>
+            <% } %>
+        </tbody>
+    </table>
+</div>
+
+<div class="section-block">
+    <div class="section-block-title">5. Issuance of Shares</div>
+    <div class="clause">RESOLVED THAT the Corporation issue from treasury the following shares to the persons listed below, each of whom has subscribed for the indicated number of shares for the consideration specified, such consideration to be paid in full prior to issuance:</div>
+    <table>
+        <thead>
+            <tr><th>Subscriber</th><th>Class</th><th>Number of Shares</th></tr>
+        </thead>
+        <tbody>
+            <% company.shareholders.forEach(function(s) { %>
+                <tr>
+                    <td><%= s.name %></td>
+                    <td><%= s.sharesClass %></td>
+                    <td><%= s.numberOfShares %></td>
+                </tr>
+            <% }); %>
+        </tbody>
+    </table>
+    <div class="clause">RESOLVED FURTHER THAT, upon receipt of the consideration aforesaid, the said shares shall be issued as fully paid and non-assessable shares in the capital of the Corporation, and certificates therefor shall be issued.</div>
+</div>
+
+<div class="section-block">
+    <div class="section-block-title">6. Financial Year End</div>
+    <div class="clause">RESOLVED THAT the financial year end of the Corporation is hereby fixed as <%= company.fiscalYearEnd || 'December 31' %> in each year, until changed by further resolution of the directors.</div>
+</div>
+
+<div class="section-block">
+    <div class="section-block-title">7. Banking Arrangements</div>
+    <div class="clause">RESOLVED THAT the officers of the Corporation are hereby authorized to open and maintain one or more bank accounts with such financial institution(s) as they may from time to time determine, and to execute such bank documentation as they consider necessary or desirable for the proper conduct of the Corporation's banking business.</div>
+</div>
+
+<div class="section-block">
+    <div class="section-block-title">8. Appointment of Accountant; Waiver of Auditor</div>
+    <div class="clause">RESOLVED THAT, the Corporation being a non-distributing corporation, the appointment of an auditor for the current financial year is hereby waived by unanimous consent of the directors, subject to and conditional upon a corresponding waiver by the shareholders entitled to vote.</div>
+    <div class="clause">RESOLVED FURTHER THAT the officers of the Corporation may engage such accountant or accounting firm as they deem appropriate to prepare the financial statements of the Corporation.</div>
+</div>
+
+<div class="section-block">
+    <div class="section-block-title">9. General Authorization</div>
+    <div class="clause">RESOLVED THAT any one director or officer of the Corporation is hereby authorized to do all such acts and things and to execute and deliver all such documents and instruments as may be necessary or desirable to give effect to the foregoing resolutions and to carry out the organization of the Corporation.</div>
+</div>

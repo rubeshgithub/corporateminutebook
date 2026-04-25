@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Share Certificate - <%= company.name %></title>
+    <style>
+        html, body { margin: 0; padding: 0; }
+        body { font-family: 'Helvetica', 'Arial', sans-serif; }
+
+        .certificate {
+            box-sizing: border-box;
+            width: 9in;
+            height: 6.5in;
+            page-break-after: always;
+            page-break-inside: avoid;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+        .certificate:last-child { page-break-after: auto; }
+
+        .frame {
+            box-sizing: border-box;
+            flex: 1;
+            border: 8px double #1a237e;
+            padding: 28px 60px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .cert-no { text-align: right; font-size: 11px; color: #555; }
+        .header { text-align: center; margin-top: 4px; }
+        .corp-name { font-size: 28px; font-weight: bold; letter-spacing: 3px; color: #1a237e; }
+        .cert-title { font-size: 18px; margin-top: 4px; letter-spacing: 6px; }
+        .jurisdiction { font-size: 11px; margin-top: 4px; color: #555; }
+
+        .body { margin-top: 16px; font-size: 14px; line-height: 1.5; text-align: center; flex: 1; }
+        .holder { font-size: 22px; font-weight: bold; margin: 10px 0; text-decoration: underline; }
+        .shares-amount { font-size: 30px; font-weight: bold; color: #1a237e; display: block; margin-top: 10px; }
+        .shares-class { font-size: 15px; margin-top: 2px; }
+        .legalese { margin-top: 14px; font-size: 12px; color: #333; max-width: 75%; margin-left: auto; margin-right: auto; }
+
+        .footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-top: 16px;
+        }
+        .sig-block { width: 35%; text-align: center; }
+        .sig-line { border-top: 1px solid #000; padding-top: 4px; margin-top: 30px; font-size: 12px; }
+    </style>
+</head>
+
+<body>
+    <% company.shareholders.forEach(function(shareholder, idx) { %>
+        <div class="certificate">
+            <div class="frame">
+                <div class="cert-no">Certificate No. <%= idx + 1 %></div>
+                <div class="header">
+                    <div class="corp-name"><%= company.name.toUpperCase() %></div>
+                    <div class="cert-title">SHARE CERTIFICATE</div>
+                    <div class="jurisdiction">
+                        Incorporated under the laws of <%= company.registeredOfficeAddress.country || 'Canada' %>
+                    </div>
+                </div>
+
+                <div class="body">
+                    <div>This is to certify that</div>
+                    <div class="holder"><%= shareholder.name %></div>
+                    <div>is the registered holder of</div>
+                    <span class="shares-amount"><%= shareholder.numberOfShares %></span>
+                    <div class="shares-class"><%= shareholder.sharesClass %> Shares</div>
+                    <div class="legalese">
+                        in the capital of the above-named Corporation, fully paid and non-assessable,
+                        transferable only on the books of the Corporation upon surrender of this
+                        certificate properly endorsed.
+                    </div>
+                </div>
+
+                <div class="footer">
+                    <div class="sig-block">
+                        <div class="sig-line">President / Director</div>
+                    </div>
+                    <div class="sig-block">
+                        <div class="sig-line">Secretary</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    <% }); %>
+</body>
+
+</html>

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Organizational Resolution - <%= company.name %></title>
+    <style>
+        body { font-family: 'Helvetica', 'Arial', sans-serif; padding: 0; line-height: 1.6; font-size: 11.5pt; }
+        h1 { text-align: center; font-size: 22px; text-decoration: underline; margin-bottom: 6px; }
+        h2 { text-align: center; font-size: 16px; margin-top: 6px; }
+        .preamble { text-align: center; font-style: italic; margin-bottom: 18px; }
+        .section { margin-top: 22px; }
+        .section-title { font-weight: bold; text-transform: uppercase; margin-bottom: 8px; font-size: 12.5pt; }
+        .clause { margin-bottom: 12px; text-align: justify; }
+        .signature { margin-top: 60px; }
+        .sig-line { border-top: 1px solid #000; width: 280px; margin-top: 50px; padding-top: 4px; }
+        table { border-collapse: collapse; width: 100%; margin-top: 8px; }
+        th, td { border: 1px solid #555; padding: 6px 8px; text-align: left; font-size: 11pt; }
+        th { background: #f3f3f3; }
+    </style>
+</head>
+
+<body>
+    <h1>RESOLUTIONS OF THE FIRST DIRECTORS</h1>
+    <h2><%= company.name %></h2>
+    <p class="preamble">(the "Corporation")</p>
+
+    <p>The undersigned, being all of the first directors of the Corporation, hereby consent in writing to the following resolutions, in lieu of holding the organizational meeting of the directors of the Corporation pursuant to the applicable corporate legislation:</p>
+
+    <div class="section">
+        <div class="section-title">1. Confirmation of Incorporation</div>
+        <div class="clause">RESOLVED THAT the Articles of Incorporation of the Corporation, dated <%= company.incorporationDate ? new Date(company.incorporationDate).toLocaleDateString() : '__________' %>, are hereby received and acknowledged.</div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">2. Registered Office</div>
+        <div class="clause">RESOLVED THAT the registered office of the Corporation is established at <%= company.registeredOfficeAddress.street %>, <%= company.registeredOfficeAddress.city %>, <%= company.registeredOfficeAddress.province %> <%= company.registeredOfficeAddress.postalCode %>.</div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">3. Adoption of By-Law No. 1</div>
+        <div class="clause">RESOLVED THAT By-Law No. 1 of the Corporation, being a by-law relating generally to the transaction of the business and affairs of the Corporation, in the form annexed to these resolutions, is hereby made, enacted, confirmed and approved as a by-law of the Corporation.</div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">4. Appointment of Officers</div>
+        <div class="clause">RESOLVED THAT the following persons are hereby appointed as officers of the Corporation, to hold office at the pleasure of the Board:</div>
+        <table>
+            <thead>
+                <tr><th>Name</th><th>Office</th><th>Effective Date</th></tr>
+            </thead>
+            <tbody>
+                <% (company.officers || []).forEach(function(o) { %>
+                    <tr>
+                        <td><%= o.name %></td>
+                        <td><%= o.title %></td>
+                        <td><%= o.appointedDate ? new Date(o.appointedDate).toLocaleDateString() : '' %></td>
+                    </tr>
+                <% }); %>
+                <% if (!company.officers || company.officers.length === 0) { %>
+                    <tr><td colspan="3"><em>No officers appointed at this time.</em></td></tr>
+                <% } %>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <div class="section-title">5. Issuance of Shares</div>
+        <div class="clause">RESOLVED THAT the Corporation issue from treasury the following shares to the persons listed below, each of whom has subscribed for the indicated number of shares for the consideration specified, such consideration to be paid in full prior to issuance:</div>
+        <table>
+            <thead>
+                <tr><th>Subscriber</th><th>Class</th><th>Number of Shares</th></tr>
+            </thead>
+            <tbody>
+                <% company.shareholders.forEach(function(s) { %>
+                    <tr>
+                        <td><%= s.name %></td>
+                        <td><%= s.sharesClass %></td>
+                        <td><%= s.numberOfShares %></td>
+                    </tr>
+                <% }); %>
+            </tbody>
+        </table>
+        <div class="clause">RESOLVED FURTHER THAT, upon receipt of the consideration aforesaid, the said shares shall be issued as fully paid and non-assessable shares in the capital of the Corporation, and certificates therefor shall be issued to the persons entitled thereto.</div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">6. Financial Year End</div>
+        <div class="clause">RESOLVED THAT the financial year end of the Corporation be, and is hereby fixed as, <%= company.fiscalYearEnd || 'December 31' %> in each year, until changed by further resolution of the directors.</div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">7. Banking Arrangements</div>
+        <div class="clause">RESOLVED THAT the officers of the Corporation are hereby authorized to open and maintain one or more bank accounts with such financial institution(s) as they may from time to time determine, and to execute such bank documentation, account agreements and signing authority resolutions in respect thereof as they consider necessary or desirable for the proper conduct of the Corporation's banking business.</div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">8. Appointment of Accountant; Waiver of Auditor</div>
+        <div class="clause">RESOLVED THAT, the Corporation being a non-distributing corporation, the appointment of an auditor for the current financial year is hereby waived by unanimous consent of the directors, subject to and conditional upon a corresponding waiver by the shareholders entitled to vote.</div>
+        <div class="clause">RESOLVED FURTHER THAT the officers of the Corporation may engage such accountant or accounting firm as they deem appropriate to prepare the financial statements of the Corporation.</div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">9. General Authorization</div>
+        <div class="clause">RESOLVED THAT any one director or officer of the Corporation is hereby authorized to do all such acts and things and to execute and deliver all such documents and instruments as may be necessary or desirable to give effect to the foregoing resolutions and to carry out the organization of the Corporation.</div>
+    </div>
+
+    <div class="signature">
+        <p>DATED this <%= new Date().toLocaleDateString() %>.</p>
+        <% company.directors.forEach(function(director) { %>
+            <div class="sig-line"><%= director.name %>, Director</div>
+        <% }); %>
+    </div>
+</body>
+
+</html>

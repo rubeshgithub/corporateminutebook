@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Minute Book - <%= company.name %></title>
+    <style>
+        @page { size: Letter; }
+        html, body { margin: 0; padding: 0; }
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            color: #1a1a1a;
+            font-size: 11.5pt;
+            line-height: 1.55;
+        }
+
+        /* ============ COVER ============ */
+        .cover {
+            page-break-after: always;
+            position: relative;
+            height: 9in;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            color: #fff;
+            background: linear-gradient(135deg, #0d1b3d 0%, #1a237e 55%, #283593 100%);
+            box-sizing: border-box;
+            padding: 0.7in 0.7in 0.6in 0.7in;
+        }
+        .cover::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(circle at 20% 10%, rgba(255,255,255,0.10), transparent 35%),
+                radial-gradient(circle at 80% 95%, rgba(255,255,255,0.08), transparent 40%);
+            pointer-events: none;
+        }
+        .cover-top {
+            position: relative;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            font-size: 10pt;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            opacity: 0.85;
+        }
+        .cover-mid {
+            position: relative;
+            text-align: center;
+        }
+        .cover-mid .label {
+            font-size: 14pt;
+            letter-spacing: 8px;
+            opacity: 0.85;
+        }
+        .cover-mid .corp {
+            font-size: 36pt;
+            font-weight: 700;
+            letter-spacing: 1px;
+            margin-top: 14px;
+            line-height: 1.15;
+        }
+        .cover-mid .rule {
+            width: 120px;
+            height: 3px;
+            background: #fff;
+            margin: 22px auto 22px auto;
+            opacity: 0.85;
+        }
+        .cover-mid .subtitle {
+            font-size: 16pt;
+            font-weight: 300;
+            letter-spacing: 6px;
+            text-transform: uppercase;
+        }
+        .cover-bottom {
+            position: relative;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            font-size: 10.5pt;
+        }
+        .cover-bottom .left, .cover-bottom .right {
+            line-height: 1.6;
+        }
+        .cover-bottom .label-line {
+            font-size: 8.5pt;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            opacity: 0.7;
+            margin-bottom: 4px;
+        }
+
+        /* ============ COMMON SECTION ============ */
+        .page {
+            page-break-before: always;
+            padding: 0;
+        }
+        .section-title {
+            text-align: center;
+            margin: 100px 0 40px 0;
+        }
+        .section-title .num {
+            font-size: 14pt;
+            letter-spacing: 8px;
+            color: #1a237e;
+            text-transform: uppercase;
+        }
+        .section-title .name {
+            font-size: 30pt;
+            font-weight: 700;
+            margin-top: 14px;
+            color: #0d1b3d;
+        }
+        .section-title .rule {
+            width: 80px;
+            height: 3px;
+            background: #1a237e;
+            margin: 22px auto 0 auto;
+        }
+        .doc-content { padding: 0 0.1in; }
+        .doc-content h1 { text-align: center; font-size: 18pt; text-decoration: underline; margin-bottom: 6px; }
+        .doc-content h2 { text-align: center; font-size: 13pt; margin-top: 6px; }
+
+        /* shared text styles */
+        .preamble { text-align: center; font-style: italic; margin-bottom: 18px; }
+        .article-title { font-weight: bold; margin-top: 22px; margin-bottom: 8px; font-size: 12.5pt; text-transform: uppercase; }
+        .clause { margin-bottom: 10px; text-align: justify; padding-left: 14px; text-indent: -14px; }
+        .clause-no { font-weight: bold; margin-right: 6px; }
+        .section-block { margin-top: 22px; }
+        .section-block-title { font-weight: bold; text-transform: uppercase; margin-bottom: 8px; font-size: 11.5pt; }
+        .signature { margin-top: 50px; }
+        .sig-line { border-top: 1px solid #000; width: 280px; margin-top: 40px; padding-top: 4px; }
+        table { border-collapse: collapse; width: 100%; margin-top: 8px; }
+        th, td { border: 1px solid #555; padding: 6px 8px; text-align: left; font-size: 10.5pt; vertical-align: top; }
+        th { background: #f3f3f3; font-weight: bold; }
+
+        /* TOC */
+        .toc-list {
+            list-style: none;
+            padding: 0;
+            margin-top: 30px;
+            font-size: 12pt;
+        }
+        .toc-list li {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px dotted #999;
+            padding: 8px 0;
+        }
+        .toc-list li .num { color: #1a237e; font-weight: bold; margin-right: 12px; }
+        .toc-list li .label { flex: 1; }
+
+        /* Share certificate (landscape isn't available mid-doc; render portrait variant) */
+        .cert-page {
+            page-break-before: always;
+            padding: 30px;
+        }
+        .cert-frame {
+            box-sizing: border-box;
+            border: 8px double #1a237e;
+            padding: 36px 44px;
+            position: relative;
+            min-height: 8in;
+            display: flex;
+            flex-direction: column;
+        }
+        .cert-no { text-align: right; font-size: 11px; color: #555; }
+        .cert-header { text-align: center; margin-top: 20px; }
+        .cert-header .corp-name { font-size: 26px; font-weight: bold; letter-spacing: 2px; color: #1a237e; }
+        .cert-header .cert-title { font-size: 18px; margin-top: 6px; letter-spacing: 4px; }
+        .cert-header .jurisdiction { font-size: 11px; margin-top: 6px; color: #555; }
+        .cert-body { margin-top: 30px; font-size: 14px; line-height: 1.7; text-align: center; flex: 1; }
+        .cert-body .holder { font-size: 22px; font-weight: bold; margin: 14px 0; text-decoration: underline; }
+        .cert-body .shares-amount { font-size: 30px; font-weight: bold; color: #1a237e; display: block; margin-top: 12px; }
+        .cert-body .shares-class { font-size: 15px; margin-top: 4px; }
+        .cert-body .legalese { margin-top: 20px; font-size: 12.5px; color: #333; max-width: 78%; margin-left: auto; margin-right: auto; }
+        .cert-footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 20px; }
+        .cert-footer .sig-block { width: 35%; text-align: center; }
+        .cert-footer .sig-line { border-top: 1px solid #000; padding-top: 4px; margin-top: 30px; font-size: 12px; }
+
+        /* registers */
+        .register-title { font-size: 15pt; font-weight: bold; margin-top: 24px; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 2px solid #1a237e; color: #1a237e; }
+        .register-subtitle { font-style: italic; color: #555; margin-bottom: 12px; font-size: 10pt; }
+        .empty { text-align: center; font-style: italic; color: #888; padding: 18px; }
+    </style>
+</head>
+
+<body>
+    <% var today = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }); %>
+    <% var incorpDate = company.incorporationDate ? new Date(company.incorporationDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : '—'; %>
+
+    <!-- ============ COVER ============ -->
+    <div class="cover">
+        <div class="cover-top">
+            <span>MinuteBook</span>
+            <span><%= today %></span>
+        </div>
+        <div class="cover-mid">
+            <div class="label">Corporate</div>
+            <div class="corp"><%= company.name %></div>
+            <div class="rule"></div>
+            <div class="subtitle">Minute Book</div>
+        </div>
+        <div class="cover-bottom">
+            <div class="left">
+                <div class="label-line">Registered Office</div>
+                <div><%= company.registeredOfficeAddress.street %></div>
+                <div><%= company.registeredOfficeAddress.city %>, <%= company.registeredOfficeAddress.province %> <%= company.registeredOfficeAddress.postalCode %></div>
+                <div><%= company.registeredOfficeAddress.country %></div>
+            </div>
+            <div class="right" style="text-align: right;">
+                <div class="label-line">Incorporated</div>
+                <div><%= incorpDate %></div>
+                <% if (company.corporateAccessNumber) { %>
+                    <div class="label-line" style="margin-top: 10px;">Access No.</div>
+                    <div><%= company.corporateAccessNumber %></div>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ TABLE OF CONTENTS ============ -->
+    <div class="page">
+        <div class="section-title">
+            <div class="num">Contents</div>
+            <div class="name">Table of Contents</div>
+            <div class="rule"></div>
+        </div>
+        <ul class="toc-list">
+            <li><span><span class="num">I.</span><span class="label">Articles of Incorporation</span></span></li>
+            <li><span><span class="num">II.</span><span class="label">By-Law No. 1 — General By-Law</span></span></li>
+            <li><span><span class="num">III.</span><span class="label">Organizational Resolutions of the First Directors</span></span></li>
+            <li><span><span class="num">IV.</span><span class="label">Consents to Act as Director</span></span></li>
+            <li><span><span class="num">V.</span><span class="label">Annual Resolutions of the Directors</span></span></li>
+            <li><span><span class="num">VI.</span><span class="label">Annual Resolutions of the Shareholders</span></span></li>
+            <li><span><span class="num">VII.</span><span class="label">Share Certificates</span></span></li>
+            <li><span><span class="num">VIII.</span><span class="label">Corporate Registers</span></span></li>
+        </ul>
+    </div>
+
+    <!-- ============ I. ARTICLES ============ -->
+    <div class="page">
+        <div class="section-title">
+            <div class="num">Section I</div>
+            <div class="name">Articles of Incorporation</div>
+            <div class="rule"></div>
+        </div>
+    </div>
+    <div class="page doc-content">
+        <h1>ARTICLES OF INCORPORATION</h1>
+        <div class="section-block">
+            <div class="section-block-title">1. Name of Corporation</div>
+            <div><%= company.name %></div>
+        </div>
+        <div class="section-block">
+            <div class="section-block-title">2. Corporate Access Number</div>
+            <div><%= company.corporateAccessNumber || 'N/A' %></div>
+        </div>
+        <div class="section-block">
+            <div class="section-block-title">3. Registered Office</div>
+            <div><%= company.registeredOfficeAddress.street %></div>
+            <div><%= company.registeredOfficeAddress.city %>, <%= company.registeredOfficeAddress.province %> <%= company.registeredOfficeAddress.postalCode %></div>
+            <div><%= company.registeredOfficeAddress.country %></div>
+        </div>
+        <div class="section-block">
+            <div class="section-block-title">4. Directors</div>
+            <table>
+                <thead><tr><th>Name</th><th>Address</th><th>Appointed</th></tr></thead>
+                <tbody>
+                    <% company.directors.forEach(function(d) { %>
+                        <tr><td><%= d.name %></td><td><%= d.address %></td><td><%= d.appointedDate ? new Date(d.appointedDate).toLocaleDateString() : '' %></td></tr>
+                    <% }); %>
+                </tbody>
+            </table>
+        </div>
+        <div class="section-block">
+            <div class="section-block-title">5. Share Structure</div>
+            <table>
+                <thead><tr><th>Shareholder</th><th>Class</th><th>Number of Shares</th></tr></thead>
+                <tbody>
+                    <% company.shareholders.forEach(function(s) { %>
+                        <tr><td><%= s.name %></td><td><%= s.sharesClass %></td><td><%= s.numberOfShares %></td></tr>
+                    <% }); %>
+                </tbody>
+            </table>
+        </div>
+        <div class="signature">
+            <p>Dated: <%= today %></p>
+            <div class="sig-line">Authorized Signature</div>
+        </div>
+    </div>
+
+    <!-- ============ II. BY-LAW NO. 1 ============ -->
+    <div class="page">
+        <div class="section-title">
+            <div class="num">Section II</div>
+            <div class="name">By-Law No. 1</div>
+            <div class="rule"></div>
+        </div>
+    </div>
+    <div class="page doc-content">
+        <h1>BY-LAW NO. 1</h1>
+        <p class="preamble">A by-law relating generally to the transaction of the business and affairs of</p>
+        <h2><%= company.name %></h2>
+        <p class="preamble">(the "Corporation")</p>
+
+        <%- include('_by_laws_body', { company: company }) %>
+
+        <div class="signature">
+            <p>ENACTED by the directors of the Corporation this <%= today %>.</p>
+            <% (company.officers || []).filter(function(o){ return /president|secretary/i.test(o.title); }).forEach(function(o){ %>
+                <div class="sig-line"><%= o.name %>, <%= o.title %></div>
+            <% }); %>
+            <% if (!company.officers || company.officers.length === 0) { %>
+                <div class="sig-line">Authorized Signatory</div>
+            <% } %>
+        </div>
+    </div>
+
+    <!-- ============ III. ORGANIZATIONAL RESOLUTION ============ -->
+    <div class="page">
+        <div class="section-title">
+            <div class="num">Section III</div>
+            <div class="name">Organizational Resolutions</div>
+            <div class="rule"></div>
+        </div>
+    </div>
+    <div class="page doc-content">
+        <h1>RESOLUTIONS OF THE FIRST DIRECTORS</h1>
+        <h2><%= company.name %></h2>
+        <p class="preamble">(the "Corporation")</p>
+        <p>The undersigned, being all of the first directors of the Corporation, hereby consent in writing to the following resolutions, in lieu of holding the organizational meeting of the directors:</p>
+
+        <%- include('_organizational_body', { company: company, today: today, incorpDate: incorpDate }) %>
+
+        <div class="signature">
+            <p>DATED this <%= today %>.</p>
+            <% company.directors.forEach(function(d) { %>
+                <div class="sig-line"><%= d.name %>, Director</div>
+            <% }); %>
+        </div>
+    </div>
+
+    <!-- ============ IV. CONSENTS TO ACT ============ -->
+    <div class="page">
+        <div class="section-title">
+            <div class="num">Section IV</div>
+            <div class="name">Consents to Act as Director</div>
+            <div class="rule"></div>
+        </div>
+    </div>
+    <% company.directors.forEach(function(director) { %>
+        <div class="page doc-content">
+            <h1>CONSENT TO ACT AS DIRECTOR</h1>
+            <h2><%= company.name %></h2>
+            <p class="preamble">(the "Corporation")</p>
+            <p style="margin-top: 28px; text-align: justify;">I, <strong><%= director.name %></strong>, of <%= director.address %>, hereby consent to act as a director of the Corporation, effective <%= director.appointedDate ? new Date(director.appointedDate).toLocaleDateString() : '_________________' %>.</p>
+            <p style="text-align: justify;">I acknowledge that I am not disqualified under the applicable corporate legislation from acting as a director of the Corporation, and I undertake to notify the Corporation forthwith if I become so disqualified.</p>
+            <div class="signature">
+                <p>Date: <%= today %></p>
+                <div class="sig-line"><%= director.name %></div>
+                <div style="margin-top: 16px;">Witness: ___________________________________</div>
+            </div>
+        </div>
+    <% }); %>
+
+    <!-- ============ V. ANNUAL DIRECTOR RESOLUTION ============ -->
+    <div class="page">
+        <div class="section-title">
+            <div class="num">Section V</div>
+            <div class="name">Annual Resolutions of the Directors</div>
+            <div class="rule"></div>
+        </div>
+    </div>
+    <div class="page doc-content">
+        <h1>RESOLUTION OF THE DIRECTORS</h1>
+        <h2><%= company.name %></h2>
+        <p class="preamble">(the "Corporation")</p>
+        <p>The undersigned, being all the directors of the Corporation, hereby consent in writing to the following resolutions:</p>
+
+        <div class="section-block">
+            <div class="section-block-title">1. Confirmation of Directors</div>
+            <div class="clause">RESOLVED THAT the persons whose names appear below are confirmed as the directors of the Corporation:</div>
+            <ul>
+                <% company.directors.forEach(function(d){ %>
+                    <li><%= d.name %> &mdash; appointed <%= d.appointedDate ? new Date(d.appointedDate).toLocaleDateString() : '' %></li>
+                <% }); %>
+            </ul>
+        </div>
+        <div class="section-block">
+            <div class="section-block-title">2. Financial Statements</div>
+            <div class="clause">RESOLVED THAT the unaudited financial statements of the Corporation for the fiscal year ending <%= company.fiscalYearEnd || 'December 31' %> are hereby approved as presented to the directors.</div>
+        </div>
+        <div class="section-block">
+            <div class="section-block-title">3. General Authorization</div>
+            <div class="clause">RESOLVED THAT any one director or officer of the Corporation is hereby authorized to execute and deliver all such documents as may be necessary or desirable to give effect to these resolutions.</div>
+        </div>
+
+        <div class="signature">
+            <p>DATED this <%= today %>.</p>
+            <% company.directors.forEach(function(d){ %>
+                <div class="sig-line"><%= d.name %>, Director</div>
+            <% }); %>
+        </div>
+    </div>
+
+    <!-- ============ VI. ANNUAL SHAREHOLDER RESOLUTION ============ -->
+    <div class="page">
+        <div class="section-title">
+            <div class="num">Section VI</div>
+            <div class="name">Annual Resolutions of the Shareholders</div>
+            <div class="rule"></div>
+        </div>
+    </div>
+    <div class="page doc-content">
+        <h1>RESOLUTION OF THE SHAREHOLDERS</h1>
+        <h2><%= company.name %></h2>
+        <p class="preamble">(the "Corporation")</p>
+        <p>The undersigned, being all the shareholders of the Corporation entitled to vote, hereby consent in writing to the following resolutions in lieu of the annual meeting of shareholders:</p>
+
+        <div class="section-block">
+            <div class="section-block-title">1. Election of Directors</div>
+            <div class="clause">RESOLVED THAT the following persons are elected as directors of the Corporation, to hold office until the next annual meeting:</div>
+            <ul>
+                <% company.directors.forEach(function(d){ %>
+                    <li><%= d.name %></li>
+                <% }); %>
+            </ul>
+        </div>
+        <div class="section-block">
+            <div class="section-block-title">2. Waiver of Auditor</div>
+            <div class="clause">RESOLVED THAT, the Corporation being a non-distributing corporation, the appointment of an auditor for the ensuing year is waived by unanimous consent of all shareholders entitled to vote.</div>
+        </div>
+        <div class="section-block">
+            <div class="section-block-title">3. Acts of Directors and Officers</div>
+            <div class="clause">RESOLVED THAT all acts, contracts, by-laws, proceedings, appointments, elections and payments enacted, made, done and taken by the directors and officers of the Corporation are hereby approved, ratified and confirmed.</div>
+        </div>
+
+        <div class="signature">
+            <p>DATED this <%= today %>.</p>
+            <% company.shareholders.forEach(function(s){ %>
+                <div class="sig-line"><%= s.name %>, Shareholder</div>
+            <% }); %>
+        </div>
+    </div>
+
+    <!-- ============ VII. SHARE CERTIFICATES ============ -->
+    <div class="page">
+        <div class="section-title">
+            <div class="num">Section VII</div>
+            <div class="name">Share Certificates</div>
+            <div class="rule"></div>
+        </div>
+    </div>
+    <% company.shareholders.forEach(function(s, idx){ %>
+        <div class="cert-page">
+            <div class="cert-frame">
+                <div class="cert-no">Certificate No. <%= idx + 1 %></div>
+                <div class="cert-header">
+                    <div class="corp-name"><%= company.name.toUpperCase() %></div>
+                    <div class="cert-title">SHARE CERTIFICATE</div>
+                    <div class="jurisdiction">Incorporated under the laws of <%= company.registeredOfficeAddress.country || 'Canada' %></div>
+                </div>
+                <div class="cert-body">
+                    <div>This is to certify that</div>
+                    <div class="holder"><%= s.name %></div>
+                    <div>is the registered holder of</div>
+                    <span class="shares-amount"><%= s.numberOfShares %></span>
+                    <div class="shares-class"><%= s.sharesClass %> Shares</div>
+                    <div class="legalese">
+                        in the capital of the above-named Corporation, fully paid and non-assessable, transferable only on the books of the Corporation upon surrender of this certificate properly endorsed.
+                    </div>
+                </div>
+                <div class="cert-footer">
+                    <div class="sig-block"><div class="sig-line">President / Director</div></div>
+                    <div class="sig-block"><div class="sig-line">Secretary</div></div>
+                </div>
+            </div>
+        </div>
+    <% }); %>
+
+    <!-- ============ VIII. REGISTERS ============ -->
+    <div class="page">
+        <div class="section-title">
+            <div class="num">Section VIII</div>
+            <div class="name">Corporate Registers</div>
+            <div class="rule"></div>
+        </div>
+    </div>
+    <div class="page doc-content">
+        <%- include('_registers_body', { company: company }) %>
+    </div>
+</body>
+
+</html>

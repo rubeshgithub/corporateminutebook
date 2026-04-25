@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Annual Shareholder Resolution - <%= company.name %></title>
+    <style>
+        body { font-family: 'Helvetica', 'Arial', sans-serif; padding: 40px; line-height: 1.6; }
+        h1 { text-align: center; font-size: 22px; text-decoration: underline; }
+        h2 { text-align: center; font-size: 18px; margin-top: 10px; }
+        .section { margin-top: 24px; }
+        .clause { margin-bottom: 16px; text-align: justify; }
+        .bold { font-weight: bold; }
+        .signature { margin-top: 60px; }
+        .sig-line { border-top: 1px solid #000; width: 280px; margin-top: 50px; padding-top: 4px; }
+    </style>
+</head>
+
+<body>
+    <h1>RESOLUTION OF THE SHAREHOLDERS</h1>
+    <h2><%= company.name %></h2>
+    <p style="text-align: center;">(the "Corporation")</p>
+
+    <div class="section">
+        <p>The undersigned, being all the shareholders of the Corporation entitled to vote, hereby consent
+            in writing to the following resolutions and certify that these resolutions have been duly passed
+            in lieu of the annual meeting of shareholders:</p>
+    </div>
+
+    <div class="section">
+        <div class="bold">1. ELECTION OF DIRECTORS</div>
+        <div class="clause">
+            RESOLVED THAT the following persons are elected as directors of the Corporation, to hold office
+            until the next annual meeting of shareholders or until their successors are duly elected:
+            <ul>
+                <% company.directors.forEach(function(director) { %>
+                    <li><%= director.name %></li>
+                <% }); %>
+            </ul>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="bold">2. WAIVER OF AUDITOR</div>
+        <div class="clause">
+            RESOLVED THAT, the Corporation being a non-distributing corporation, the appointment of an
+            auditor for the ensuing year is hereby waived by unanimous consent of all shareholders entitled
+            to vote.
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="bold">3. APPROVAL OF FINANCIAL STATEMENTS</div>
+        <div class="clause">
+            RESOLVED THAT the financial statements of the Corporation for the fiscal year ending
+            <%= company.fiscalYearEnd || 'December 31' %>, as presented by the directors, are hereby
+            received and approved.
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="bold">4. ACTS OF DIRECTORS AND OFFICERS</div>
+        <div class="clause">
+            RESOLVED THAT all acts, contracts, by-laws, proceedings, appointments, elections, and payments
+            enacted, made, done, and taken by the directors and officers of the Corporation since the date
+            of the last annual meeting of shareholders are hereby approved, ratified, and confirmed.
+        </div>
+    </div>
+
+    <div class="signature">
+        <p>DATED this <%= new Date().toLocaleDateString() %>.</p>
+        <% company.shareholders.forEach(function(shareholder) { %>
+            <div class="sig-line"><%= shareholder.name %>, Shareholder</div>
+        <% }); %>
+    </div>
+</body>
+
+</html>

@@ -3,88 +3,101 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>By-Laws - <%= company.name %>
-    </title>
+    <title>By-Law No. 1 - <%= company.name %></title>
     <style>
-        body {
-            font-family: 'Helvetica', 'Arial', sans-serif;
-            padding: 40px;
-            line-height: 1.6;
-        }
-
-        h1 {
-            text-align: center;
-            font-size: 24px;
-            text-decoration: underline;
-        }
-
-        h2 {
-            text-align: center;
-            font-size: 20px;
-            margin-top: 40px;
-        }
-
-        .section {
-            margin-top: 20px;
-        }
-
-        .clause {
-            margin-bottom: 20px;
-            text-align: justify;
-        }
-
-        .bold {
-            font-weight: bold;
-        }
+        body { font-family: 'Helvetica', 'Arial', sans-serif; padding: 0; line-height: 1.55; font-size: 11.5pt; color: #222; }
+        h1 { text-align: center; font-size: 22px; text-decoration: underline; margin-bottom: 6px; }
+        h2 { text-align: center; font-size: 16px; margin-top: 6px; margin-bottom: 4px; }
+        .preamble { text-align: center; font-style: italic; margin-bottom: 18px; }
+        .article-title { font-weight: bold; margin-top: 22px; margin-bottom: 8px; font-size: 13.5pt; text-transform: uppercase; }
+        .clause { margin-bottom: 10px; text-align: justify; padding-left: 14px; text-indent: -14px; }
+        .clause-no { font-weight: bold; margin-right: 6px; }
+        .signature { margin-top: 50px; }
+        .sig-line { border-top: 1px solid #000; width: 280px; margin-top: 40px; padding-top: 4px; }
+        .defn-term { font-weight: bold; }
     </style>
 </head>
 
 <body>
     <h1>BY-LAW NO. 1</h1>
-    <p style="text-align: center;">A by-law relating generally to the transaction of the business and affairs of</p>
-    <h2>
-        <%= company.name %>
-    </h2>
-    <p style="text-align: center;">(hereinafter referred to as the "Corporation")</p>
+    <p class="preamble">A by-law relating generally to the transaction of the business and affairs of</p>
+    <h2><%= company.name %></h2>
+    <p class="preamble">(hereinafter referred to as the "Corporation")</p>
 
-    <div class="section">
-        <p class="bold">BE IT ENACTED</p>
-        <p>as a by-law of the Corporation as follows:</p>
-    </div>
+    <p><strong>BE IT ENACTED</strong> as a by-law of the Corporation as follows:</p>
 
-    <div class="section">
-        <div class="bold">1. REGISTERED OFFICE</div>
-        <div class="clause">
-            The registered office of the Corporation shall be located in the Province of <%=
-                company.registeredOfficeAddress.province %>, at <%= company.registeredOfficeAddress.street %>, <%=
-                        company.registeredOfficeAddress.city %>, <%= company.registeredOfficeAddress.postalCode %>, and
-                            the Corporation may from time to time by resolution of the directors change the location of
-                            the registered office within the province.
-        </div>
-    </div>
+    <div class="article-title">Article 1 — Interpretation</div>
+    <div class="clause"><span class="clause-no">1.1</span> <span class="defn-term">"Act"</span> means the statute pursuant to which the Corporation is incorporated, including any successor or replacement legislation, together with the regulations made thereunder, in each case as amended from time to time.</div>
+    <div class="clause"><span class="clause-no">1.2</span> <span class="defn-term">"Articles"</span> means the articles of incorporation of the Corporation, as amended or restated from time to time.</div>
+    <div class="clause"><span class="clause-no">1.3</span> <span class="defn-term">"Board"</span> means the board of directors of the Corporation.</div>
+    <div class="clause"><span class="clause-no">1.4</span> Words importing the singular include the plural and vice versa; words importing one gender include all genders.</div>
 
-    <div class="section">
-        <div class="bold">2. DIRECTORS</div>
-        <div class="clause">
-            The affairs of the Corporation shall be managed by a board of directors. The initial directors of the
-            Corporation shall be those persons whose names are set out in the Articles of Incorporation. Currently,
-            there are <%= company.directors.length %> appointed directors.
-        </div>
-    </div>
+    <div class="article-title">Article 2 — Registered Office and Seal</div>
+    <div class="clause"><span class="clause-no">2.1</span> The registered office of the Corporation shall be located in the Province of <%= company.registeredOfficeAddress.province %>, at <%= company.registeredOfficeAddress.street %>, <%= company.registeredOfficeAddress.city %>, <%= company.registeredOfficeAddress.postalCode %>, and may be changed within that Province from time to time by resolution of the Board.</div>
+    <div class="clause"><span class="clause-no">2.2</span> The Corporation may, but is not required to, have a corporate seal which shall be such device as the Board may by resolution from time to time adopt.</div>
 
-    <div class="section">
-        <div class="bold">3. SHAREHOLDERS</div>
-        <div class="clause">
-            Meetings of shareholders shall be held at the registered office of the Corporation or at such other place as
-            the directors may from time to time determine. The fiscal year end of the Corporation shall be <%=
-                company.fiscalYearEnd || 'December 31' %>.
-        </div>
-    </div>
+    <div class="article-title">Article 3 — Financial Year and Banking</div>
+    <div class="clause"><span class="clause-no">3.1</span> The financial year of the Corporation shall end on <%= company.fiscalYearEnd || 'December 31' %> in each year, or on such other date as the Board may from time to time determine by resolution.</div>
+    <div class="clause"><span class="clause-no">3.2</span> The banking business of the Corporation shall be transacted with such bank, trust company or other financial institution as the Board may designate, and shall be transacted under such agreements, instructions and delegations of authority as the Board may from time to time prescribe.</div>
 
-    <div style="margin-top: 80px;">
+    <div class="article-title">Article 4 — Execution of Documents</div>
+    <div class="clause"><span class="clause-no">4.1</span> Deeds, transfers, assignments, contracts, obligations and other instruments in writing requiring execution by the Corporation may be signed by any one director or officer of the Corporation, and any such signing officer may affix the corporate seal (if any) thereto.</div>
+    <div class="clause"><span class="clause-no">4.2</span> The Board may from time to time direct the manner in which, and the person(s) by whom, any particular instrument or class of instruments may or shall be signed.</div>
+
+    <div class="article-title">Article 5 — Directors</div>
+    <div class="clause"><span class="clause-no">5.1</span> The number of directors shall be the number set out in the Articles or, if a minimum and maximum number is set out, such number not less than the minimum nor greater than the maximum as may be fixed from time to time by ordinary resolution of the shareholders or, if so authorized, by resolution of the Board.</div>
+    <div class="clause"><span class="clause-no">5.2</span> Subject to the Articles and the Act, vacancies on the Board may be filled by the remaining directors if a quorum exists; otherwise the directors then in office shall forthwith call a meeting of shareholders to fill the vacancy.</div>
+    <div class="clause"><span class="clause-no">5.3</span> Meetings of the Board may be called by the Chair, the President or any director on not less than 48 hours' notice given to each director, except that no notice shall be required for a meeting held immediately following an annual or special meeting of shareholders.</div>
+    <div class="clause"><span class="clause-no">5.4</span> A majority of the directors in office shall constitute a quorum, provided that no business shall be transacted unless the prescribed proportion of resident Canadian directors required by the Act (if any) is present.</div>
+    <div class="clause"><span class="clause-no">5.5</span> Each director present at a meeting shall have one vote. Questions arising shall be decided by a majority of votes; in the case of a tie, the chair of the meeting shall not have a second or casting vote.</div>
+    <div class="clause"><span class="clause-no">5.6</span> A director may participate in a meeting of the Board by means of telephonic, electronic or other communication facility that permits all participants to communicate adequately, and a director so participating shall be deemed present at the meeting.</div>
+    <div class="clause"><span class="clause-no">5.7</span> A resolution in writing signed by all the directors entitled to vote on that resolution at a meeting of the Board is as valid as if it had been passed at a meeting of the Board.</div>
+    <div class="clause"><span class="clause-no">5.8</span> The remuneration of the directors, if any, shall be such as the Board may from time to time determine. The directors shall also be entitled to be reimbursed for travelling and other reasonable expenses properly incurred in attending meetings of the Board or in otherwise discharging their duties.</div>
+
+    <div class="article-title">Article 6 — Officers</div>
+    <div class="clause"><span class="clause-no">6.1</span> The Board may from time to time appoint a President, one or more Vice-Presidents, a Secretary, a Treasurer and such other officers as the Board may determine, including one or more assistants to any of the officers so appointed. One person may hold more than one office.</div>
+    <div class="clause"><span class="clause-no">6.2</span> The officers of the Corporation shall have such powers and duties as the Board may specify, and in the absence of such specification shall have the powers and duties usually pertaining to their respective offices.</div>
+    <div class="clause"><span class="clause-no">6.3</span> All officers shall hold office at the pleasure of the Board and may be removed at any time by resolution of the Board, with or without cause.</div>
+
+    <div class="article-title">Article 7 — Indemnification</div>
+    <div class="clause"><span class="clause-no">7.1</span> The Corporation shall indemnify a director or officer of the Corporation, a former director or officer of the Corporation, or a person who acts or acted at the Corporation's request as a director or officer of another body corporate, and his or her heirs and legal representatives, to the fullest extent permitted by the Act, against all costs, charges and expenses, including any amount paid to settle an action or satisfy a judgment, reasonably incurred in respect of any civil, criminal, administrative, investigative or other proceeding to which he or she is involved by reason of being or having been a director or officer.</div>
+    <div class="clause"><span class="clause-no">7.2</span> The Corporation may purchase and maintain insurance for the benefit of any person referred to in section 7.1 against any liability incurred by him or her as permitted by the Act.</div>
+
+    <div class="article-title">Article 8 — Meetings of Shareholders</div>
+    <div class="clause"><span class="clause-no">8.1</span> Meetings of shareholders shall be held at the registered office of the Corporation or at such other place within or, if permitted by the Articles or the Act, outside Canada as the Board may determine.</div>
+    <div class="clause"><span class="clause-no">8.2</span> The Board shall call an annual meeting of shareholders not later than 15 months after the last preceding annual meeting and within the period required by the Act after the end of the Corporation's financial year, to consider the financial statements and auditor's report (if any), elect directors, appoint an auditor (if required) and transact other business properly brought before the meeting.</div>
+    <div class="clause"><span class="clause-no">8.3</span> Notice of the time and place of each meeting of shareholders shall be sent not less than 21 nor more than 60 days before the meeting to each shareholder entitled to vote, each director, and the auditor (if any). A meeting of shareholders may be held without notice if all shareholders entitled to vote at the meeting waive notice.</div>
+    <div class="clause"><span class="clause-no">8.4</span> A quorum at any meeting of shareholders shall be one or more persons present in person or represented by proxy holding or representing not less than a majority of the outstanding shares of the Corporation entitled to vote at such meeting.</div>
+    <div class="clause"><span class="clause-no">8.5</span> Each shareholder entitled to vote shall have one vote in respect of each share held. Questions at a meeting of shareholders shall be decided by a majority of votes cast, unless the Articles, the by-laws or the Act otherwise require.</div>
+    <div class="clause"><span class="clause-no">8.6</span> A shareholder entitled to vote at a meeting of shareholders may, by means of a proxy, appoint a proxyholder, who need not be a shareholder, to attend and act at the meeting in the manner and to the extent authorized by the proxy.</div>
+    <div class="clause"><span class="clause-no">8.7</span> A resolution in writing signed by all the shareholders entitled to vote on that resolution at a meeting of shareholders is as valid as if it had been passed at a meeting of the shareholders.</div>
+
+    <div class="article-title">Article 9 — Shares</div>
+    <div class="clause"><span class="clause-no">9.1</span> Subject to the Articles, the Act and the rights of the holders of any class of shares, the Board may from time to time issue shares of the Corporation to such persons and for such consideration as the Board may determine, provided that no share shall be issued until it is fully paid in money, in property or in past services.</div>
+    <div class="clause"><span class="clause-no">9.2</span> Share certificates issued by the Corporation shall be in such form as the Board may from time to time approve and shall be signed in accordance with the Act.</div>
+    <div class="clause"><span class="clause-no">9.3</span> Subject to the Act and the Articles, no share or other security of the Corporation shall be transferred without the express consent of the Board, evidenced by resolution.</div>
+    <div class="clause"><span class="clause-no">9.4</span> The Corporation shall maintain a securities register in which it records the shares issued by it, showing with respect to each class of shares the names, alphabetically arranged, and the latest known address of each holder, the number of shares held, and the date and particulars of the issue and transfer of each share.</div>
+
+    <div class="article-title">Article 10 — Dividends</div>
+    <div class="clause"><span class="clause-no">10.1</span> Subject to the Act, the Board may from time to time declare and the Corporation may pay dividends to the shareholders according to their respective rights and interests in the Corporation.</div>
+    <div class="clause"><span class="clause-no">10.2</span> The Board may fix in advance a date as the record date for the determination of the persons entitled to receive payment of a dividend.</div>
+
+    <div class="article-title">Article 11 — Notices</div>
+    <div class="clause"><span class="clause-no">11.1</span> Any notice required to be given to a shareholder, director, officer or auditor may be given by personal delivery, by prepaid mail, or by electronic means in accordance with the Act, addressed to the recipient at his or her latest address as shown in the records of the Corporation.</div>
+    <div class="clause"><span class="clause-no">11.2</span> A notice sent by mail shall be deemed to have been given when deposited in a post office or public letter box.</div>
+
+    <div class="article-title">Article 12 — Effective Date and Amendment</div>
+    <div class="clause"><span class="clause-no">12.1</span> This by-law shall come into force when made by the Board, in accordance with the Act.</div>
+    <div class="clause"><span class="clause-no">12.2</span> The Board may, by resolution, make, amend or repeal any by-laws that regulate the business or affairs of the Corporation. Any such by-law, amendment or repeal is effective from the date of the resolution of the directors until it is confirmed, confirmed as amended, or rejected by the shareholders at the next meeting of shareholders.</div>
+
+    <div class="signature">
         <p>ENACTED by the directors of the Corporation this <%= new Date().toLocaleDateString() %>.</p>
-        <p style="margin-top: 40px;">_____________________________________</p>
-        <p>President / Director</p>
+        <% (company.officers && company.officers.length > 0 ? company.officers.filter(function(o){ return /president|secretary/i.test(o.title); }) : []).forEach(function(officer) { %>
+            <div class="sig-line"><%= officer.name %>, <%= officer.title %></div>
+        <% }); %>
+        <% if (!company.officers || company.officers.length === 0) { %>
+            <div class="sig-line">Authorized Signatory</div>
+        <% } %>
     </div>
 </body>
 
