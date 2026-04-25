@@ -24,4 +24,16 @@ api.interceptors.request.use(
     }
 );
 
+// On 401 the token is invalid or expired — clear session and bounce to login
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401 && localStorage.getItem('user')) {
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+        }
+        return Promise.reject(error);
+    }
+);
+
 export default api;

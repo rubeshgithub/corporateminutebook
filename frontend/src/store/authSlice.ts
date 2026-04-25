@@ -5,10 +5,22 @@ interface AuthState {
     isAuthenticated: boolean;
 }
 
-const initialState: AuthState = {
-    user: null,
-    isAuthenticated: false,
+const loadInitialState = (): AuthState => {
+    try {
+        const userString = localStorage.getItem('user');
+        if (userString) {
+            const user = JSON.parse(userString);
+            if (user && user.token) {
+                return { user, isAuthenticated: true };
+            }
+        }
+    } catch {
+        localStorage.removeItem('user');
+    }
+    return { user: null, isAuthenticated: false };
 };
+
+const initialState: AuthState = loadInitialState();
 
 const authSlice = createSlice({
     name: 'auth',
