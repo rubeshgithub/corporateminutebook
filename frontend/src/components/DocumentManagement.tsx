@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
     Box, Typography, Paper, List, ListItem, ListItemText, IconButton, Divider, CircularProgress,
-    Select, MenuItem, InputLabel, FormControl, Chip, Dialog, DialogTitle, DialogContent, DialogActions, Button
+    Chip, Dialog, DialogTitle, DialogContent, DialogActions, Button, Autocomplete, TextField
 } from "@mui/material";
 import DownloadIcon from "@mui/icons-material/Download";
 import VisibilityIcon from "@mui/icons-material/Visibility";
@@ -31,9 +31,11 @@ const DocumentManagement = () => {
     const [preview, setPreview] = useState<PreviewState | null>(null);
 
     const templates = [
+        { id: 'glossary', name: 'Glossary' },
         { id: 'articles_of_incorporation', name: 'Articles of Incorporation' },
         { id: 'by_laws', name: 'By-Laws No. 1' },
-        { id: 'organizational_resolution', name: 'Organizational Resolution' },
+        { id: 'organizational_resolution', name: 'Organizational Resolution (Directors)' },
+        { id: 'shareholders_organizational_resolution', name: 'Organizational Resolution (Shareholders)' },
         { id: 'consent_to_act', name: 'Consent to Act as Director' },
         { id: 'annual_director_resolution', name: 'Annual Director Resolution' },
         { id: 'annual_shareholder_resolution', name: 'Annual Shareholder Resolution' },
@@ -221,23 +223,31 @@ const DocumentManagement = () => {
                 </Typography>
                 <Divider sx={{ my: 2 }} />
 
-                <FormControl fullWidth margin="normal">
-                    <InputLabel id="company-select-label">Select Company</InputLabel>
-                    <Select
-                        labelId="company-select-label"
-                        value={selectedCompanyId}
-                        label="Select Company"
-                        onChange={(e) => setSelectedCompanyId(e.target.value)}
-                    >
-                        {companies.length === 0 ? (
-                            <MenuItem value="" disabled>No companies found</MenuItem>
-                        ) : (
-                            companies.map(c => (
-                                <MenuItem key={c._id} value={c._id}>{c.name}</MenuItem>
-                            ))
-                        )}
-                    </Select>
-                </FormControl>
+                <Autocomplete
+                    sx={{ mt: 2, mb: 1 }}
+                    options={companies}
+                    getOptionLabel={(c: any) => c?.name || ''}
+                    isOptionEqualToValue={(opt: any, val: any) => opt._id === val._id}
+                    value={companies.find((c) => c._id === selectedCompanyId) || null}
+                    onChange={(_e, newValue: any) => setSelectedCompanyId(newValue?._id || '')}
+                    noOptionsText={companies.length === 0 ? 'No companies found' : 'No matches'}
+                    renderInput={(params) => (
+                        <TextField {...params} label="Select Company" placeholder="Type to search…" />
+                    )}
+                    renderOption={(props, option: any) => (
+                        <li {...props} key={option._id}>
+                            <Box>
+                                <Typography variant="body1">{option.name}</Typography>
+                                {option.corporateAccessNumber && (
+                                    <Typography variant="caption" color="textSecondary">
+                                        CAN: {option.corporateAccessNumber}
+                                    </Typography>
+                                )}
+                            </Box>
+                        </li>
+                    )}
+                />
+
 
                 <Box
                     sx={{
@@ -258,15 +268,14 @@ const DocumentManagement = () => {
                             One PDF: cover page, table of contents, articles, by-laws, resolutions, consents, share certificates and registers.
                         </Typography>
                     </Box>
-                    <Button
-                        variant="outlined"
-                        sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.6)', '&:hover': { borderColor: 'white' } }}
-                        startIcon={isBusy('minute_book', 'preview') ? <CircularProgress size={16} sx={{ color: 'white' }} /> : <VisibilityIcon />}
+                    <IconButton
+                        title="Preview"
+                        sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}
                         onClick={handlePreviewMinuteBook}
                         disabled={!selectedCompanyId || isAnyBusy('minute_book')}
                     >
-                        Preview
-                    </Button>
+                        {isBusy('minute_book', 'preview') ? <CircularProgress size={20} sx={{ color: 'white' }} /> : <VisibilityIcon />}
+                    </IconButton>
                     <Button
                         variant="contained"
                         sx={{ bgcolor: 'white', color: '#1a237e', '&:hover': { bgcolor: '#e8eaf6' } }}

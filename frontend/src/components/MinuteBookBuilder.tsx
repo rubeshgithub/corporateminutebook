@@ -6,7 +6,7 @@ import {
     Box, Button, TextField, Typography, Paper, Grid, IconButton, CircularProgress,
     Stepper, Step, StepLabel, StepButton, Divider, List, ListItem, ListItemText,
     Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
-    MenuItem
+    MenuItem, FormControlLabel, Switch, RadioGroup, Radio, FormControl, FormLabel
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
@@ -31,6 +31,48 @@ const companySchema = z.object({
         postalCode: z.string().min(1, 'Postal Code is required'),
         country: z.string().default('Canada'),
     }),
+    recordsAddress: z.object({
+        sameAsRegistered: z.boolean().default(true),
+        street: z.string().optional(),
+        city: z.string().optional(),
+        province: z.string().optional(),
+        postalCode: z.string().optional(),
+        country: z.string().optional(),
+    }).superRefine((val, ctx) => {
+        if (!val.sameAsRegistered) {
+            (['street', 'city', 'province', 'postalCode'] as const).forEach((field) => {
+                if (!val[field] || val[field]!.trim() === '') {
+                    ctx.addIssue({
+                        code: z.ZodIssueCode.custom,
+                        path: [field],
+                        message: `${field} is required when Records Address differs from Registered`,
+                    });
+                }
+            });
+        }
+    }),
+    restrictions: z.object({
+        hasRestrictions: z.boolean().default(false),
+        description: z.string().optional(),
+    }).superRefine((val, ctx) => {
+        if (val.hasRestrictions && (!val.description || val.description.trim() === '')) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['description'],
+                message: 'Describe the restrictions',
+            });
+        }
+    }),
+    authorizedBy: z.object({
+        name: z.string().min(1, 'Authorizer name is required'),
+        company: z.string().optional(),
+        email: z.string().email('Valid email is required'),
+        phone: z.string().min(1, 'Phone number is required'),
+    }),
+    schedules: z.array(z.object({
+        name: z.string().min(1, 'Schedule name is required'),
+        content: z.string().min(1, 'Schedule content is required'),
+    })).default([]),
     directors: z.array(z.object({
         name: z.string().min(1, 'Director Name is required'),
         address: z.string().min(1, 'Address is required'),
@@ -52,15 +94,17 @@ const companySchema = z.object({
 type CompanyFormValues = z.infer<typeof companySchema>;
 
 const STEPS: Array<{ label: string; fields: FieldPath<CompanyFormValues>[] }> = [
-    { label: 'Company', fields: ['name', 'corporateAccessNumber', 'businessNumber', 'incorporationDate', 'fiscalYearEnd'] },
-    { label: 'Address', fields: ['registeredOfficeAddress'] },
+    { label: 'Company', fields: ['name', 'corporateAccessNumber', 'businessNumber', 'incorporationDate', 'fiscalYearEnd', 'restrictions', 'authorizedBy'] },
+    { label: 'Addresses', fields: ['registeredOfficeAddress', 'recordsAddress'] },
     { label: 'Directors', fields: ['directors'] },
     { label: 'Officers', fields: ['officers'] },
     { label: 'Shareholders', fields: ['shareholders'] },
+    { label: 'Schedules', fields: ['schedules'] },
     { label: 'Review', fields: [] },
 ];
 
 const OFFICER_TITLES = ['President', 'Vice-President', 'Secretary', 'Treasurer', 'CEO', 'CFO', 'COO', 'Chair', 'Other'];
+const SCHEDULE_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 
 const MinuteBookBuilder: React.FC = () => {
     const navigate = useNavigate();
@@ -73,7 +117,7 @@ const MinuteBookBuilder: React.FC = () => {
     const [saving, setSaving] = useState(false);
 
     const {
-        control, handleSubmit, reset, getValues, setValue, trigger, formState: { errors }
+        control, handleSubmit, reset, getValues, setValue, trigger, watch, formState: { errors }
     } = useForm<CompanyFormValues>({
         resolver: zodResolver(companySchema),
         defaultValues: {
@@ -84,6 +128,13 @@ const MinuteBookBuilder: React.FC = () => {
             registeredOfficeAddress: {
                 street: '', city: '', province: '', postalCode: '', country: 'Canada'
             },
+            recordsAddress: {
+                sameAsRegistered: true,
+                street: '', city: '', province: '', postalCode: '', country: 'Canada'
+            },
+            restrictions: { hasRestrictions: false, description: '' },
+            authorizedBy: { name: '', company: '', email: '', phone: '' },
+            schedules: [],
             directors: [{ name: '', address: '', appointedDate: '' }],
             shareholders: [{ name: '', sharesClass: 'Common', numberOfShares: 100 }],
             officers: [{ name: '', title: 'President', appointedDate: '' }],
@@ -103,6 +154,14 @@ const MinuteBookBuilder: React.FC = () => {
         fields: officerFields, append: appendOfficer, remove: removeOfficer
     } = useFieldArray({ control, name: 'officers' });
 
+    const {
+        fields: scheduleFields, append: appendSchedule, remove: removeSchedule
+    } = useFieldArray({ control, name: 'schedules' });
+
+    const recordsSame = watch('recordsAddress.sameAsRegistered');
+    const hasRestrictions = watch('restrictions.hasRestrictions');
+    const hasSchedules = scheduleFields.length > 0;
+
     useEffect(() => {
         if (!isEdit) return;
         const fetchCompany = async () => {
@@ -120,6 +179,28 @@ const MinuteBookBuilder: React.FC = () => {
                         postalCode: data.registeredOfficeAddress?.postalCode || '',
                         country: data.registeredOfficeAddress?.country || 'Canada',
                     },
+                    recordsAddress: {
+                        sameAsRegistered: data.recordsAddress?.sameAsRegistered ?? true,
+                        street: data.recordsAddress?.street || '',
+                        city: data.recordsAddress?.city || '',
+                        province: data.recordsAddress?.province || '',
+                        postalCode: data.recordsAddress?.postalCode || '',
+                        country: data.recordsAddress?.country || 'Canada',
+                    },
+                    restrictions: {
+                        hasRestrictions: data.restrictions?.hasRestrictions ?? false,
+                        description: data.restrictions?.description || '',
+                    },
+                    authorizedBy: {
+                        name: data.authorizedBy?.name || '',
+                        company: data.authorizedBy?.company || '',
+                        email: data.authorizedBy?.email || '',
+                        phone: data.authorizedBy?.phone || '',
+                    },
+                    schedules: (data.schedules || []).map((s: any) => ({
+                        name: s.name || '',
+                        content: s.content || '',
+                    })),
                     directors: (data.directors?.length ? data.directors : [{}]).map((d: any) => ({
                         name: d.name || '',
                         address: d.address || '',
@@ -289,12 +370,81 @@ const MinuteBookBuilder: React.FC = () => {
                                     )} />
                                 </Grid>
                             </Grid>
+
+                            <Divider sx={{ my: 3 }} />
+                            <Typography variant="h6" gutterBottom>Restrictions on Business</Typography>
+                            <Controller
+                                name="restrictions.hasRestrictions"
+                                control={control}
+                                render={({ field }) => (
+                                    <FormControl>
+                                        <FormLabel>Does the corporation have any restrictions on its business?</FormLabel>
+                                        <RadioGroup
+                                            row
+                                            value={field.value ? 'yes' : 'no'}
+                                            onChange={(e) => field.onChange(e.target.value === 'yes')}
+                                        >
+                                            <FormControlLabel value="no" control={<Radio />} label="No" />
+                                            <FormControlLabel value="yes" control={<Radio />} label="Yes" />
+                                        </RadioGroup>
+                                    </FormControl>
+                                )}
+                            />
+                            {hasRestrictions && (
+                                <Controller
+                                    name="restrictions.description"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <TextField
+                                            {...field}
+                                            fullWidth
+                                            multiline
+                                            minRows={3}
+                                            label="Describe the restrictions"
+                                            sx={{ mt: 1 }}
+                                            error={!!errors.restrictions?.description}
+                                            helperText={errors.restrictions?.description?.message}
+                                        />
+                                    )}
+                                />
+                            )}
+
+                            <Divider sx={{ my: 3 }} />
+                            <Typography variant="h6" gutterBottom>Corporation Authorized By</Typography>
+                            <Typography variant="body2" color="textSecondary" mb={2}>
+                                The person who is authorizing the setup of this corporation.
+                            </Typography>
+                            <Grid container spacing={2}>
+                                <Grid item xs={12} sm={6}>
+                                    <Controller name="authorizedBy.name" control={control} render={({ field }) => (
+                                        <TextField {...field} fullWidth label="Name" error={!!errors.authorizedBy?.name} helperText={errors.authorizedBy?.name?.message} />
+                                    )} />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <Controller name="authorizedBy.company" control={control} render={({ field }) => (
+                                        <TextField {...field} fullWidth label="Company (optional)" />
+                                    )} />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <Controller name="authorizedBy.email" control={control} render={({ field }) => (
+                                        <TextField {...field} fullWidth label="Email" type="email" error={!!errors.authorizedBy?.email} helperText={errors.authorizedBy?.email?.message} />
+                                    )} />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <Controller name="authorizedBy.phone" control={control} render={({ field }) => (
+                                        <TextField {...field} fullWidth label="Phone" error={!!errors.authorizedBy?.phone} helperText={errors.authorizedBy?.phone?.message} />
+                                    )} />
+                                </Grid>
+                            </Grid>
                         </Box>
                     )}
 
                     {activeStep === 1 && (
                         <Box>
                             <Typography variant="h6" gutterBottom>Registered Office Address</Typography>
+                            <Typography variant="body2" color="textSecondary" mb={2}>
+                                Where the corporation is operating.
+                            </Typography>
                             <Grid container spacing={2}>
                                 <Grid item xs={12}>
                                     <Controller name="registeredOfficeAddress.street" control={control} render={({ field }) => (
@@ -317,6 +467,46 @@ const MinuteBookBuilder: React.FC = () => {
                                     )} />
                                 </Grid>
                             </Grid>
+
+                            <Divider sx={{ my: 3 }} />
+                            <Typography variant="h6" gutterBottom>Records Address</Typography>
+                            <Typography variant="body2" color="textSecondary" mb={1}>
+                                Where corporate records are sent or stored.
+                            </Typography>
+                            <Controller
+                                name="recordsAddress.sameAsRegistered"
+                                control={control}
+                                render={({ field }) => (
+                                    <FormControlLabel
+                                        control={<Switch checked={field.value} onChange={(e) => field.onChange(e.target.checked)} />}
+                                        label="Same as Registered Office Address"
+                                    />
+                                )}
+                            />
+                            {!recordsSame && (
+                                <Grid container spacing={2} sx={{ mt: 1 }}>
+                                    <Grid item xs={12}>
+                                        <Controller name="recordsAddress.street" control={control} render={({ field }) => (
+                                            <TextField {...field} fullWidth label="Street Address" error={!!errors.recordsAddress?.street} helperText={errors.recordsAddress?.street?.message} />
+                                        )} />
+                                    </Grid>
+                                    <Grid item xs={12} sm={4}>
+                                        <Controller name="recordsAddress.city" control={control} render={({ field }) => (
+                                            <TextField {...field} fullWidth label="City" error={!!errors.recordsAddress?.city} helperText={errors.recordsAddress?.city?.message} />
+                                        )} />
+                                    </Grid>
+                                    <Grid item xs={12} sm={4}>
+                                        <Controller name="recordsAddress.province" control={control} render={({ field }) => (
+                                            <TextField {...field} fullWidth label="Province/State" error={!!errors.recordsAddress?.province} helperText={errors.recordsAddress?.province?.message} />
+                                        )} />
+                                    </Grid>
+                                    <Grid item xs={12} sm={4}>
+                                        <Controller name="recordsAddress.postalCode" control={control} render={({ field }) => (
+                                            <TextField {...field} fullWidth label="Postal/Zip Code" error={!!errors.recordsAddress?.postalCode} helperText={errors.recordsAddress?.postalCode?.message} />
+                                        )} />
+                                    </Grid>
+                                </Grid>
+                            )}
                         </Box>
                     )}
 
@@ -435,7 +625,82 @@ const MinuteBookBuilder: React.FC = () => {
                         </Box>
                     )}
 
-                    {activeStep === 5 && <ReviewStep values={getValues()} />}
+                    {activeStep === 5 && (
+                        <Box>
+                            <Typography variant="h6" gutterBottom>Schedules</Typography>
+                            <Typography variant="body2" color="textSecondary" mb={2}>
+                                Schedules form part of the Articles of Incorporation (e.g. share-class provisions, transfer restrictions, special rights).
+                            </Typography>
+
+                            <FormControl sx={{ mb: 2 }}>
+                                <FormLabel>Do the Articles have schedules?</FormLabel>
+                                <RadioGroup
+                                    row
+                                    value={hasSchedules ? 'yes' : 'no'}
+                                    onChange={(e) => {
+                                        if (e.target.value === 'yes' && scheduleFields.length === 0) {
+                                            appendSchedule({ name: 'Schedule A', content: '' });
+                                        } else if (e.target.value === 'no') {
+                                            for (let i = scheduleFields.length - 1; i >= 0; i--) removeSchedule(i);
+                                        }
+                                    }}
+                                >
+                                    <FormControlLabel value="no" control={<Radio />} label="No" />
+                                    <FormControlLabel value="yes" control={<Radio />} label="Yes" />
+                                </RadioGroup>
+                            </FormControl>
+
+                            {hasSchedules && (
+                                <>
+                                    {scheduleFields.map((field, index) => (
+                                        <Box key={field.id} mb={3} p={2} border={1} borderColor="grey.300" borderRadius={1}>
+                                            <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                                                <Controller name={`schedules.${index}.name`} control={control} render={({ field: f }) => (
+                                                    <TextField
+                                                        {...f}
+                                                        label="Schedule Name"
+                                                        size="small"
+                                                        sx={{ width: 220 }}
+                                                        error={!!errors.schedules?.[index]?.name}
+                                                        helperText={errors.schedules?.[index]?.name?.message}
+                                                    />
+                                                )} />
+                                                <IconButton color="error" onClick={() => removeSchedule(index)}>
+                                                    <DeleteIcon />
+                                                </IconButton>
+                                            </Box>
+                                            <Controller name={`schedules.${index}.content`} control={control} render={({ field: f }) => (
+                                                <TextField
+                                                    {...f}
+                                                    fullWidth
+                                                    multiline
+                                                    minRows={5}
+                                                    label="Schedule Content"
+                                                    placeholder="Paste the text of the schedule here..."
+                                                    error={!!errors.schedules?.[index]?.content}
+                                                    helperText={errors.schedules?.[index]?.content?.message}
+                                                />
+                                            )} />
+                                        </Box>
+                                    ))}
+                                    <Button
+                                        type="button"
+                                        startIcon={<AddIcon />}
+                                        variant="outlined"
+                                        size="small"
+                                        onClick={() => {
+                                            const nextLetter = SCHEDULE_LETTERS[scheduleFields.length] || String(scheduleFields.length + 1);
+                                            appendSchedule({ name: `Schedule ${nextLetter}`, content: '' });
+                                        }}
+                                    >
+                                        Add Another Schedule
+                                    </Button>
+                                </>
+                            )}
+                        </Box>
+                    )}
+
+                    {activeStep === 6 && <ReviewStep values={getValues()} />}
 
                     <Divider sx={{ my: 4 }} />
 
@@ -504,11 +769,32 @@ const ReviewStep: React.FC<{ values: CompanyFormValues }> = ({ values }) => (
             <ListItem disableGutters><ListItemText primary="Fiscal Year End" secondary={values.fiscalYearEnd || '—'} /></ListItem>
         </List>
 
+        <Typography variant="subtitle2" sx={{ mt: 2 }}>Restrictions</Typography>
+        <Typography variant="body2">
+            {values.restrictions?.hasRestrictions
+                ? values.restrictions.description || '(no description)'
+                : 'None'}
+        </Typography>
+
+        <Typography variant="subtitle2" sx={{ mt: 2 }}>Authorized By</Typography>
+        <Typography variant="body2">
+            {values.authorizedBy.name}
+            {values.authorizedBy.company ? ` (${values.authorizedBy.company})` : ''} —{' '}
+            {values.authorizedBy.email} • {values.authorizedBy.phone}
+        </Typography>
+
         <Typography variant="subtitle2" sx={{ mt: 2 }}>Registered Office</Typography>
         <Typography variant="body2">
             {values.registeredOfficeAddress.street}, {values.registeredOfficeAddress.city},{' '}
             {values.registeredOfficeAddress.province} {values.registeredOfficeAddress.postalCode},{' '}
             {values.registeredOfficeAddress.country}
+        </Typography>
+
+        <Typography variant="subtitle2" sx={{ mt: 2 }}>Records Address</Typography>
+        <Typography variant="body2">
+            {values.recordsAddress?.sameAsRegistered
+                ? 'Same as Registered Office'
+                : `${values.recordsAddress?.street || ''}, ${values.recordsAddress?.city || ''}, ${values.recordsAddress?.province || ''} ${values.recordsAddress?.postalCode || ''}`}
         </Typography>
 
         <Typography variant="subtitle2" sx={{ mt: 2 }}>Directors ({values.directors.length})</Typography>
@@ -537,6 +823,22 @@ const ReviewStep: React.FC<{ values: CompanyFormValues }> = ({ values }) => (
                 </ListItem>
             ))}
         </List>
+
+        <Typography variant="subtitle2" sx={{ mt: 2 }}>Schedules ({values.schedules?.length || 0})</Typography>
+        {values.schedules && values.schedules.length > 0 ? (
+            <List dense>
+                {values.schedules.map((s, i) => (
+                    <ListItem key={i} disableGutters>
+                        <ListItemText
+                            primary={s.name}
+                            secondary={s.content.length > 100 ? `${s.content.slice(0, 100)}…` : s.content}
+                        />
+                    </ListItem>
+                ))}
+            </List>
+        ) : (
+            <Typography variant="body2">None</Typography>
+        )}
     </Box>
 );
 

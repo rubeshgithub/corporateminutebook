@@ -6,9 +6,11 @@ import { Company } from '../models/Company';
 import { generatePDFBuffer, generateMinuteBookPDF } from '../services/documentGenerator';
 
 const TEMPLATE_LABELS: Record<string, string> = {
+    glossary: 'Glossary',
     articles_of_incorporation: 'Articles of Incorporation',
     by_laws: 'By-Laws No. 1',
-    organizational_resolution: 'Organizational Resolution',
+    organizational_resolution: 'Organizational Resolution (Directors)',
+    shareholders_organizational_resolution: 'Organizational Resolution (Shareholders)',
     consent_to_act: 'Consent to Act as Director',
     annual_director_resolution: 'Annual Director Resolution',
     annual_shareholder_resolution: 'Annual Shareholder Resolution',

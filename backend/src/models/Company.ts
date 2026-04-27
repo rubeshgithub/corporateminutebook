@@ -13,6 +13,28 @@ export interface ICompany extends Document {
         postalCode: string;
         country: string;
     };
+    recordsAddress: {
+        sameAsRegistered: boolean;
+        street?: string;
+        city?: string;
+        province?: string;
+        postalCode?: string;
+        country?: string;
+    };
+    restrictions: {
+        hasRestrictions: boolean;
+        description?: string;
+    };
+    authorizedBy: {
+        name: string;
+        company?: string;
+        email: string;
+        phone: string;
+    };
+    schedules: Array<{
+        name: string;
+        content: string;
+    }>;
     directors: Array<{
         name: string;
         address: string;
@@ -50,6 +72,30 @@ const companySchema: Schema = new Schema(
             postalCode: String,
             country: { type: String, default: 'Canada' },
         },
+        recordsAddress: {
+            sameAsRegistered: { type: Boolean, default: true },
+            street: String,
+            city: String,
+            province: String,
+            postalCode: String,
+            country: String,
+        },
+        restrictions: {
+            hasRestrictions: { type: Boolean, default: false },
+            description: String,
+        },
+        authorizedBy: {
+            name: String,
+            company: String,
+            email: String,
+            phone: String,
+        },
+        schedules: [
+            {
+                name: String,
+                content: String,
+            },
+        ],
         directors: [
             {
                 name: String,

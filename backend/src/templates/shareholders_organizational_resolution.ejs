@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Shareholders' Organizational Resolution - <%= company.name %></title>
+    <style>
+        body { font-family: 'Helvetica', 'Arial', sans-serif; padding: 0; line-height: 1.6; font-size: 11.5pt; }
+        h1 { text-align: center; font-size: 22px; text-decoration: underline; margin-bottom: 6px; }
+        h2 { text-align: center; font-size: 16px; margin-top: 6px; }
+        .preamble { text-align: center; font-style: italic; margin-bottom: 18px; }
+        .section { margin-top: 22px; }
+        .section-title { font-weight: bold; text-transform: uppercase; margin-bottom: 8px; font-size: 12.5pt; }
+        .clause { margin-bottom: 12px; text-align: justify; }
+        .signature { margin-top: 60px; }
+        .sig-line { border-top: 1px solid #000; width: 320px; margin-top: 50px; padding-top: 4px; }
+    </style>
+</head>
+
+<body>
+    <h1>ORGANIZATIONAL RESOLUTIONS OF THE SHAREHOLDERS</h1>
+    <h2><%= company.name %></h2>
+    <p class="preamble">(the "Corporation")</p>
+
+    <p><strong>BACKGROUND:</strong></p>
+    <p>A. The first directors of the Corporation have taken the necessary steps to organize the Corporation following its incorporation under the applicable corporate legislation.</p>
+    <p>B. The shareholders desire to elect directors for the ensuing year, confirm the by-laws enacted by the directors, and waive the appointment of an auditor.</p>
+
+    <p style="margin-top: 18px;"><strong>IT IS RESOLVED THAT:</strong></p>
+
+    <div class="section">
+        <div class="section-title">1. Election of Directors</div>
+        <div class="clause">RESOLVED THAT the following individuals are hereby elected as the Directors of the Corporation, to hold office for one year or until their successors are duly elected:</div>
+        <ul>
+            <% company.directors.forEach(function(d){ %>
+                <li><%= d.name %></li>
+            <% }); %>
+        </ul>
+    </div>
+
+    <div class="section">
+        <div class="section-title">2. Consents to Act</div>
+        <div class="clause">RESOLVED THAT the consent of each director to serve as a Director of the Corporation shall be obtained in writing and filed with the Secretary of the Corporation.</div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">3. Confirmation of By-Law No. 1</div>
+        <div class="clause">RESOLVED THAT By-Law No. 1, being a by-law relating generally to the transaction of the business and affairs of the Corporation, as enacted by the directors, is hereby confirmed as a by-law of the Corporation.</div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">4. Waiver of Auditor</div>
+        <div class="clause">RESOLVED THAT, the Corporation being a non-distributing corporation, the appointment of an auditor of the Corporation for the ensuing year is hereby waived by unanimous consent of all the shareholders entitled to vote at a meeting of shareholders, and the directors of the Corporation are hereby authorized to retain the services of an accountant or accounting firm to perform such accounting services as the directors may from time to time require.</div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">5. Ratification of Acts</div>
+        <div class="clause">RESOLVED THAT all acts, contracts, by-laws, proceedings, appointments, elections and payments enacted, made, done and taken by the directors and officers of the Corporation since its incorporation are hereby approved, ratified and confirmed.</div>
+    </div>
+
+    <div class="signature">
+        <p><strong>SIGNED</strong> by the shareholders of the Corporation entitled to vote on the foregoing resolutions, effective <%= new Date().toLocaleDateString() %>.</p>
+        <% company.shareholders.forEach(function(s){ %>
+            <div class="sig-line"><%= s.name %>, Shareholder</div>
+        <% }); %>
+    </div>
+</body>
+
+</html>

@@ -185,6 +185,21 @@
         .register-title { font-size: 15pt; font-weight: bold; margin-top: 24px; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 2px solid #1a237e; color: #1a237e; }
         .register-subtitle { font-style: italic; color: #555; margin-bottom: 12px; font-size: 10pt; }
         .empty { text-align: center; font-style: italic; color: #888; padding: 18px; }
+
+        /* By-law index + dual signature */
+        .bylaw-index { page-break-after: always; }
+        .bylaw-index-title { text-align: center; font-size: 18pt; font-weight: bold; margin: 12px 0 24px 0; text-decoration: underline; }
+        .bylaw-index-section { font-weight: bold; margin-top: 14px; font-size: 11.5pt; }
+        .bylaw-index-item { padding-left: 18px; font-size: 10.5pt; color: #333; }
+        .sig-block-title { font-weight: bold; margin-top: 22px; margin-bottom: 6px; font-size: 11.5pt; }
+        .sig-grid { display: flex; flex-wrap: wrap; gap: 24px; }
+        .sig-cell { width: 280px; }
+
+        /* Glossary */
+        .glossary-title { text-align: center; font-size: 26pt; font-weight: 700; margin: 80px 0 30px 0; letter-spacing: 2px; }
+        .glossary-list { padding-left: 24px; font-size: 12pt; line-height: 1.65; }
+        .glossary-list li { margin-bottom: 14px; padding-left: 6px; text-align: justify; }
+        .glossary-list .term { font-weight: bold; }
     </style>
 </head>
 
@@ -222,6 +237,25 @@
         </div>
     </div>
 
+    <!-- ============ GLOSSARY ============ -->
+    <div class="page">
+        <div class="glossary-title">GLOSSARY</div>
+        <ol class="glossary-list">
+            <li><span class="term">Articles of Incorporation:</span> Legal documents filed with the government when incorporating a business, outlining the company's basic information and structure.</li>
+            <li><span class="term">By-Laws:</span> Rules and regulations adopted by a corporation to govern its internal affairs and management.</li>
+            <li><span class="term">Minutes of Meetings:</span> Official written records of discussions, decisions, and actions taken during corporate meetings, such as board meetings or shareholder meetings.</li>
+            <li><span class="term">Share Certificates:</span> Legal documents that represent ownership of shares in a corporation, issued to shareholders.</li>
+            <li><span class="term">Register of Directors and Officers:</span> A record that includes the names, addresses, and positions of the current directors and officers of a corporation.</li>
+            <li><span class="term">Register of Shareholders:</span> A list of individuals or entities holding shares in a corporation, detailing the number and class of shares they own.</li>
+            <li><span class="term">Consents and Resolutions:</span> Written consents or formal decisions made by directors or shareholders outside of regular meetings.</li>
+            <li><span class="term">Securities Register:</span> The official record of all securities issued by the corporation, showing each issuance, transfer, cancellation and the current registered holder.</li>
+            <li><span class="term">Organizational Resolutions:</span> The first resolutions passed by the directors (and confirmed by the shareholders) immediately after incorporation to organize the corporation, adopt by-laws, appoint officers, and issue initial shares.</li>
+            <li><span class="term">Annual Resolutions:</span> Resolutions passed each year by the directors and shareholders in lieu of holding the annual meeting, dealing with election of directors, financial statements and the appointment or waiver of an auditor.</li>
+            <li><span class="term">Unanimous Shareholders Agreement (USA):</span> A written agreement among all shareholders that may restrict, in whole or in part, the powers of the directors to manage the business and affairs of the corporation.</li>
+            <li><span class="term">Resident Canadian:</span> An individual who is a Canadian citizen ordinarily resident in Canada, a member of a prescribed class of Canadian citizens not so resident, or a permanent resident as defined under federal immigration law and ordinarily resident in Canada.</li>
+        </ol>
+    </div>
+
     <!-- ============ TABLE OF CONTENTS ============ -->
     <div class="page">
         <div class="section-title">
@@ -234,10 +268,11 @@
             <li><span><span class="num">II.</span><span class="label">By-Law No. 1 — General By-Law</span></span></li>
             <li><span><span class="num">III.</span><span class="label">Organizational Resolutions of the First Directors</span></span></li>
             <li><span><span class="num">IV.</span><span class="label">Consents to Act as Director</span></span></li>
-            <li><span><span class="num">V.</span><span class="label">Annual Resolutions of the Directors</span></span></li>
-            <li><span><span class="num">VI.</span><span class="label">Annual Resolutions of the Shareholders</span></span></li>
-            <li><span><span class="num">VII.</span><span class="label">Share Certificates</span></span></li>
-            <li><span><span class="num">VIII.</span><span class="label">Corporate Registers</span></span></li>
+            <li><span><span class="num">V.</span><span class="label">Organizational Resolutions of the Shareholders</span></span></li>
+            <li><span><span class="num">VI.</span><span class="label">Annual Resolutions of the Directors</span></span></li>
+            <li><span><span class="num">VII.</span><span class="label">Annual Resolutions of the Shareholders</span></span></li>
+            <li><span><span class="num">VIII.</span><span class="label">Share Certificates</span></span></li>
+            <li><span><span class="num">IX.</span><span class="label">Corporate Registers</span></span></li>
         </ul>
     </div>
 
@@ -266,7 +301,25 @@
             <div><%= company.registeredOfficeAddress.country %></div>
         </div>
         <div class="section-block">
-            <div class="section-block-title">4. Directors</div>
+            <div class="section-block-title">4. Records Address</div>
+            <% if (!company.recordsAddress || company.recordsAddress.sameAsRegistered) { %>
+                <div>Same as Registered Office.</div>
+            <% } else { %>
+                <div><%= company.recordsAddress.street %></div>
+                <div><%= company.recordsAddress.city %>, <%= company.recordsAddress.province %> <%= company.recordsAddress.postalCode %></div>
+                <div><%= company.recordsAddress.country || 'Canada' %></div>
+            <% } %>
+        </div>
+        <div class="section-block">
+            <div class="section-block-title">5. Restrictions on Business</div>
+            <% if (company.restrictions && company.restrictions.hasRestrictions) { %>
+                <div style="white-space: pre-wrap;"><%= company.restrictions.description %></div>
+            <% } else { %>
+                <div>There are no restrictions on the business the Corporation may carry on.</div>
+            <% } %>
+        </div>
+        <div class="section-block">
+            <div class="section-block-title">6. Directors</div>
             <table>
                 <thead><tr><th>Name</th><th>Address</th><th>Appointed</th></tr></thead>
                 <tbody>
@@ -277,7 +330,7 @@
             </table>
         </div>
         <div class="section-block">
-            <div class="section-block-title">5. Share Structure</div>
+            <div class="section-block-title">7. Share Structure</div>
             <table>
                 <thead><tr><th>Shareholder</th><th>Class</th><th>Number of Shares</th></tr></thead>
                 <tbody>
@@ -287,11 +340,37 @@
                 </tbody>
             </table>
         </div>
+        <% if (company.schedules && company.schedules.length > 0) { %>
+            <div class="section-block">
+                <div class="section-block-title">8. Schedules Forming Part of these Articles</div>
+                <ul>
+                    <% company.schedules.forEach(function(s) { %>
+                        <li><%= s.name %></li>
+                    <% }); %>
+                </ul>
+            </div>
+        <% } %>
         <div class="signature">
             <p>Dated: <%= today %></p>
-            <div class="sig-line">Authorized Signature</div>
+            <% if (company.authorizedBy && company.authorizedBy.name) { %>
+                <p style="margin-top: 24px;">Authorized by:</p>
+                <div><strong><%= company.authorizedBy.name %></strong><% if (company.authorizedBy.company) { %>, <%= company.authorizedBy.company %><% } %></div>
+                <div><%= company.authorizedBy.email %> &nbsp;|&nbsp; <%= company.authorizedBy.phone %></div>
+                <div class="sig-line">Signature</div>
+            <% } else { %>
+                <div class="sig-line">Authorized Signature</div>
+            <% } %>
         </div>
     </div>
+    <% if (company.schedules && company.schedules.length > 0) { %>
+        <% company.schedules.forEach(function(s) { %>
+            <div class="page doc-content">
+                <h1 style="margin-top: 60px;"><%= s.name %></h1>
+                <p class="preamble">Forming part of the Articles of Incorporation of <%= company.name %></p>
+                <div style="white-space: pre-wrap; text-align: justify; margin-top: 20px;"><%= s.content %></div>
+            </div>
+        <% }); %>
+    <% } %>
 
     <!-- ============ II. BY-LAW NO. 1 ============ -->
     <div class="page">
@@ -309,14 +388,24 @@
 
         <%- include('_by_laws_body', { company: company }) %>
 
-        <div class="signature">
-            <p>ENACTED by the directors of the Corporation this <%= today %>.</p>
-            <% (company.officers || []).filter(function(o){ return /president|secretary/i.test(o.title); }).forEach(function(o){ %>
-                <div class="sig-line"><%= o.name %>, <%= o.title %></div>
-            <% }); %>
-            <% if (!company.officers || company.officers.length === 0) { %>
-                <div class="sig-line">Authorized Signatory</div>
-            <% } %>
+        <div class="signature" style="page-break-before: always;">
+            <p><strong>ENACTED</strong> by the directors of the Corporation, and <strong>CONFIRMED</strong> by the shareholders of the Corporation, this <%= today %>.</p>
+            <div class="sig-block-title">Directors</div>
+            <div class="sig-grid">
+                <% company.directors.forEach(function(d) { %>
+                    <div class="sig-cell">
+                        <div class="sig-line"><%= d.name %>, Director</div>
+                    </div>
+                <% }); %>
+            </div>
+            <div class="sig-block-title">Shareholders</div>
+            <div class="sig-grid">
+                <% company.shareholders.forEach(function(s) { %>
+                    <div class="sig-cell">
+                        <div class="sig-line"><%= s.name %>, Shareholder</div>
+                    </div>
+                <% }); %>
+            </div>
         </div>
     </div>
 
@@ -367,10 +456,61 @@
         </div>
     <% }); %>
 
-    <!-- ============ V. ANNUAL DIRECTOR RESOLUTION ============ -->
+    <!-- ============ V. SHAREHOLDERS ORGANIZATIONAL RESOLUTION ============ -->
     <div class="page">
         <div class="section-title">
             <div class="num">Section V</div>
+            <div class="name">Organizational Resolutions of the Shareholders</div>
+            <div class="rule"></div>
+        </div>
+    </div>
+    <div class="page doc-content">
+        <h1>ORGANIZATIONAL RESOLUTIONS OF THE SHAREHOLDERS</h1>
+        <h2><%= company.name %></h2>
+        <p class="preamble">(the "Corporation")</p>
+        <p><strong>BACKGROUND:</strong></p>
+        <p>A. The first directors of the Corporation have taken the necessary steps to organize the Corporation following its incorporation under the applicable corporate legislation.</p>
+        <p>B. The shareholders desire to elect directors for the ensuing year, confirm the by-laws enacted by the directors, and waive the appointment of an auditor.</p>
+        <p style="margin-top: 18px;"><strong>IT IS RESOLVED THAT:</strong></p>
+
+        <div class="section-block">
+            <div class="section-block-title">1. Election of Directors</div>
+            <div class="clause">RESOLVED THAT the following individuals are hereby elected as the Directors of the Corporation, to hold office for one year or until their successors are duly elected:</div>
+            <ul>
+                <% company.directors.forEach(function(d){ %>
+                    <li><%= d.name %></li>
+                <% }); %>
+            </ul>
+        </div>
+        <div class="section-block">
+            <div class="section-block-title">2. Consents to Act</div>
+            <div class="clause">RESOLVED THAT the consent of each director to serve as a Director of the Corporation shall be obtained in writing and filed with the Secretary of the Corporation.</div>
+        </div>
+        <div class="section-block">
+            <div class="section-block-title">3. Confirmation of By-Law No. 1</div>
+            <div class="clause">RESOLVED THAT By-Law No. 1, being a by-law relating generally to the transaction of the business and affairs of the Corporation, as enacted by the directors, is hereby confirmed as a by-law of the Corporation.</div>
+        </div>
+        <div class="section-block">
+            <div class="section-block-title">4. Waiver of Auditor</div>
+            <div class="clause">RESOLVED THAT, the Corporation being a non-distributing corporation, the appointment of an auditor of the Corporation for the ensuing year is hereby waived by unanimous consent of all the shareholders entitled to vote, and the directors of the Corporation are hereby authorized to retain the services of an accountant or accounting firm to perform such accounting services as the directors may from time to time require.</div>
+        </div>
+        <div class="section-block">
+            <div class="section-block-title">5. Ratification of Acts</div>
+            <div class="clause">RESOLVED THAT all acts, contracts, by-laws, proceedings, appointments, elections and payments enacted, made, done and taken by the directors and officers of the Corporation since its incorporation are hereby approved, ratified and confirmed.</div>
+        </div>
+
+        <div class="signature">
+            <p><strong>SIGNED</strong> by the shareholders of the Corporation entitled to vote on the foregoing resolutions, effective <%= today %>.</p>
+            <% company.shareholders.forEach(function(s){ %>
+                <div class="sig-line"><%= s.name %>, Shareholder</div>
+            <% }); %>
+        </div>
+    </div>
+
+    <!-- ============ VI. ANNUAL DIRECTOR RESOLUTION ============ -->
+    <div class="page">
+        <div class="section-title">
+            <div class="num">Section VI</div>
             <div class="name">Annual Resolutions of the Directors</div>
             <div class="rule"></div>
         </div>
@@ -407,10 +547,10 @@
         </div>
     </div>
 
-    <!-- ============ VI. ANNUAL SHAREHOLDER RESOLUTION ============ -->
+    <!-- ============ VII. ANNUAL SHAREHOLDER RESOLUTION ============ -->
     <div class="page">
         <div class="section-title">
-            <div class="num">Section VI</div>
+            <div class="num">Section VII</div>
             <div class="name">Annual Resolutions of the Shareholders</div>
             <div class="rule"></div>
         </div>
@@ -447,10 +587,10 @@
         </div>
     </div>
 
-    <!-- ============ VII. SHARE CERTIFICATES ============ -->
+    <!-- ============ VIII. SHARE CERTIFICATES ============ -->
     <div class="page">
         <div class="section-title">
-            <div class="num">Section VII</div>
+            <div class="num">Section VIII</div>
             <div class="name">Share Certificates</div>
             <div class="rule"></div>
         </div>
@@ -482,10 +622,10 @@
         </div>
     <% }); %>
 
-    <!-- ============ VIII. REGISTERS ============ -->
+    <!-- ============ IX. REGISTERS ============ -->
     <div class="page">
         <div class="section-title">
-            <div class="num">Section VIII</div>
+            <div class="num">Section IX</div>
             <div class="name">Corporate Registers</div>
             <div class="rule"></div>
         </div>
