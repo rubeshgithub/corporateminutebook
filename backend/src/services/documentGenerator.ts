@@ -20,7 +20,7 @@ const renderTemplate = (templateName: string, data: Record<string, unknown>): st
 export const generatePDFBuffer = async (company: ICompany, templateName: string): Promise<Buffer> => {
     const compiledHtml = renderTemplate(templateName, { company });
 
-    const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+    const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] });
     const page = await browser.newPage();
 
     await page.setContent(compiledHtml, { waitUntil: 'networkidle0' });
@@ -41,7 +41,7 @@ export const generateMinuteBookPDF = async (company: ICompany): Promise<Buffer> 
     const mainHtml = renderTemplate('minute_book', { company });
     const certHtml = renderTemplate('share_certificate', { company });
 
-    const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+    const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] });
 
     // Main book — portrait, no puppeteer header/footer (we'll overlay with pdf-lib so numbering is continuous across the merged doc)
     const mainPage = await browser.newPage();
