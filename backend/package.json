@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node dist/server.js",
     "dev": "nodemon src/server.ts",
-    "build": "tsc"
+    "build": "tsc && cp -r src/templates dist/templates"
   },
   "keywords": [],
   "author": "",
