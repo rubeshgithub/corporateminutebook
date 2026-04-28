@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from "react";
 import {
     Box, Typography, Paper, List, ListItem, ListItemText, IconButton, Divider, CircularProgress,
-    Chip, Dialog, DialogTitle, DialogContent, DialogActions, Button, Autocomplete, TextField
+    Chip, Dialog, DialogTitle, DialogContent, DialogActions, Button, Autocomplete, TextField,
+    Accordion, AccordionSummary, AccordionDetails, InputAdornment
 } from "@mui/material";
 import DownloadIcon from "@mui/icons-material/Download";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import SearchIcon from "@mui/icons-material/Search";
 import api from "../utils/api";
 
 interface DocumentRecord {
@@ -14,6 +17,7 @@ interface DocumentRecord {
     type: string;
     version: number;
     generatedAt: string;
+    generatedBy?: { name: string; email: string };
 }
 
 interface PreviewState {
@@ -29,17 +33,22 @@ const DocumentManagement = () => {
     const [busy, setBusy] = useState<{ type: string; mode: 'preview' | 'download' } | null>(null);
     const [history, setHistory] = useState<DocumentRecord[]>([]);
     const [preview, setPreview] = useState<PreviewState | null>(null);
+    const [docSearch, setDocSearch] = useState('');
 
     const templates = [
         { id: 'glossary', name: 'Glossary' },
         { id: 'articles_of_incorporation', name: 'Articles of Incorporation' },
+        { id: 'schedule_a', name: 'Schedule A — Share Capital' },
         { id: 'by_laws', name: 'By-Laws No. 1' },
         { id: 'organizational_resolution', name: 'Organizational Resolution (Directors)' },
         { id: 'shareholders_organizational_resolution', name: 'Organizational Resolution (Shareholders)' },
         { id: 'consent_to_act', name: 'Consent to Act as Director' },
         { id: 'annual_director_resolution', name: 'Annual Director Resolution' },
         { id: 'annual_shareholder_resolution', name: 'Annual Shareholder Resolution' },
+        { id: 'share_subscription', name: 'Share Subscriptions' },
         { id: 'share_certificate', name: 'Share Certificate' },
+        { id: 'share_ledger', name: 'Share Ledgers' },
+        { id: 'share_transfer_register', name: 'Share Transfer Register' },
         { id: 'registers', name: 'Corporate Registers' },
     ];
 
@@ -287,94 +296,133 @@ const DocumentManagement = () => {
                     </Button>
                 </Box>
 
-                <Typography variant="h6" sx={{ mt: 4 }}>Generate New Document</Typography>
-                <List>
-                    {templates.map((doc) => (
-                        <React.Fragment key={doc.id}>
-                            <ListItem
-                                secondaryAction={
-                                    <Box>
-                                        <IconButton
-                                            aria-label="preview"
-                                            onClick={() => handlePreview(doc.id)}
-                                            disabled={isAnyBusy(doc.id) || !selectedCompanyId}
-                                            color="primary"
-                                            title="Preview"
+                {/* Generate New Document accordion */}
+                <Accordion defaultExpanded={false} sx={{ mt: 3 }}>
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                        <Typography variant="h6">Generate New Document</Typography>
+                    </AccordionSummary>
+                    <AccordionDetails sx={{ pt: 0 }}>
+                        <TextField
+                            size="small"
+                            fullWidth
+                            placeholder="Search documents…"
+                            value={docSearch}
+                            onChange={(e) => setDocSearch(e.target.value)}
+                            sx={{ mb: 1 }}
+                            InputProps={{
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <SearchIcon fontSize="small" />
+                                    </InputAdornment>
+                                ),
+                            }}
+                        />
+                        <List disablePadding>
+                            {templates
+                                .filter((doc) => doc.name.toLowerCase().includes(docSearch.toLowerCase()))
+                                .map((doc) => (
+                                    <React.Fragment key={doc.id}>
+                                        <ListItem
+                                            secondaryAction={
+                                                <Box>
+                                                    <IconButton
+                                                        aria-label="preview"
+                                                        onClick={() => handlePreview(doc.id)}
+                                                        disabled={isAnyBusy(doc.id) || !selectedCompanyId}
+                                                        color="primary"
+                                                        title="Preview"
+                                                    >
+                                                        {isBusy(doc.id, 'preview') ? <CircularProgress size={24} /> : <VisibilityIcon />}
+                                                    </IconButton>
+                                                    <IconButton
+                                                        edge="end"
+                                                        aria-label="download"
+                                                        onClick={() => handleDownload(doc.id)}
+                                                        disabled={isAnyBusy(doc.id) || !selectedCompanyId}
+                                                        color="primary"
+                                                        title="Download"
+                                                    >
+                                                        {isBusy(doc.id, 'download') ? <CircularProgress size={24} /> : <DownloadIcon />}
+                                                    </IconButton>
+                                                </Box>
+                                            }
                                         >
-                                            {isBusy(doc.id, 'preview') ? <CircularProgress size={24} /> : <VisibilityIcon />}
-                                        </IconButton>
-                                        <IconButton
-                                            edge="end"
-                                            aria-label="download"
-                                            onClick={() => handleDownload(doc.id)}
-                                            disabled={isAnyBusy(doc.id) || !selectedCompanyId}
-                                            color="primary"
-                                            title="Download"
-                                        >
-                                            {isBusy(doc.id, 'download') ? <CircularProgress size={24} /> : <DownloadIcon />}
-                                        </IconButton>
-                                    </Box>
-                                }
-                            >
-                                <ListItemText
-                                    primary={doc.name}
-                                    secondary="Format: PDF | Generated from latest company data"
-                                />
-                            </ListItem>
-                            <Divider component="li" />
-                        </React.Fragment>
-                    ))}
-                </List>
+                                            <ListItemText
+                                                primary={doc.name}
+                                                secondary="Format: PDF | Generated from latest company data"
+                                            />
+                                        </ListItem>
+                                        <Divider component="li" />
+                                    </React.Fragment>
+                                ))}
+                            {templates.filter((doc) => doc.name.toLowerCase().includes(docSearch.toLowerCase())).length === 0 && (
+                                <Typography variant="body2" color="textSecondary" sx={{ py: 2, textAlign: 'center' }}>
+                                    No documents match your search.
+                                </Typography>
+                            )}
+                        </List>
+                    </AccordionDetails>
+                </Accordion>
 
-                <Typography variant="h6" sx={{ mt: 4 }}>Generation History</Typography>
-                {history.length === 0 ? (
-                    <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                        No documents generated yet for this company.
-                    </Typography>
-                ) : (
-                    <List>
-                        {history.map((record) => (
-                            <React.Fragment key={record._id}>
-                                <ListItem
-                                    secondaryAction={
-                                        <Box>
-                                            <IconButton
-                                                aria-label="preview"
-                                                onClick={() => handlePreview(record.type)}
-                                                disabled={isAnyBusy(record.type) || !selectedCompanyId}
-                                                color="primary"
-                                                title="Preview latest"
-                                            >
-                                                {isBusy(record.type, 'preview') ? <CircularProgress size={24} /> : <VisibilityIcon />}
-                                            </IconButton>
-                                            <IconButton
-                                                edge="end"
-                                                aria-label="re-download"
-                                                onClick={() => handleDownload(record.type)}
-                                                disabled={isAnyBusy(record.type) || !selectedCompanyId}
-                                                color="primary"
-                                                title="Re-download"
-                                            >
-                                                {isBusy(record.type, 'download') ? <CircularProgress size={24} /> : <DownloadIcon />}
-                                            </IconButton>
-                                        </Box>
-                                    }
-                                >
-                                    <ListItemText
-                                        primary={
-                                            <Box display="flex" alignItems="center" gap={1}>
-                                                {record.title}
-                                                <Chip label={`v${record.version}`} size="small" />
-                                            </Box>
-                                        }
-                                        secondary={`Generated ${new Date(record.generatedAt).toLocaleString()}`}
-                                    />
-                                </ListItem>
-                                <Divider component="li" />
-                            </React.Fragment>
-                        ))}
-                    </List>
-                )}
+                {/* Generation History accordion */}
+                <Accordion defaultExpanded={false} sx={{ mt: 1 }}>
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                        <Typography variant="h6">Generation History</Typography>
+                    </AccordionSummary>
+                    <AccordionDetails sx={{ pt: 0 }}>
+                        {history.length === 0 ? (
+                            <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                                No documents generated yet for this company.
+                            </Typography>
+                        ) : (
+                            <List disablePadding>
+                                {history.map((record) => (
+                                    <React.Fragment key={record._id}>
+                                        <ListItem
+                                            secondaryAction={
+                                                <Box>
+                                                    <IconButton
+                                                        aria-label="preview"
+                                                        onClick={() => handlePreview(record.type)}
+                                                        disabled={isAnyBusy(record.type) || !selectedCompanyId}
+                                                        color="primary"
+                                                        title="Preview latest"
+                                                    >
+                                                        {isBusy(record.type, 'preview') ? <CircularProgress size={24} /> : <VisibilityIcon />}
+                                                    </IconButton>
+                                                    <IconButton
+                                                        edge="end"
+                                                        aria-label="re-download"
+                                                        onClick={() => handleDownload(record.type)}
+                                                        disabled={isAnyBusy(record.type) || !selectedCompanyId}
+                                                        color="primary"
+                                                        title="Re-download"
+                                                    >
+                                                        {isBusy(record.type, 'download') ? <CircularProgress size={24} /> : <DownloadIcon />}
+                                                    </IconButton>
+                                                </Box>
+                                            }
+                                        >
+                                            <ListItemText
+                                                primary={
+                                                    <Box display="flex" alignItems="center" gap={1}>
+                                                        {record.title}
+                                                        <Chip label={`v${record.version}`} size="small" />
+                                                    </Box>
+                                                }
+                                                secondary={
+                                                    `${new Date(record.generatedAt).toLocaleString()}` +
+                                                    (record.generatedBy ? ` · ${record.generatedBy.name}` : '')
+                                                }
+                                            />
+                                        </ListItem>
+                                        <Divider component="li" />
+                                    </React.Fragment>
+                                ))}
+                            </List>
+                        )}
+                    </AccordionDetails>
+                </Accordion>
             </Paper>
 
             <Dialog open={!!preview} onClose={handleClosePreview} fullWidth maxWidth="lg">

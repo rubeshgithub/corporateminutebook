@@ -6,6 +6,7 @@
             <tr>
                 <th>Name</th>
                 <th>Residential Address</th>
+                <th>Resident Canadian</th>
                 <th>Date Appointed</th>
                 <th>Date Resigned</th>
             </tr>
@@ -13,8 +14,9 @@
         <tbody>
             <% company.directors.forEach(function(d) { %>
                 <tr>
-                    <td><%= d.name %></td>
+                    <td><%= d.name || ((d.firstName || '') + ' ' + (d.middleName || '') + ' ' + (d.lastName || '')).replace(/\s+/g,' ').trim() %></td>
                     <td><%= d.address %></td>
+                    <td><%= d.residentCanadian === false ? 'No' : 'Yes' %></td>
                     <td><%= d.appointedDate ? new Date(d.appointedDate).toLocaleDateString() : '' %></td>
                     <td><%= d.resignedDate ? new Date(d.resignedDate).toLocaleDateString() : '—' %></td>
                 </tr>
@@ -52,7 +54,41 @@
     <div class="empty">No officers recorded.</div>
 <% } %>
 
-<div class="register-title">C. Securities Register / Shareholders' Ledger</div>
+<div class="register-title">C. Register of Shareholders</div>
+<div class="register-subtitle">Holders of shares of the Corporation.</div>
+<% if (company.shareholders && company.shareholders.length > 0) { %>
+    <table>
+        <thead>
+            <tr>
+                <th>Holder</th>
+                <th>Type</th>
+                <th>Address</th>
+                <th>Voting %</th>
+                <th>Date Became Holder</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% company.shareholders.forEach(function(s) { %>
+                <tr>
+                    <td>
+                        <%= s.name %>
+                        <% if (s.holderType === 'Legal Entity' && s.corporateAccessNumber) { %>
+                            <div style="font-size: 8.5pt; color: #666;">CAN: <%= s.corporateAccessNumber %><% if (s.businessNumber) { %> &middot; BN: <%= s.businessNumber %><% } %></div>
+                        <% } %>
+                    </td>
+                    <td><%= s.holderType || 'Individual' %></td>
+                    <td><%= s.address || '—' %></td>
+                    <td><%= s.votingPercent != null ? s.votingPercent + '%' : '—' %></td>
+                    <td><%= company.incorporationDate ? new Date(company.incorporationDate).toLocaleDateString() : '' %></td>
+                </tr>
+            <% }); %>
+        </tbody>
+    </table>
+<% } else { %>
+    <div class="empty">No shareholders recorded.</div>
+<% } %>
+
+<div class="register-title">D. Securities Register / Shareholders' Ledger</div>
 <div class="register-subtitle">Record of issued and outstanding shares of the Corporation.</div>
 <% if (company.shareholders && company.shareholders.length > 0) { %>
     <table>
@@ -71,7 +107,7 @@
                     <td><%= s.name %></td>
                     <td><%= s.sharesClass %></td>
                     <td><%= s.numberOfShares %></td>
-                    <td><%= idx + 1 %></td>
+                    <td>A<%= idx + 1 %></td>
                     <td><%= company.incorporationDate ? new Date(company.incorporationDate).toLocaleDateString() : '' %></td>
                 </tr>
             <% }); %>

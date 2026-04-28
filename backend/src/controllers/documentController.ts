@@ -8,13 +8,17 @@ import { generatePDFBuffer, generateMinuteBookPDF } from '../services/documentGe
 const TEMPLATE_LABELS: Record<string, string> = {
     glossary: 'Glossary',
     articles_of_incorporation: 'Articles of Incorporation',
+    schedule_a: 'Schedule A — Share Capital',
     by_laws: 'By-Laws No. 1',
     organizational_resolution: 'Organizational Resolution (Directors)',
     shareholders_organizational_resolution: 'Organizational Resolution (Shareholders)',
     consent_to_act: 'Consent to Act as Director',
     annual_director_resolution: 'Annual Director Resolution',
     annual_shareholder_resolution: 'Annual Shareholder Resolution',
+    share_subscription: 'Share Subscriptions',
     share_certificate: 'Share Certificate',
+    share_ledger: 'Share Ledgers',
+    share_transfer_register: 'Share Transfer Register',
     registers: 'Corporate Registers',
 };
 
@@ -43,6 +47,7 @@ export const generateDocument = async (req: AuthRequest, res: Response) => {
             type: documentType,
             version: previousCount + 1,
             generatedAt: new Date(),
+            generatedBy: userId,
         });
 
         await ActivityLog.create({
@@ -70,7 +75,9 @@ export const getDocuments = async (req: AuthRequest, res: Response) => {
             return res.status(404).json({ message: 'Company not found' });
         }
 
-        const documents = await DocumentModel.find({ companyId }).sort({ generatedAt: -1 });
+        const documents = await DocumentModel.find({ companyId })
+            .sort({ generatedAt: -1 })
+            .populate('generatedBy', 'name email');
         res.json(documents);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -96,6 +103,7 @@ export const compileMinuteBook = async (req: AuthRequest, res: Response) => {
             type: 'minute_book',
             version: previousCount + 1,
             generatedAt: new Date(),
+            generatedBy: userId,
         });
 
         await ActivityLog.create({

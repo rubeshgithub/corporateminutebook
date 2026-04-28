@@ -11,61 +11,22 @@
             line-height: 1.55;
             color: #1a1a1a;
         }
-        h1 {
-            text-align: center;
-            font-size: 24px;
-            text-decoration: underline;
-        }
-        .section {
-            margin-top: 26px;
-        }
-        .section-title {
-            font-weight: bold;
-            margin-bottom: 8px;
-            text-transform: uppercase;
-            font-size: 12pt;
-        }
-        .data-row {
-            margin-bottom: 5px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 8px;
-        }
-        th, td {
-            border: 1px solid #555;
-            padding: 7px 9px;
-            text-align: left;
-            font-size: 10.5pt;
-            vertical-align: top;
-        }
+        h1 { text-align: center; font-size: 24px; text-decoration: underline; }
+        .section { margin-top: 26px; }
+        .section-title { font-weight: bold; margin-bottom: 8px; text-transform: uppercase; font-size: 12pt; }
+        .data-row { margin-bottom: 5px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        th, td { border: 1px solid #555; padding: 7px 9px; text-align: left; font-size: 10.5pt; vertical-align: top; }
         th { background: #f3f3f3; }
-        .signature-block {
-            margin-top: 50px;
-        }
-        .auth-line {
-            margin-top: 6px;
-        }
+        .signature-block { margin-top: 50px; }
+        .auth-line { margin-top: 6px; }
         .schedule {
             page-break-before: always;
             margin-top: 0;
         }
-        .schedule h2 {
-            text-align: center;
-            font-size: 18pt;
-            margin-bottom: 4px;
-        }
-        .schedule .scope {
-            text-align: center;
-            font-style: italic;
-            color: #555;
-            margin-bottom: 18px;
-        }
-        .schedule .content {
-            white-space: pre-wrap;
-            text-align: justify;
-        }
+        .schedule h2 { text-align: center; font-size: 18pt; margin-bottom: 4px; }
+        .schedule .scope { text-align: center; font-style: italic; color: #555; margin-bottom: 18px; }
+        .schedule .content { white-space: pre-wrap; text-align: justify; }
     </style>
 </head>
 
@@ -78,8 +39,9 @@
     </div>
 
     <div class="section">
-        <div class="section-title">2. Corporate Access Number</div>
-        <div class="data-row"><%= company.corporateAccessNumber || 'N/A' %></div>
+        <div class="section-title">2. Corporate Access Number / Business Number</div>
+        <div class="data-row">CAN: <%= company.corporateAccessNumber || 'N/A' %></div>
+        <div class="data-row">BN: <%= company.businessNumber || 'N/A' %></div>
     </div>
 
     <div class="section">
@@ -101,8 +63,38 @@
     </div>
 
     <div class="section">
-        <div class="section-title">5. Restrictions on Business</div>
-        <% if (company.restrictions && company.restrictions.hasRestrictions) { %>
+        <div class="section-title">5. Address for Service by Mail</div>
+        <% if (!company.addressForService || company.addressForService.sameAsRegistered) { %>
+            <div class="data-row">Same as Registered Office.</div>
+        <% } else if (company.addressForService.sameAsRecords) { %>
+            <div class="data-row">Same as Records Address.</div>
+        <% } else { %>
+            <% if (company.addressForService.poBox) { %><div class="data-row">PO Box <%= company.addressForService.poBox %></div><% } %>
+            <% if (company.addressForService.street) { %><div class="data-row"><%= company.addressForService.street %></div><% } %>
+            <div class="data-row"><%= company.addressForService.city || '' %>, <%= company.addressForService.province || '' %> <%= company.addressForService.postalCode || '' %></div>
+            <div class="data-row"><%= company.addressForService.country || 'Canada' %></div>
+        <% } %>
+        <% if (company.addressForService && company.addressForService.email) { %>
+            <div class="data-row">Email: <%= company.addressForService.email %></div>
+        <% } %>
+    </div>
+
+    <div class="section">
+        <div class="section-title">6. Restrictions on Business</div>
+        <% var rTo = company.restrictions && company.restrictions.restrictedTo;
+           var rFrom = company.restrictions && company.restrictions.restrictedFrom;
+           var legacy = company.restrictions && company.restrictions.hasRestrictions;
+        %>
+        <% if ((rTo && rTo.has) || (rFrom && rFrom.has)) { %>
+            <% if (rTo && rTo.has) { %>
+                <div class="data-row" style="margin-top: 6px;"><strong>Business Restricted To:</strong></div>
+                <div class="data-row" style="white-space: pre-wrap;"><%= rTo.description %></div>
+            <% } %>
+            <% if (rFrom && rFrom.has) { %>
+                <div class="data-row" style="margin-top: 6px;"><strong>Business Restricted From:</strong></div>
+                <div class="data-row" style="white-space: pre-wrap;"><%= rFrom.description %></div>
+            <% } %>
+        <% } else if (legacy && company.restrictions.description) { %>
             <div class="data-row" style="white-space: pre-wrap;"><%= company.restrictions.description %></div>
         <% } else { %>
             <div class="data-row">There are no restrictions on the business the Corporation may carry on.</div>
@@ -110,21 +102,29 @@
     </div>
 
     <div class="section">
-        <div class="section-title">6. Directors</div>
+        <div class="section-title">7. Number of Directors</div>
+        <div class="data-row">Minimum: <%= company.minDirectors != null ? company.minDirectors : 1 %></div>
+        <div class="data-row">Maximum: <%= company.maxDirectors != null ? company.maxDirectors : 10 %></div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">8. Directors</div>
         <table>
             <thead>
                 <tr>
                     <th>Name</th>
                     <th>Address</th>
+                    <th>Resident Canadian</th>
                     <th>Appointed Date</th>
                 </tr>
             </thead>
             <tbody>
                 <% company.directors.forEach(function(director) { %>
                     <tr>
-                        <td><%= director.name %></td>
+                        <td><%= director.name || ((director.firstName || '') + ' ' + (director.middleName || '') + ' ' + (director.lastName || '')).replace(/\s+/g,' ').trim() %></td>
                         <td><%= director.address %></td>
-                        <td><%= new Date(director.appointedDate).toLocaleDateString() %></td>
+                        <td><%= director.residentCanadian === false ? 'No' : 'Yes' %></td>
+                        <td><%= director.appointedDate ? new Date(director.appointedDate).toLocaleDateString() : '' %></td>
                     </tr>
                 <% }); %>
             </tbody>
@@ -132,21 +132,66 @@
     </div>
 
     <div class="section">
-        <div class="section-title">7. Share Structure</div>
+        <div class="section-title">9. Authorized Share Capital</div>
+        <% if (company.shareClasses && company.shareClasses.length > 0) { %>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Class</th>
+                        <th>Type</th>
+                        <th>Voting</th>
+                        <th>Maximum Authorized</th>
+                        <th>Par Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% company.shareClasses.forEach(function(sc) { %>
+                        <tr>
+                            <td><%= sc.name %></td>
+                            <td><%= sc.type %></td>
+                            <td><%= sc.voting ? 'Voting' : 'Non-Voting' %></td>
+                            <td><%= sc.maxAuthorized != null ? sc.maxAuthorized.toLocaleString() : 'Unlimited' %></td>
+                            <td><%= sc.parValue != null ? '$' + sc.parValue : 'No par' %></td>
+                        </tr>
+                    <% }); %>
+                </tbody>
+            </table>
+            <% var hasScheduleA = (company.schedules || []).some(function(s){ return /schedule\s*a/i.test(s.name); }); %>
+            <% if (hasScheduleA) { %>
+                <p style="margin-top: 8px; font-style: italic; color: #555;">The rights, restrictions, conditions and limitations attaching to each class of shares are set out in <strong>Schedule A — Share Capital</strong>, attached and forming part of these Articles.</p>
+            <% } else { %>
+                <p style="margin-top: 8px; font-style: italic; color: #555;">The rights, restrictions, conditions and limitations attaching to each class of shares shall be as determined by the directors of the Corporation by resolution from time to time, in accordance with the applicable corporate legislation.</p>
+            <% } %>
+        <% } else { %>
+            <p style="font-style: italic;">No share classes defined.</p>
+        <% } %>
+    </div>
+
+    <div class="section">
+        <div class="section-title">10. Issued Shares</div>
         <table>
             <thead>
                 <tr>
-                    <th>Shareholder Name</th>
+                    <th>Shareholder</th>
+                    <th>Type</th>
                     <th>Class of Shares</th>
                     <th>Number of Shares</th>
+                    <th>Voting %</th>
                 </tr>
             </thead>
             <tbody>
                 <% company.shareholders.forEach(function(shareholder) { %>
                     <tr>
-                        <td><%= shareholder.name %></td>
+                        <td>
+                            <%= shareholder.name %>
+                            <% if (shareholder.holderType === 'Legal Entity' && shareholder.corporateAccessNumber) { %>
+                                <div style="font-size: 9pt; color: #666;">CAN: <%= shareholder.corporateAccessNumber %></div>
+                            <% } %>
+                        </td>
+                        <td><%= shareholder.holderType || 'Individual' %></td>
                         <td><%= shareholder.sharesClass %></td>
                         <td><%= shareholder.numberOfShares %></td>
+                        <td><%= shareholder.votingPercent != null ? shareholder.votingPercent + '%' : '—' %></td>
                     </tr>
                 <% }); %>
             </tbody>
@@ -155,7 +200,7 @@
 
     <% if (company.schedules && company.schedules.length > 0) { %>
         <div class="section">
-            <div class="section-title">8. Schedules Forming Part of these Articles</div>
+            <div class="section-title">11. Schedules Forming Part of these Articles</div>
             <ul>
                 <% company.schedules.forEach(function(s) { %>
                     <li><%= s.name %></li>

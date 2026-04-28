@@ -2,6 +2,7 @@ import ejs from 'ejs';
 import puppeteer, { PDFOptions } from 'puppeteer';
 import path from 'path';
 import fs from 'fs';
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { ICompany } from '../models/Company';
 
 const TEMPLATES_DIR = path.join(__dirname, '..', 'templates');
@@ -37,36 +38,74 @@ export const generatePDFBuffer = async (company: ICompany, templateName: string)
 };
 
 export const generateMinuteBookPDF = async (company: ICompany): Promise<Buffer> => {
-    const compiledHtml = renderTemplate('minute_book', { company });
-
-    const safeName = company.name.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-    const headerTemplate = `
-        <div style="font-size:8pt; width:100%; padding: 0 0.5in; color:#777; display:flex; justify-content:space-between;">
-            <span>${safeName}</span>
-            <span>Corporate Minute Book</span>
-        </div>`;
-    const footerTemplate = `
-        <div style="font-size:8pt; width:100%; padding: 0 0.5in; color:#777; display:flex; justify-content:space-between;">
-            <span>Confidential</span>
-            <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
-        </div>`;
+    const mainHtml = renderTemplate('minute_book', { company });
+    const certHtml = renderTemplate('share_certificate', { company });
 
     const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
-    const page = await browser.newPage();
 
-    await page.setContent(compiledHtml, { waitUntil: 'networkidle0' });
-
-    const pdfBuffer = await page.pdf({
+    // Main book — portrait, no puppeteer header/footer (we'll overlay with pdf-lib so numbering is continuous across the merged doc)
+    const mainPage = await browser.newPage();
+    await mainPage.setContent(mainHtml, { waitUntil: 'networkidle0' });
+    const mainPdfBytes = await mainPage.pdf({
         format: 'Letter',
         printBackground: true,
         margin: { top: '0.7in', right: '0.7in', bottom: '0.7in', left: '0.7in' },
-        displayHeaderFooter: true,
-        headerTemplate,
-        footerTemplate,
+    });
+
+    // Share certificates — landscape, no header/footer
+    const certPage = await browser.newPage();
+    await certPage.setContent(certHtml, { waitUntil: 'networkidle0' });
+    const certPdfBytes = await certPage.pdf({
+        format: 'Letter',
+        landscape: true,
+        printBackground: true,
+        margin: { top: '1in', right: '1in', bottom: '1in', left: '1in' },
     });
 
     await browser.close();
 
-    return Buffer.from(pdfBuffer);
+    // Merge with pdf-lib
+    const merged = await PDFDocument.create();
+    const mainDoc = await PDFDocument.load(mainPdfBytes);
+    const certDoc = await PDFDocument.load(certPdfBytes);
+
+    const mainPages = await merged.copyPages(mainDoc, mainDoc.getPageIndices());
+    const certPages = await merged.copyPages(certDoc, certDoc.getPageIndices());
+    mainPages.forEach((p) => merged.addPage(p));
+    certPages.forEach((p) => merged.addPage(p));
+
+    // Overlay running header (company name + 'Corporate Minute Book') and footer (page X of Y) on every page except the cover
+    const font = await merged.embedFont(StandardFonts.Helvetica);
+    const totalPages = merged.getPageCount();
+    const subtle = rgb(0.45, 0.45, 0.45);
+    const headerSize = 8;
+    const footerSize = 8;
+
+    merged.getPages().forEach((page, idx) => {
+        if (idx === 0) return; // skip cover
+        const { width, height } = page.getSize();
+        const pageNum = idx + 1;
+
+        // Header
+        page.drawText(company.name, {
+            x: 36, y: height - 24, size: headerSize, font, color: subtle,
+        });
+        const rightHeader = 'Corporate Minute Book';
+        const rightHeaderWidth = font.widthOfTextAtSize(rightHeader, headerSize);
+        page.drawText(rightHeader, {
+            x: width - 36 - rightHeaderWidth, y: height - 24, size: headerSize, font, color: subtle,
+        });
+
+        // Footer
+        page.drawText('Confidential', {
+            x: 36, y: 24, size: footerSize, font, color: subtle,
+        });
+        const footerText = `Page ${pageNum} of ${totalPages}`;
+        const footerWidth = font.widthOfTextAtSize(footerText, footerSize);
+        page.drawText(footerText, {
+            x: width - 36 - footerWidth, y: 24, size: footerSize, font, color: subtle,
+        });
+    });
+
+    return Buffer.from(await merged.save());
 };

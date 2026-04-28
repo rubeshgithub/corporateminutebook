@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Schedule A &mdash; Share Capital - <%= company.name %></title>
+    <style>
+        body { font-family: 'Times New Roman', Times, serif; padding: 50px 60px; line-height: 1.7; font-size: 12pt; color: #1a1a1a; }
+        h1 { text-align: center; font-size: 18pt; font-weight: 700; margin-bottom: 4px; }
+        h2 { text-align: center; font-size: 14pt; font-weight: 700; margin-top: 0; margin-bottom: 4px; }
+        .corp-context { text-align: center; font-style: italic; margin-bottom: 30px; font-size: 11pt; }
+        .section-heading { font-weight: bold; text-transform: uppercase; text-align: center; margin: 28px 0 14px 0; font-size: 12pt; letter-spacing: 0.5px; }
+        .group-intro { margin: 20px 0 10px 0; text-align: justify; }
+        .numbered { margin: 14px 0 6px 0; font-weight: bold; }
+        .lettered { margin: 8px 0 8px 28px; text-align: justify; }
+        .lettered-continuation { margin: 8px 0 8px 28px; text-align: justify; }
+        .price-subhead { font-weight: bold; margin: 12px 0 4px 0; }
+        p { margin-bottom: 10px; text-align: justify; }
+        .auth-list { list-style: none; padding: 0; margin: 8px 0 0 28px; }
+        .auth-list li { margin: 4px 0; }
+    </style>
+</head>
+
+<body>
+<%
+    var shareClasses = company.shareClasses || [];
+
+    /* ── helpers ──────────────────────────────────────────── */
+    var lq = '“', rq = '”';
+
+    function qname(sc) { return lq + sc.name + rq; }
+
+    /* "Class "A" Common Shares" */
+    function shortLabel(sc) { return 'Class ' + qname(sc) + ' ' + sc.type + ' Shares'; }
+
+    /* "Class "A" Common Voting Shares" */
+    function fullLabel(sc) {
+        return 'Class ' + qname(sc) + ' ' + sc.type + ' ' + (sc.voting ? 'Voting' : 'Non-Voting') + ' Shares';
+    }
+
+    /* join with Oxford-style "and" */
+    function joinList(arr) {
+        if (!arr || arr.length === 0) return '';
+        if (arr.length === 1) return arr[0];
+        if (arr.length === 2) return arr[0] + ' and ' + arr[1];
+        return arr.slice(0, -1).join(', ') + ' and ' + arr[arr.length - 1];
+    }
+
+    function joinShort(classes) { return joinList(classes.map(shortLabel)); }
+
+    var alphaLower = ['a','b','c','d','e','f','g','h','i','j','k','l'];
+
+    /* groups */
+    var commonClasses    = shareClasses.filter(function(sc){ return sc.type === 'Common'; });
+    var preferredClasses = shareClasses.filter(function(sc){ return sc.type === 'Preferred'; });
+    var votingCommon     = commonClasses.filter(function(sc){ return sc.voting; });
+    var nonVotingCommon  = commonClasses.filter(function(sc){ return !sc.voting; });
+    var votingPref       = preferredClasses.filter(function(sc){ return sc.voting; });
+    var nonVotingPref    = preferredClasses.filter(function(sc){ return !sc.voting; });
+
+    var allNoPar = shareClasses.length > 0 && shareClasses.every(function(sc){ return sc.parValue == null; });
+%>
+
+<h1>SCHEDULE <%- lq %>A<%- rq %></h1>
+<h2>SHARE CAPITAL</h2>
+<div class="corp-context">Forming part of the Articles of Incorporation of <%= company.name %></div>
+
+<p>
+    The Corporation is authorized to issue shares<% if (allNoPar) { %> without nominal or par value<% } %> divided as follows:
+</p>
+
+<% if (shareClasses.length === 0) { %>
+    <p style="font-style:italic; text-align:center;">No share classes defined.</p>
+<% } else { %>
+    <ul class="auth-list">
+    <% shareClasses.forEach(function(sc, i) { %>
+        <li>(<%= alphaLower[i] %>)&nbsp;&nbsp;<% if (sc.maxAuthorized != null) { %>Max. <%= sc.maxAuthorized.toLocaleString() %><% } else { %>Unlimited<% } %> <%- fullLabel(sc) %><% if (sc.parValue != null) { %> at $<%= sc.parValue %> per share<% } %>;</li>
+    <% }); %>
+    </ul>
+<% } %>
+
+
+<%/* ══════════════════════════════════════════
+       COMMON SHARES
+   ══════════════════════════════════════════ */%>
+<% if (commonClasses.length > 0) { %>
+
+<div class="section-heading">RIGHTS AND RESTRICTIONS ON CLASSES OF SHARES</div>
+
+<p class="group-intro">
+    The <%- joinShort(commonClasses) %> shall carry and be subject to the following rights, restrictions, conditions and limitations:
+</p>
+
+<div class="numbered">1.&nbsp;&nbsp;Voting:</div>
+
+<% if (votingCommon.length > 0) { %>
+<div class="lettered">
+    (a)&nbsp;&nbsp;The holders of <%- joinShort(votingCommon) %> in the Corporation are entitled to notice of and attend at meetings of the Shareholders of the Corporation, and shall be entitled to one (1) vote in respect of each such share so held and the holder shall also be entitled to consent to and sign a resolution in writing to be signed by the Shareholders of the Corporation.
+</div>
+<% } %>
+
+<% if (nonVotingCommon.length > 0) { %>
+<div class="lettered">
+    (<%= votingCommon.length > 0 ? 'b' : 'a' %>)&nbsp;&nbsp;Except as provided in the Business Corporations Act, as amended from time to time, the holders of the <%- joinShort(nonVotingCommon) %> shall not, as such, be entitled to vote at, nor to receive notice of or attend shareholders meetings nor shall the holders be entitled to consent to or sign a resolution in writing to be signed by the Shareholders of the Corporation.
+</div>
+<% } %>
+
+<div class="numbered">2.&nbsp;&nbsp;Dividends:</div>
+
+<div class="lettered">
+    (a)&nbsp;&nbsp;The holders of the <%- joinShort(commonClasses) %> shall be entitled to receive a dividend when, as, and if declared by the Directors of the Corporation on the <%- joinShort(commonClasses) %>, as the case may be.
+</div>
+
+<div class="lettered-continuation">
+    Dividends may be declared and paid on the <%- joinShort(commonClasses) %> to the complete exclusion of dividends being declared and paid on any other class or classes of shares of the Corporation. Provided however, no dividends shall be declared on such shares if to do so would impair the ability of the Corporation to redeem the then outstanding Preferred Shares in the capital stock of the Corporation.
+</div>
+
+<div class="numbered">3.&nbsp;&nbsp;Return of Capital:</div>
+
+<div class="lettered">
+    (a)&nbsp;&nbsp;In the event of liquidation, dissolution or winding up of the Corporation or other distribution of the assets of the Corporation among shareholders for the purpose of winding up its affairs, the holders of the <%- joinShort(commonClasses) %> shall<% if (commonClasses.length > 1) { %> rank pari passu with one another and<% } %> be entitled to receive any remaining balance of the assets and properties of the Corporation after payment of return of capital and any declared but unpaid dividends to the holders of the Preferred shares herein referred to.
+</div>
+
+<% } /* end commonClasses */ %>
+
+
+<%/* ══════════════════════════════════════════
+       PREFERRED SHARES
+   ══════════════════════════════════════════ */%>
+<% if (preferredClasses.length > 0) { %>
+
+<% if (commonClasses.length === 0) { %>
+<div class="section-heading">RIGHTS AND RESTRICTIONS ON CLASSES OF SHARES</div>
+<% } %>
+
+<p class="group-intro" style="margin-top: 24px;">
+    The <%- joinShort(preferredClasses) %> shall carry and be subject to the following rights, restrictions, conditions and limitations:
+</p>
+
+<div class="numbered">1.&nbsp;&nbsp;Voting:</div>
+
+<% if (votingPref.length > 0) { %>
+<div class="lettered">
+    (a)&nbsp;&nbsp;The holders of the <%- joinShort(votingPref) %> in the Corporation shall be entitled to notice of and to attend at meetings of the Shareholders of the Corporation, and shall be entitled to one (1) vote in respect of each such share so held and the holder shall also be entitled to consent to and sign a resolution in writing to be signed by the Shareholders of the Corporation.
+</div>
+<% } %>
+
+<% if (nonVotingPref.length > 0) { %>
+<div class="lettered">
+    (<%= votingPref.length > 0 ? 'b' : 'a' %>)&nbsp;&nbsp;Except as provided in the Business Corporations Act, as amended from time to time, the holders of the <%- joinShort(nonVotingPref) %> shall not, as such, be entitled to vote at, nor to receive notice of or attend shareholders meetings nor shall the holders be entitled to consent to or sign a resolution in writing to be signed by the Shareholders of the Corporation.
+</div>
+<% } %>
+
+<div class="numbered">2.&nbsp;&nbsp;Dividends:</div>
+
+<div class="lettered">
+    (a)&nbsp;&nbsp;The holders of the <%- joinShort(preferredClasses) %> shall be entitled to receive, when, as and if declared by the Board of Directors of the Corporation, out of the net profits and surplus of the Corporation properly applicable to the payment of dividends, a dividend at the rate or rates as the Directors of the Corporation may from time to time determine on the redemption price thereof (as hereinafter provided); the Directors of the Corporation shall further determine the amount or method or methods of calculation of dividends on the <%- joinShort(preferredClasses) %>, the time and place of payment of dividends, whether cumulative or non-cumulative or partially cumulative and whether such rate, amount or method of calculation shall be subject to change or adjustment in the future. For greater certainty, the holders of the <%- joinShort(preferredClasses) %> shall have no preference or priority as to the declaration of dividends, and dividends may be declared and paid on any other class of shares of the Corporation to the exclusion of a dividend being declared and paid on the <%- joinShort(preferredClasses) %>.<% if (preferredClasses.length > 1) { %> Dividends may be declared and paid on the other of them.<% } %> Provided, however, no dividends shall be declared on such other shares if to do so would impair the ability of the Corporation to redeem the then outstanding <%- joinShort(preferredClasses) %> in the capital stock of the Corporation.
+</div>
+
+<div class="numbered">3.&nbsp;&nbsp;Return of Capital:</div>
+
+<div class="lettered">
+    (a)&nbsp;&nbsp;In the event of liquidation, dissolution or winding-up of the Corporation, the holders of the <%- joinShort(preferredClasses) %> shall rank pari passu with one another and shall have priority as to payment of the redemption price, as hereinafter provided, and priority for all declared and unpaid dividends up to the commencement of the winding-up, over all other shares in the capital for the time being of the Corporation; but shall not have any right to participate in the assets of the Corporation beyond the redemption price, as hereinafter provided, and all declared and unpaid dividends whether in a winding-up or on the reduction, redemption or purchase by the Corporation of the capital stock.
+</div>
+
+<div class="numbered">4.&nbsp;&nbsp;Redemption at Corporation&rsquo;s Option:</div>
+
+<div class="lettered">
+    (a)&nbsp;&nbsp;The Corporation may by resolution of the Directors, and upon giving notice as hereinafter provided, from time to time redeem or purchase the whole or any part of the <%- joinShort(preferredClasses) %> on payment for each share to be redeemed or purchased of the redemption price as hereinafter provided thereof together with all declared and unpaid dividends. In case a part only of the then outstanding <%- joinShort(preferredClasses) %> is at any time to be redeemed or purchased the redemption or purchase shall be pro rata disregarding fractions amongst all the holders of the then outstanding <%- joinShort(preferredClasses) %>, unless the Corporation and all of the holders of the then outstanding <%- joinShort(preferredClasses) %> otherwise agree in writing. Unless the holders of the <%- joinShort(preferredClasses) %> otherwise agree in writing, not less than ten days&rsquo; notice in writing of such redemption or purchase shall be given by mailing to the registered holder of the shares to be redeemed or purchased a notice specifying the date and place of redemption or purchase, which may be a chartered bank.
+</div>
+
+<div class="lettered">
+    (b)&nbsp;&nbsp;If notice of any such redemption or purchase be given by the Corporation in the manner aforesaid and an amount sufficient to redeem or purchase the shares to be redeemed or purchased be deposited with the chartered bank specified in the notice on or before the date fixed for redemption or purchase, dividends on the <%- joinShort(preferredClasses) %> to be redeemed or purchased shall cease to accrue after the date so fixed for redemption or purchase and the holders thereof shall thereafter have no rights against the Corporation in respect thereof except upon surrender of certificates for such shares to receive payment thereof of the redemption price.
+</div>
+
+<div class="numbered">5.&nbsp;&nbsp;Retraction at Shareholder&rsquo;s Option:</div>
+
+<div class="lettered">
+    (a)&nbsp;&nbsp;Every holder of record of <%- joinShort(preferredClasses) %> shall, subject as hereinafter provided, be entitled to require the Corporation to redeem or to purchase all or any part of the <%- joinShort(preferredClasses) %> held by such holder by surrendering on a business day the certificate or certificates representing such <%- joinShort(preferredClasses) %>, properly endorsed in blank for transfer or accompanied by an appropriate form of transfer properly executed in blank, at the registered office of the Corporation or at the office of any transfer agent of the Corporation or at such other place or places as the Directors of the Corporation may from time to time designate, such certificate or certificates so surrendered to be accompanied by a notice in writing (hereinafter called a &ldquo;redemption notice&rdquo;) signed by such holder or by his duly authorized attorney requiring the Corporation to redeem or purchase all or a specified number of the <%- joinShort(preferredClasses) %> represented thereby. If the redemption notice is signed by an attorney, it shall be accompanied by evidence of the authority of such attorney satisfactory to the Corporation or a transfer agent of the Corporation.
+</div>
+
+<div class="lettered">
+    (b)&nbsp;&nbsp;A redemption notice shall be deemed to have been given when actually received at the registered office of the Corporation or at the office of any transfer agent of the Corporation or at such other place or places as the Directors of the Corporation may from time to time designate and when so given shall, subject as hereinafter provided in 5(e), be irrevocable.
+</div>
+
+<div class="lettered">
+    (c)&nbsp;&nbsp;Payment of the redemption price for the <%- joinShort(preferredClasses) %> surrendered for redemption or for sale shall be made by or on behalf of the Corporation to the holders of record thereof not later than the seventh day following the date upon which the redemption notice is given as aforesaid.
+</div>
+
+<div class="lettered">
+    (d)&nbsp;&nbsp;Payment for <%- joinShort(preferredClasses) %> surrendered for redemption or for sale shall be made in such manner as may be agreed between the Corporation and the holder(s) thereof or by cheque payable at par in Canadian funds at any branch of the Corporation&rsquo;s bankers and delivered to the holders of record of <%- joinShort(preferredClasses) %> so surrendered or at the option of the Corporation such cheque shall be forwarded by registered mail, postage prepaid, to the holders of record of the <%- joinShort(preferredClasses) %> so surrendered at their addresses as the same appear in the records of the Corporation. In the case of each cheque so mailed, delivery thereof shall be deemed to have been made to the registered holder concerned as soon as the letter containing the same has been mailed.
+</div>
+
+<div class="lettered">
+    (e)&nbsp;&nbsp;In the event that the redemption or purchase of all those outstanding <%- joinShort(preferredClasses) %> in respect of which the Corporation has received redemption notices at any given time would cause the Corporation to be in contravention of the provisions of the Business Corporations Act (Alberta), the Corporation shall at that time redeem or purchase, on a pro rata basis, disregarding fractions, only such number of <%- joinShort(preferredClasses) %> as can be redeemed or purchased without causing such contravention and the Corporation shall redeem or purchase the balance of the outstanding <%- joinShort(preferredClasses) %> in respect of which the Corporation has received redemption notices on a pro rata basis, disregarding fractions, at such time or times as such redemption or purchase can be made without causing the Corporation to be in contravention of the provisions of the Business Corporations Act (Alberta).
+</div>
+
+<div class="numbered">6.&nbsp;&nbsp;Redemption or Purchase Price:</div>
+
+<% preferredClasses.forEach(function(sc, idx) { %>
+<div class="price-subhead"><%- shortLabel(sc) %></div>
+<div class="lettered">
+    (<%= alphaLower[idx] %>)&nbsp;&nbsp;The redemption price or the purchase price for the <%- shortLabel(sc) %> surrendered for redemption or for sale shall be such amount as may be determined by the Directors of the Corporation at the time such <%- shortLabel(sc) %> is issued together with any declared and unpaid dividends thereon.
+</div>
+<% }); %>
+
+<div class="numbered">7.&nbsp;&nbsp;Liquidity:</div>
+
+<div class="lettered">
+    (a)&nbsp;&nbsp;Notwithstanding anything to the contrary herein contained, no dividends or other payment or distribution shall be made to the holders, as such, of shares in the capital stock of the Corporation other than <%- joinShort(preferredClasses) %> if the payment thereof would result in the fair market value of the Corporation&rsquo;s assets, net of liabilities owed by the Corporation, being less than the aggregate of the redemption or purchase price of all <%- joinShort(preferredClasses) %> then outstanding.
+</div>
+
+<% } /* end preferredClasses */ %>
+
+</body>
+</html>

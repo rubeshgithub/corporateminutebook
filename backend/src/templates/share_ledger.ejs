@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Share Ledgers - <%= company.name %></title>
+    <style>
+        body { font-family: 'Helvetica', 'Arial', sans-serif; padding: 30px; line-height: 1.4; font-size: 10.5pt; color: #1a1a1a; }
+        h1 { text-align: center; font-size: 18pt; font-weight: 700; margin-bottom: 6px; text-decoration: underline; }
+        .corp-name { text-align: center; font-style: italic; margin-bottom: 18px; font-size: 11pt; }
+        .ledger { page-break-after: always; }
+        .ledger:last-child { page-break-after: auto; }
+        .holder-block { margin-top: 14px; margin-bottom: 8px; }
+        .holder-name { font-weight: bold; font-size: 12pt; }
+        .holder-meta { font-size: 10pt; color: #555; }
+        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        th, td { border: 1px solid #555; padding: 6px 8px; text-align: left; font-size: 10pt; }
+        th { background: #f3f3f3; font-weight: bold; }
+        .empty-row td { color: #aaa; font-style: italic; text-align: center; }
+    </style>
+</head>
+
+<body>
+    <%
+        var classByName = {};
+        (company.shareClasses || []).forEach(function(sc){ classByName[sc.name] = sc; });
+        var lookupPar = function(className) {
+            var sc = classByName[className];
+            return sc && sc.parValue != null ? sc.parValue : 1;
+        };
+    %>
+    <% (company.shareholders || []).forEach(function(s, holderIdx) { %>
+        <% var par = lookupPar(s.sharesClass); var paidUp = (par * (s.numberOfShares || 0)).toFixed(2); %>
+        <div class="ledger">
+            <h1>SHARE LEDGER</h1>
+            <div class="corp-name"><%= company.name %></div>
+
+            <div class="holder-block">
+                <div class="holder-name">Holder: <%= s.name %></div>
+                <div class="holder-meta">
+                    <%= s.holderType || 'Individual' %>
+                    <% if (s.holderType === 'Legal Entity' && s.corporateAccessNumber) { %> &mdash; CAN <%= s.corporateAccessNumber %><% } %>
+                    <% if (s.holderType === 'Legal Entity' && s.businessNumber) { %> &mdash; BN <%= s.businessNumber %><% } %>
+                </div>
+                <% if (s.address) { %><div class="holder-meta"><%= s.address %></div><% } %>
+                <div class="holder-meta">Class of Shares: <strong><%= s.sharesClass %></strong></div>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Cert. No.<br/>Issued</th>
+                        <th>Cert. No.<br/>Cancelled</th>
+                        <th>Transfer No.</th>
+                        <th>To / From Whom</th>
+                        <th>Paid Up</th>
+                        <th>Sold</th>
+                        <th>Bought</th>
+                        <th>Balance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><%= company.incorporationDate ? new Date(company.incorporationDate).toLocaleDateString() : '' %></td>
+                        <td>A<%= holderIdx + 1 %></td>
+                        <td>—</td>
+                        <td>Initial</td>
+                        <td>From Treasury</td>
+                        <td>$<%= paidUp %></td>
+                        <td>—</td>
+                        <td><%= s.numberOfShares %></td>
+                        <td><strong><%= s.numberOfShares %></strong></td>
+                    </tr>
+                    <% for (var r = 0; r < 12; r++) { %>
+                        <tr class="empty-row"><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                    <% } %>
+                </tbody>
+            </table>
+        </div>
+    <% }); %>
+    <% if (!company.shareholders || company.shareholders.length === 0) { %>
+        <h1>SHARE LEDGER</h1>
+        <div class="corp-name"><%= company.name %></div>
+        <p style="text-align: center; font-style: italic; margin-top: 40px;">No shareholders recorded.</p>
+    <% } %>
+</body>
+
+</html>

@@ -3,10 +3,11 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface IDocument extends Document {
     companyId: mongoose.Types.ObjectId;
     title: string;
-    type: string; // e.g., 'Articles of Incorporation', 'By-laws'
+    type: string;
     fileUrl?: string;
     version: number;
     generatedAt: Date;
+    generatedBy?: mongoose.Types.ObjectId;
 }
 
 const documentSchema: Schema = new Schema(
@@ -17,6 +18,7 @@ const documentSchema: Schema = new Schema(
         fileUrl: { type: String },
         version: { type: Number, default: 1 },
         generatedAt: { type: Date, default: Date.now },
+        generatedBy: { type: Schema.Types.ObjectId, ref: 'User' },
     },
     { timestamps: true }
 );

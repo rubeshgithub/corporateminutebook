@@ -264,15 +264,18 @@
             <div class="rule"></div>
         </div>
         <ul class="toc-list">
-            <li><span><span class="num">I.</span><span class="label">Articles of Incorporation</span></span></li>
+            <li><span><span class="num">I.</span><span class="label">Articles of Incorporation (with Schedules)</span></span></li>
             <li><span><span class="num">II.</span><span class="label">By-Law No. 1 — General By-Law</span></span></li>
             <li><span><span class="num">III.</span><span class="label">Organizational Resolutions of the First Directors</span></span></li>
             <li><span><span class="num">IV.</span><span class="label">Consents to Act as Director</span></span></li>
             <li><span><span class="num">V.</span><span class="label">Organizational Resolutions of the Shareholders</span></span></li>
             <li><span><span class="num">VI.</span><span class="label">Annual Resolutions of the Directors</span></span></li>
             <li><span><span class="num">VII.</span><span class="label">Annual Resolutions of the Shareholders</span></span></li>
-            <li><span><span class="num">VIII.</span><span class="label">Share Certificates</span></span></li>
-            <li><span><span class="num">IX.</span><span class="label">Corporate Registers</span></span></li>
+            <li><span><span class="num">VIII.</span><span class="label">Share Subscriptions</span></span></li>
+            <li><span><span class="num">IX.</span><span class="label">Share Ledgers</span></span></li>
+            <li><span><span class="num">X.</span><span class="label">Share Transfer Register</span></span></li>
+            <li><span><span class="num">XI.</span><span class="label">Corporate Registers</span></span></li>
+            <li><span><span class="num">XII.</span><span class="label">Share Certificates (Landscape Appendix)</span></span></li>
         </ul>
     </div>
 
@@ -291,8 +294,9 @@
             <div><%= company.name %></div>
         </div>
         <div class="section-block">
-            <div class="section-block-title">2. Corporate Access Number</div>
-            <div><%= company.corporateAccessNumber || 'N/A' %></div>
+            <div class="section-block-title">2. Corporate Access Number / Business Number</div>
+            <div>CAN: <%= company.corporateAccessNumber || 'N/A' %></div>
+            <div>BN: <%= company.businessNumber || 'N/A' %></div>
         </div>
         <div class="section-block">
             <div class="section-block-title">3. Registered Office</div>
@@ -311,38 +315,115 @@
             <% } %>
         </div>
         <div class="section-block">
-            <div class="section-block-title">5. Restrictions on Business</div>
-            <% if (company.restrictions && company.restrictions.hasRestrictions) { %>
+            <div class="section-block-title">5. Address for Service by Mail</div>
+            <% if (!company.addressForService || company.addressForService.sameAsRegistered) { %>
+                <div>Same as Registered Office.</div>
+            <% } else if (company.addressForService.sameAsRecords) { %>
+                <div>Same as Records Address.</div>
+            <% } else { %>
+                <% if (company.addressForService.poBox) { %><div>PO Box <%= company.addressForService.poBox %></div><% } %>
+                <% if (company.addressForService.street) { %><div><%= company.addressForService.street %></div><% } %>
+                <div><%= company.addressForService.city || '' %>, <%= company.addressForService.province || '' %> <%= company.addressForService.postalCode || '' %></div>
+                <div><%= company.addressForService.country || 'Canada' %></div>
+            <% } %>
+            <% if (company.addressForService && company.addressForService.email) { %>
+                <div>Email: <%= company.addressForService.email %></div>
+            <% } %>
+        </div>
+        <div class="section-block">
+            <div class="section-block-title">6. Restrictions on Business</div>
+            <% var rTo = company.restrictions && company.restrictions.restrictedTo;
+               var rFrom = company.restrictions && company.restrictions.restrictedFrom;
+               var legacy = company.restrictions && company.restrictions.hasRestrictions;
+            %>
+            <% if ((rTo && rTo.has) || (rFrom && rFrom.has)) { %>
+                <% if (rTo && rTo.has) { %>
+                    <div style="margin-top: 6px;"><strong>Business Restricted To:</strong></div>
+                    <div style="white-space: pre-wrap;"><%= rTo.description %></div>
+                <% } %>
+                <% if (rFrom && rFrom.has) { %>
+                    <div style="margin-top: 6px;"><strong>Business Restricted From:</strong></div>
+                    <div style="white-space: pre-wrap;"><%= rFrom.description %></div>
+                <% } %>
+            <% } else if (legacy && company.restrictions.description) { %>
                 <div style="white-space: pre-wrap;"><%= company.restrictions.description %></div>
             <% } else { %>
                 <div>There are no restrictions on the business the Corporation may carry on.</div>
             <% } %>
         </div>
         <div class="section-block">
-            <div class="section-block-title">6. Directors</div>
+            <div class="section-block-title">7. Number of Directors</div>
+            <div>Minimum: <%= company.minDirectors != null ? company.minDirectors : 1 %></div>
+            <div>Maximum: <%= company.maxDirectors != null ? company.maxDirectors : 10 %></div>
+        </div>
+        <div class="section-block">
+            <div class="section-block-title">8. Directors</div>
             <table>
-                <thead><tr><th>Name</th><th>Address</th><th>Appointed</th></tr></thead>
+                <thead><tr><th>Name</th><th>Address</th><th>Resident Canadian</th><th>Appointed</th></tr></thead>
                 <tbody>
                     <% company.directors.forEach(function(d) { %>
-                        <tr><td><%= d.name %></td><td><%= d.address %></td><td><%= d.appointedDate ? new Date(d.appointedDate).toLocaleDateString() : '' %></td></tr>
+                        <tr>
+                            <td><%= d.name || ((d.firstName || '') + ' ' + (d.middleName || '') + ' ' + (d.lastName || '')).replace(/\s+/g,' ').trim() %></td>
+                            <td><%= d.address %></td>
+                            <td><%= d.residentCanadian === false ? 'No' : 'Yes' %></td>
+                            <td><%= d.appointedDate ? new Date(d.appointedDate).toLocaleDateString() : '' %></td>
+                        </tr>
                     <% }); %>
                 </tbody>
             </table>
         </div>
         <div class="section-block">
-            <div class="section-block-title">7. Share Structure</div>
+            <div class="section-block-title">9. Authorized Share Capital</div>
+            <% if (company.shareClasses && company.shareClasses.length > 0) { %>
+                <table>
+                    <thead><tr><th>Class</th><th>Type</th><th>Voting</th><th>Maximum Authorized</th><th>Par Value</th></tr></thead>
+                    <tbody>
+                        <% company.shareClasses.forEach(function(sc) { %>
+                            <tr>
+                                <td><%= sc.name %></td>
+                                <td><%= sc.type %></td>
+                                <td><%= sc.voting ? 'Voting' : 'Non-Voting' %></td>
+                                <td><%= sc.maxAuthorized != null ? sc.maxAuthorized.toLocaleString() : 'Unlimited' %></td>
+                                <td><%= sc.parValue != null ? '$' + sc.parValue : 'No par' %></td>
+                            </tr>
+                        <% }); %>
+                    </tbody>
+                </table>
+                <% var hasScheduleAInner = (company.schedules || []).some(function(s){ return /schedule\s*a/i.test(s.name); }); %>
+                <% if (hasScheduleAInner) { %>
+                    <p style="margin-top: 8px; font-style: italic; color: #555;">The rights, restrictions, conditions and limitations attaching to each class of shares are set out in <strong>Schedule A — Share Capital</strong>, attached and forming part of these Articles.</p>
+                <% } else { %>
+                    <p style="margin-top: 8px; font-style: italic; color: #555;">The rights, restrictions, conditions and limitations attaching to each class of shares shall be as determined by the directors of the Corporation by resolution from time to time.</p>
+                <% } %>
+            <% } else { %>
+                <p style="font-style: italic;">No share classes defined.</p>
+            <% } %>
+        </div>
+        <div class="section-block">
+            <div class="section-block-title">10. Issued Shares</div>
             <table>
-                <thead><tr><th>Shareholder</th><th>Class</th><th>Number of Shares</th></tr></thead>
+                <thead><tr><th>Shareholder</th><th>Type</th><th>Class</th><th>Shares</th><th>Voting %</th></tr></thead>
                 <tbody>
                     <% company.shareholders.forEach(function(s) { %>
-                        <tr><td><%= s.name %></td><td><%= s.sharesClass %></td><td><%= s.numberOfShares %></td></tr>
+                        <tr>
+                            <td>
+                                <%= s.name %>
+                                <% if (s.holderType === 'Legal Entity' && s.corporateAccessNumber) { %>
+                                    <div style="font-size: 9pt; color: #666;">CAN: <%= s.corporateAccessNumber %></div>
+                                <% } %>
+                            </td>
+                            <td><%= s.holderType || 'Individual' %></td>
+                            <td><%= s.sharesClass %></td>
+                            <td><%= s.numberOfShares %></td>
+                            <td><%= s.votingPercent != null ? s.votingPercent + '%' : '—' %></td>
+                        </tr>
                     <% }); %>
                 </tbody>
             </table>
         </div>
         <% if (company.schedules && company.schedules.length > 0) { %>
             <div class="section-block">
-                <div class="section-block-title">8. Schedules Forming Part of these Articles</div>
+                <div class="section-block-title">11. Schedules Forming Part of these Articles</div>
                 <ul>
                     <% company.schedules.forEach(function(s) { %>
                         <li><%= s.name %></li>
@@ -362,6 +443,7 @@
             <% } %>
         </div>
     </div>
+
     <% if (company.schedules && company.schedules.length > 0) { %>
         <% company.schedules.forEach(function(s) { %>
             <div class="page doc-content">
@@ -587,51 +669,145 @@
         </div>
     </div>
 
-    <!-- ============ VIII. SHARE CERTIFICATES ============ -->
+    <!-- ============ VIII. SHARE SUBSCRIPTIONS ============ -->
+    <%
+        var classByName = {};
+        (company.shareClasses || []).forEach(function(sc){ classByName[sc.name] = sc; });
+        var lookupPar = function(className) {
+            var sc = classByName[className];
+            return sc && sc.parValue != null ? sc.parValue : 1;
+        };
+    %>
     <div class="page">
         <div class="section-title">
             <div class="num">Section VIII</div>
-            <div class="name">Share Certificates</div>
+            <div class="name">Share Subscriptions</div>
             <div class="rule"></div>
         </div>
     </div>
-    <% company.shareholders.forEach(function(s, idx){ %>
-        <div class="cert-page">
-            <div class="cert-frame">
-                <div class="cert-no">Certificate No. <%= idx + 1 %></div>
-                <div class="cert-header">
-                    <div class="corp-name"><%= company.name.toUpperCase() %></div>
-                    <div class="cert-title">SHARE CERTIFICATE</div>
-                    <div class="jurisdiction">Incorporated under the laws of <%= company.registeredOfficeAddress.country || 'Canada' %></div>
-                </div>
-                <div class="cert-body">
-                    <div>This is to certify that</div>
-                    <div class="holder"><%= s.name %></div>
-                    <div>is the registered holder of</div>
-                    <span class="shares-amount"><%= s.numberOfShares %></span>
-                    <div class="shares-class"><%= s.sharesClass %> Shares</div>
-                    <div class="legalese">
-                        in the capital of the above-named Corporation, fully paid and non-assessable, transferable only on the books of the Corporation upon surrender of this certificate properly endorsed.
-                    </div>
-                </div>
-                <div class="cert-footer">
-                    <div class="sig-block"><div class="sig-line">President / Director</div></div>
-                    <div class="sig-block"><div class="sig-line">Secretary</div></div>
-                </div>
+    <% (company.shareholders || []).forEach(function(s){ %>
+        <% var par = lookupPar(s.sharesClass); var totalPrice = (par * (s.numberOfShares || 0)).toFixed(2); %>
+        <div class="page doc-content">
+            <h1 style="margin-top: 30px;">SHARE SUBSCRIPTION</h1>
+            <p style="margin-top: 18px;"><strong>TO:</strong> <%= company.name %> (the "Corporation")</p>
+            <p><strong>TO:</strong> THE DIRECTORS OF <%= company.name.toUpperCase() %></p>
+            <p style="margin-top: 16px; text-align: justify;">The undersigned subscribes for and agrees to take <strong><%= s.numberOfShares %></strong> <strong><%= s.sharesClass %></strong> of the capital of the Corporation and tenders herewith the sum of <strong>$<%= totalPrice %></strong> in full payment of the subscription price for these shares.</p>
+            <p style="text-align: justify;">The undersigned hereby requests that the said shares be allotted to the undersigned, that the shares be issued as fully paid and non-assessable, and that a certificate for the shares be issued to the undersigned.</p>
+            <p style="margin-top: 16px;">DATED effective <%= company.incorporationDate ? new Date(company.incorporationDate).toLocaleDateString() : today %>.</p>
+            <div class="signature">
+                <div class="sig-line"><%= s.name %></div>
+                <% if (s.holderType === 'Legal Entity') { %>
+                    <% if (s.corporateAccessNumber) { %><div style="font-size: 10pt; color: #555;">Corporate Access Number: <%= s.corporateAccessNumber %></div><% } %>
+                    <% if (s.businessNumber) { %><div style="font-size: 10pt; color: #555;">Business Number: <%= s.businessNumber %></div><% } %>
+                <% } %>
+                <% if (s.address) { %><div style="font-size: 10pt; color: #555;"><%= s.address %></div><% } %>
             </div>
         </div>
     <% }); %>
 
-    <!-- ============ IX. REGISTERS ============ -->
+    <!-- ============ IX. SHARE LEDGERS ============ -->
     <div class="page">
         <div class="section-title">
             <div class="num">Section IX</div>
+            <div class="name">Share Ledgers</div>
+            <div class="rule"></div>
+        </div>
+    </div>
+    <% (company.shareholders || []).forEach(function(s, holderIdx){ %>
+        <% var ledgerPar = lookupPar(s.sharesClass); var ledgerPaid = (ledgerPar * (s.numberOfShares || 0)).toFixed(2); %>
+        <div class="page doc-content">
+            <h1 style="margin-top: 30px; font-size: 18pt;">SHARE LEDGER</h1>
+            <p class="preamble"><%= company.name %></p>
+            <div style="margin-top: 18px;">
+                <div style="font-weight: bold; font-size: 12pt;">Holder: <%= s.name %></div>
+                <div style="font-size: 10pt; color: #555;">
+                    <%= s.holderType || 'Individual' %>
+                    <% if (s.holderType === 'Legal Entity' && s.corporateAccessNumber) { %> &mdash; CAN <%= s.corporateAccessNumber %><% } %>
+                    <% if (s.holderType === 'Legal Entity' && s.businessNumber) { %> &mdash; BN <%= s.businessNumber %><% } %>
+                </div>
+                <% if (s.address) { %><div style="font-size: 10pt; color: #555;"><%= s.address %></div><% } %>
+                <div style="font-size: 10pt; color: #555;">Class of Shares: <strong><%= s.sharesClass %></strong></div>
+            </div>
+            <table style="margin-top: 12px;">
+                <thead>
+                    <tr><th>Date</th><th>Cert. Issued</th><th>Cert. Cancelled</th><th>Transfer No.</th><th>To / From</th><th>Paid Up</th><th>Sold</th><th>Bought</th><th>Balance</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><%= company.incorporationDate ? new Date(company.incorporationDate).toLocaleDateString() : today %></td>
+                        <td>A<%= holderIdx + 1 %></td>
+                        <td>—</td>
+                        <td>Initial</td>
+                        <td>From Treasury</td>
+                        <td>$<%= ledgerPaid %></td>
+                        <td>—</td>
+                        <td><%= s.numberOfShares %></td>
+                        <td><strong><%= s.numberOfShares %></strong></td>
+                    </tr>
+                    <% for (var r = 0; r < 8; r++) { %>
+                        <tr style="height: 24px;"><td colspan="9" style="color: #ccc; text-align: center; font-style: italic;">&nbsp;</td></tr>
+                    <% } %>
+                </tbody>
+            </table>
+        </div>
+    <% }); %>
+
+    <!-- ============ X. SHARE TRANSFER REGISTER ============ -->
+    <div class="page">
+        <div class="section-title">
+            <div class="num">Section X</div>
+            <div class="name">Share Transfer Register</div>
+            <div class="rule"></div>
+        </div>
+    </div>
+    <div class="page doc-content">
+        <h1 style="margin-top: 30px; font-size: 18pt;">SHARE TRANSFER REGISTER</h1>
+        <p class="preamble"><%= company.name %></p>
+        <p style="font-size: 10.5pt; color: #555; margin-top: 8px;">Chronological record of every issuance and transfer of shares of the Corporation.</p>
+        <table style="margin-top: 8px;">
+            <thead>
+                <tr><th>No.</th><th>Date</th><th>Class</th><th>Cert. Surrendered</th><th>Transferor</th><th>Transferee</th><th>Address</th><th>Cert. Issued</th></tr>
+            </thead>
+            <tbody>
+                <% (company.shareholders || []).forEach(function(s, idx) { %>
+                    <tr>
+                        <td><%= idx + 1 %></td>
+                        <td><%= company.incorporationDate ? new Date(company.incorporationDate).toLocaleDateString() : today %></td>
+                        <td><%= s.sharesClass %></td>
+                        <td>—</td>
+                        <td>From Treasury</td>
+                        <td><%= s.name %></td>
+                        <td><%= s.address || '' %></td>
+                        <td>A<%= idx + 1 %> / <%= s.numberOfShares %></td>
+                    </tr>
+                <% }); %>
+                <% for (var r = 0; r < 10; r++) { %>
+                    <tr style="height: 22px;"><td colspan="8" style="color: #ccc; text-align: center; font-style: italic;">&nbsp;</td></tr>
+                <% } %>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ============ XI. REGISTERS ============ -->
+    <div class="page">
+        <div class="section-title">
+            <div class="num">Section XI</div>
             <div class="name">Corporate Registers</div>
             <div class="rule"></div>
         </div>
     </div>
     <div class="page doc-content">
         <%- include('_registers_body', { company: company }) %>
+    </div>
+
+    <!-- ============ XII. SHARE CERTIFICATES (DIVIDER ONLY — landscape pages appended via pdf-lib) ============ -->
+    <div class="page">
+        <div class="section-title">
+            <div class="num">Section XII</div>
+            <div class="name">Share Certificates</div>
+            <div class="rule"></div>
+            <p style="margin-top: 24px; font-style: italic; color: #555; font-size: 11pt;">The share certificates of the Corporation follow this page in landscape orientation.</p>
+        </div>
     </div>
 </body>
 
