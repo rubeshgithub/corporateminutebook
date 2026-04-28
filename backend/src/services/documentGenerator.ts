@@ -23,7 +23,7 @@ export const generatePDFBuffer = async (company: ICompany, templateName: string)
     const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] });
     const page = await browser.newPage();
 
-    await page.setContent(compiledHtml, { waitUntil: 'networkidle0' });
+    await page.setContent(compiledHtml, { waitUntil: 'domcontentloaded' });
 
     const pdfBuffer = await page.pdf({
         format: 'Letter',
@@ -45,7 +45,7 @@ export const generateMinuteBookPDF = async (company: ICompany): Promise<Buffer> 
 
     // Main book — portrait, no puppeteer header/footer (we'll overlay with pdf-lib so numbering is continuous across the merged doc)
     const mainPage = await browser.newPage();
-    await mainPage.setContent(mainHtml, { waitUntil: 'networkidle0' });
+    await mainPage.setContent(mainHtml, { waitUntil: 'domcontentloaded' });
     const mainPdfBytes = await mainPage.pdf({
         format: 'Letter',
         printBackground: true,
@@ -54,7 +54,7 @@ export const generateMinuteBookPDF = async (company: ICompany): Promise<Buffer> 
 
     // Share certificates — landscape, no header/footer
     const certPage = await browser.newPage();
-    await certPage.setContent(certHtml, { waitUntil: 'networkidle0' });
+    await certPage.setContent(certHtml, { waitUntil: 'domcontentloaded' });
     const certPdfBytes = await certPage.pdf({
         format: 'Letter',
         landscape: true,
