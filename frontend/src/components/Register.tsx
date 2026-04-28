@@ -3,7 +3,7 @@ import { Box, Button, TextField, Typography, Paper } from '@mui/material';
 import { useDispatch } from 'react-redux';
 import { loginSuccess } from '../store/authSlice';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../utils/api';
 
 const Register: React.FC = () => {
     const [name, setName] = useState('');
@@ -15,7 +15,7 @@ const Register: React.FC = () => {
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const res = await axios.post('/api/auth/register', { name, email, password });
+            const res = await api.post('/auth/register', { name, email, password });
             dispatch(loginSuccess(res.data));
             navigate('/dashboard');
         } catch (error) {

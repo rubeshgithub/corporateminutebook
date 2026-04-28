@@ -3,7 +3,7 @@ import { Box, Button, TextField, Typography, Paper } from '@mui/material';
 import { useDispatch } from 'react-redux';
 import { loginSuccess } from '../store/authSlice';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../utils/api';
 
 const Login: React.FC = () => {
     const [email, setEmail] = useState('');
@@ -14,7 +14,7 @@ const Login: React.FC = () => {
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const res = await axios.post('/api/auth/login', { email, password });
+            const res = await api.post('/auth/login', { email, password });
             dispatch(loginSuccess(res.data));
             navigate('/dashboard');
         } catch (error) {
