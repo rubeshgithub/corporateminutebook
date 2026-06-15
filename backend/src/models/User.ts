@@ -2,10 +2,11 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IUser extends Document {
     email: string;
-    passwordHash: string;
     name: string;
     role: 'admin' | 'business_owner';
     subscriptionTier: 'free' | 'premium';
+    otpCode?: string;
+    otpExpiry?: Date;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -13,10 +14,11 @@ export interface IUser extends Document {
 const userSchema: Schema = new Schema(
     {
         email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-        passwordHash: { type: String, required: true },
-        name: { type: String, required: true },
+        name: { type: String, default: '' },
         role: { type: String, enum: ['admin', 'business_owner'], default: 'business_owner' },
         subscriptionTier: { type: String, enum: ['free', 'premium'], default: 'free' },
+        otpCode: { type: String },
+        otpExpiry: { type: Date },
     },
     { timestamps: true }
 );

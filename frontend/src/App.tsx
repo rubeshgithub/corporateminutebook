@@ -1,12 +1,18 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
 import Login from './components/Login';
-import Register from './components/Register';
 import Dashboard from './components/Dashboard';
 import MinuteBookBuilder from './components/MinuteBookBuilder';
 import DocumentManagement from './components/DocumentManagement';
+import RecordsVault from './components/RecordsVault';
 import Layout from './components/Layout';
 import { useSelector } from 'react-redux';
+import { SnackbarProvider } from './context/SnackbarContext';
+
+const EventsRedirect = () => {
+    const { companyId } = useParams<{ companyId: string }>();
+    return <Navigate to={`/records/${companyId}`} replace />;
+};
 
 const theme = createTheme({
     palette: {
@@ -34,17 +40,21 @@ function App() {
     return (
         <ThemeProvider theme={theme}>
             <CssBaseline />
+            <SnackbarProvider>
             <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
                 <Routes>
                     <Route path="/" element={<Navigate to="/login" />} />
                     <Route path="/login" element={<Login />} />
-                    <Route path="/register" element={<Register />} />
+                    <Route path="/register" element={<Navigate to="/login" />} />
                     <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
                     <Route path="/builder" element={<PrivateRoute><MinuteBookBuilder /></PrivateRoute>} />
                     <Route path="/builder/:id" element={<PrivateRoute><MinuteBookBuilder /></PrivateRoute>} />
                     <Route path="/documents" element={<PrivateRoute><DocumentManagement /></PrivateRoute>} />
+                    <Route path="/events/:companyId" element={<EventsRedirect />} />
+                    <Route path="/records/:companyId" element={<PrivateRoute><RecordsVault /></PrivateRoute>} />
                 </Routes>
             </BrowserRouter>
+            </SnackbarProvider>
         </ThemeProvider>
     );
 }
