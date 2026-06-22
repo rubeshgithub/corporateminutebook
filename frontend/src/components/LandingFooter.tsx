@@ -53,7 +53,7 @@ const LandingFooter: React.FC = () => {
                         </span>
                     </div>
                     <p style={{ fontSize: '0.8rem', lineHeight: 1.65, maxWidth: '34ch', color: '#94a3b8' }}>
-                        Court-ready Canadian corporate minute books — built in minutes, not weeks. Compliant with the
+                        Compliance-ready Canadian corporate minute books — built in minutes, not weeks. Compliant with the
                         CBCA and all 13 provincial and territorial corporate statutes.
                     </p>
                 </div>
