@@ -55,9 +55,15 @@
 
 <body>
     <% company.shareholders.forEach(function(shareholder, idx) { %>
+        <%
+            var certNo = shareholder.certificateNumber || (idx + 1);
+            var issueDate = (shareholder.issuanceDate || company.incorporationDate)
+                ? new Date(shareholder.issuanceDate || company.incorporationDate).toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })
+                : null;
+        %>
         <div class="certificate">
             <div class="frame">
-                <div class="cert-no">Certificate No. <%= idx + 1 %></div>
+                <div class="cert-no">Certificate No. <%= certNo %></div>
                 <div class="header">
                     <div class="corp-name"><%= company.name.toUpperCase() %></div>
                     <div class="cert-title">SHARE CERTIFICATE</div>
@@ -77,6 +83,9 @@
                         transferable only on the books of the Corporation upon surrender of this
                         certificate properly endorsed.
                     </div>
+                    <% if (issueDate) { %>
+                    <div style="margin-top: 12px; font-size: 12px; color: #555;">Issued: <%= issueDate %></div>
+                    <% } %>
                 </div>
 
                 <div class="footer">

@@ -65,29 +65,45 @@ export interface ICompany extends Document {
         firstName?: string;
         middleName?: string;
         lastName?: string;
-        address: string;
+        address: string;          // street line
+        city?: string;
+        province?: string;
+        postalCode?: string;
         residentCanadian?: boolean;
         appointedDate: Date;
         resignedDate?: Date;
+        email?: string;
+        phone?: string;
     }>;
     shareholders: Array<{
         name: string;
         sharesClass: string;
         numberOfShares: number;
-        // new fields
         holderType?: 'Individual' | 'Legal Entity';
-        corporateAccessNumber?: string;  // if Legal Entity
-        businessNumber?: string;         // if Legal Entity
-        address?: string;
+        corporateAccessNumber?: string;
+        businessNumber?: string;
+        address?: string;         // street line
+        city?: string;
+        province?: string;
+        postalCode?: string;
         votingPercent?: number;
+        certificateNumber?: number;
+        considerationPaid?: number;
+        issuanceDate?: Date;
+        email?: string;
+        phone?: string;
     }>;
     officers: Array<{
         name: string;
         title: string;
         appointedDate: Date;
         resignedDate?: Date;
+        email?: string;
+        phone?: string;
     }>;
     fiscalYearEnd?: string; // e.g., "12-31"
+    annualReturnDueDate?: string; // MM-DD — anniversary date when annual return is due
+    incorporationDocumentFile?: string; // UUID filename stored in uploads/
     deletedAt?: Date | null;
     createdAt: Date;
     updatedAt: Date;
@@ -168,9 +184,14 @@ const companySchema: Schema = new Schema(
                 middleName: String,
                 lastName: String,
                 address: String,
+                city: String,
+                province: String,
+                postalCode: String,
                 residentCanadian: { type: Boolean, default: true },
                 appointedDate: Date,
                 resignedDate: Date,
+                email: String,
+                phone: String,
             },
         ],
         shareholders: [
@@ -182,7 +203,15 @@ const companySchema: Schema = new Schema(
                 corporateAccessNumber: String,
                 businessNumber: String,
                 address: String,
+                city: String,
+                province: String,
+                postalCode: String,
                 votingPercent: Number,
+                certificateNumber: Number,
+                considerationPaid: Number,
+                issuanceDate: Date,
+                email: String,
+                phone: String,
             },
         ],
         officers: [
@@ -191,9 +220,13 @@ const companySchema: Schema = new Schema(
                 title: String,
                 appointedDate: Date,
                 resignedDate: Date,
+                email: String,
+                phone: String,
             },
         ],
         fiscalYearEnd: { type: String },
+        annualReturnDueDate: { type: String },
+        incorporationDocumentFile: { type: String },
         deletedAt: { type: Date, default: null },
     },
     { timestamps: true }

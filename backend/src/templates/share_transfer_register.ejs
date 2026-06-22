@@ -21,6 +21,65 @@
     <div class="corp-name"><%= company.name %></div>
     <p class="lead">Chronological record of every issuance and transfer of shares of the Corporation.</p>
 
+    <%
+        var shareEvents = (events || []).filter(function(e) {
+            return e.eventType === 'shares_issued' || e.eventType === 'shares_transferred' || e.eventType === 'shares_cancelled';
+        });
+        var fmtDate = function(d) { return d ? new Date(d).toLocaleDateString() : ''; };
+
+        // Build register rows — prefer event history; fall back to snapshot issuances
+        var rows = [];
+        if (shareEvents.length > 0) {
+            shareEvents.forEach(function(e) {
+                var d = e.data || {};
+                if (e.eventType === 'shares_issued') {
+                    rows.push({
+                        date: fmtDate(e.effectiveDate),
+                        sharesClass: d.sharesClass || '',
+                        certSurrendered: '—',
+                        transferor: 'Treasury',
+                        transferee: d.name || '',
+                        address: d.address || '',
+                        certIssued: (d.certificateNumber ? 'A' + d.certificateNumber : '') + ' / ' + (d.numberOfShares || 0),
+                    });
+                } else if (e.eventType === 'shares_transferred') {
+                    rows.push({
+                        date: fmtDate(e.effectiveDate),
+                        sharesClass: d.sharesClass || '',
+                        certSurrendered: d.certificateNumberSurrendered ? ('A' + d.certificateNumberSurrendered + ' / ' + d.numberOfShares) : ('— / ' + (d.numberOfShares || 0)),
+                        transferor: d.fromName || '',
+                        transferee: d.toName || '',
+                        address: d.toAddress || '',
+                        certIssued: d.certificateNumberIssued ? ('A' + d.certificateNumberIssued + ' / ' + d.numberOfShares) : ('— / ' + (d.numberOfShares || 0)),
+                    });
+                } else if (e.eventType === 'shares_cancelled') {
+                    rows.push({
+                        date: fmtDate(e.effectiveDate),
+                        sharesClass: d.sharesClass || '',
+                        certSurrendered: d.certificateNumber ? ('A' + d.certificateNumber + ' / ' + d.numberOfShares) : '—',
+                        transferor: d.holderName || '',
+                        transferee: 'Cancelled',
+                        address: '',
+                        certIssued: '—',
+                    });
+                }
+            });
+        } else {
+            // Fallback: initial issuances from company snapshot
+            (company.shareholders || []).forEach(function(s, idx) {
+                rows.push({
+                    date: fmtDate(s.issuanceDate || company.incorporationDate),
+                    sharesClass: s.sharesClass,
+                    certSurrendered: '—',
+                    transferor: 'Treasury',
+                    transferee: s.name,
+                    address: s.address || '',
+                    certIssued: (s.certificateNumber ? 'A' + s.certificateNumber : 'A' + (idx + 1)) + ' / ' + s.numberOfShares,
+                });
+            });
+        }
+    %>
+
     <table>
         <thead>
             <tr>
@@ -36,20 +95,21 @@
             </tr>
         </thead>
         <tbody>
-            <% (company.shareholders || []).forEach(function(s, idx) { %>
+            <% rows.forEach(function(row, idx) { %>
                 <tr>
                     <td><%= idx + 1 %></td>
-                    <td><%= company.incorporationDate ? new Date(company.incorporationDate).toLocaleDateString() : '' %></td>
-                    <td><%= s.sharesClass %></td>
-                    <td>—</td>
-                    <td>From Treasury</td>
-                    <td><%= s.name %></td>
-                    <td><%= s.address || '' %></td>
-                    <td>A<%= idx + 1 %> / <%= s.numberOfShares %></td>
-                    <td>—</td>
+                    <td><%= row.date %></td>
+                    <td><%= row.sharesClass %></td>
+                    <td><%= row.certSurrendered %></td>
+                    <td><%= row.transferor %></td>
+                    <td><%= row.transferee %></td>
+                    <td><%= row.address %></td>
+                    <td><%= row.certIssued %></td>
+                    <td>&nbsp;</td>
                 </tr>
             <% }); %>
-            <% for (var r = 0; r < 14; r++) { %>
+            <% var blankRows = Math.max(0, 10 - rows.length); %>
+            <% for (var r = 0; r < blankRows; r++) { %>
                 <tr class="empty-row"><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
             <% } %>
         </tbody>

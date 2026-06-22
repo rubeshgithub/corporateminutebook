@@ -49,6 +49,9 @@ frontend/dist/
 # Puppeteer download cache (if installed locally)
 .cache/
 
+# Uploaded incorporation documents (stored server-side, not in git)
+backend/uploads/
+
 # Optional npm/yarn caches
 .npm/
 .yarn/

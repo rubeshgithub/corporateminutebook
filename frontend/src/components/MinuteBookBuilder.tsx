@@ -7,12 +7,18 @@ import {
     Stepper, Step, StepLabel, StepButton, Divider, List, ListItem, ListItemText,
     Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
     MenuItem, FormControlLabel, Switch, RadioGroup, Radio, FormControl, FormLabel,
-    Checkbox
+    Checkbox, Alert, Chip, Collapse
 } from '@mui/material';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '../utils/api';
+import { useSnackbar } from '../context/SnackbarContext';
+import PlacesTextField from './PlacesTextField';
+
+const CONTACT_HINT = 'Providing email and phone allows us to send reminders for resolutions, annual returns, and key corporate deadlines.';
 
 const toDateInput = (value?: string | Date) => {
     if (!value) return '';
@@ -133,9 +139,14 @@ const companySchema = z.object({
         firstName: z.string().min(1, 'First name is required'),
         middleName: z.string().optional(),
         lastName: z.string().min(1, 'Last name is required'),
-        address: z.string().min(1, 'Address is required'),
+        address: z.string().min(1, 'Street address is required'),
+        city: z.string().min(1, 'City is required'),
+        province: z.string().min(1, 'Province is required'),
+        postalCode: z.string().min(1, 'Postal code is required'),
         residentCanadian: z.boolean().default(true),
         appointedDate: z.string().min(1, 'Appointed Date is required'),
+        email: z.string().email('Invalid email').optional().or(z.literal('')),
+        phone: z.string().optional(),
     })).min(1, 'At least one director is required'),
     shareholders: z.array(z.object({
         holderType: z.enum(['Individual', 'Legal Entity']).default('Individual'),
@@ -143,22 +154,34 @@ const companySchema = z.object({
         corporateAccessNumber: z.string().optional(),
         businessNumber: z.string().optional(),
         address: z.string().optional(),
+        city: z.string().optional(),
+        province: z.string().optional(),
+        postalCode: z.string().optional(),
         sharesClass: z.string().min(1, 'Share Class is required'),
         numberOfShares: z.coerce.number().min(1, 'Must have at least 1 share'),
         votingPercent: z.coerce.number().min(0).max(100).optional(),
+        certificateNumber: z.number().optional(),
+        considerationPaid: z.coerce.number().min(0).optional(),
+        issuanceDate: z.string().optional(),
+        email: z.string().email('Invalid email').optional().or(z.literal('')),
+        phone: z.string().optional(),
     })).min(1, 'At least one shareholder is required'),
     officers: z.array(z.object({
         name: z.string().min(1, 'Officer Name is required'),
         title: z.string().min(1, 'Title is required'),
         appointedDate: z.string().min(1, 'Appointed Date is required'),
+        email: z.string().email('Invalid email').optional().or(z.literal('')),
+        phone: z.string().optional(),
     })).min(1, 'At least one officer is required'),
     fiscalYearEnd: z.string().optional(),
+    annualReturnDueDate: z.string().optional(),
+    incorporationDocumentFile: z.string().optional(),
 });
 
 type CompanyFormValues = z.infer<typeof companySchema>;
 
 const STEPS: Array<{ label: string; fields: FieldPath<CompanyFormValues>[] }> = [
-    { label: 'Company', fields: ['name', 'corporateAccessNumber', 'businessNumber', 'incorporationDate', 'fiscalYearEnd', 'minDirectors', 'maxDirectors', 'restrictions', 'authorizedBy'] },
+    { label: 'Company', fields: ['name', 'corporateAccessNumber', 'businessNumber', 'incorporationDate', 'fiscalYearEnd', 'annualReturnDueDate', 'minDirectors', 'maxDirectors', 'restrictions', 'authorizedBy'] },
     { label: 'Addresses', fields: ['registeredOfficeAddress', 'recordsAddress', 'addressForService'] },
     { label: 'Directors', fields: ['directors'] },
     { label: 'Officers', fields: ['officers'] },
@@ -181,11 +204,19 @@ const MinuteBookBuilder: React.FC = () => {
     const navigate = useNavigate();
     const { id } = useParams<{ id?: string }>();
     const isEdit = Boolean(id);
+    const { showSnackbar } = useSnackbar();
     const [loading, setLoading] = useState(isEdit);
     const [lookupLoading, setLookupLoading] = useState(false);
     const [activeStep, setActiveStep] = useState(0);
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [saving, setSaving] = useState(false);
+
+    // Incorporation document upload
+    const [uploadParsing, setUploadParsing] = useState(false);
+    const [uploadError, setUploadError] = useState('');
+    const [parsedFields, setParsedFields] = useState<string[]>([]);
+    const [incorpFileName, setIncorpFileName] = useState('');   // original filename for display
+    const [showParsed, setShowParsed] = useState(false);
 
     const {
         control, handleSubmit, reset, getValues, setValue, trigger, watch, formState: { errors }
@@ -220,9 +251,10 @@ const MinuteBookBuilder: React.FC = () => {
             schedules: [],
             shareClasses: [{ ...DEFAULT_SHARE_CLASS }],
             directors: [{ name: '', firstName: '', middleName: '', lastName: '', address: '', residentCanadian: true, appointedDate: '' }],
-            shareholders: [{ holderType: 'Individual', name: '', corporateAccessNumber: '', businessNumber: '', address: '', sharesClass: DEFAULT_SHARE_CLASS.name, numberOfShares: 100, votingPercent: 100 }],
+            shareholders: [{ holderType: 'Individual', name: '', corporateAccessNumber: '', businessNumber: '', address: '', sharesClass: DEFAULT_SHARE_CLASS.name, numberOfShares: 100, votingPercent: 100, considerationPaid: undefined, issuanceDate: '' }],
             officers: [{ name: '', title: 'President', appointedDate: '' }],
             fiscalYearEnd: '12-31',
+            annualReturnDueDate: '',
         }
     });
 
@@ -331,8 +363,13 @@ const MinuteBookBuilder: React.FC = () => {
                             middleName: d.middleName || '',
                             lastName: d.lastName || (hasParts ? '' : (d.name || '').split(' ').slice(1).join(' ') || ''),
                             address: d.address || '',
+                            city: d.city || '',
+                            province: d.province || '',
+                            postalCode: d.postalCode || '',
                             residentCanadian: d.residentCanadian ?? true,
                             appointedDate: toDateInput(d.appointedDate),
+                            email: d.email || '',
+                            phone: d.phone || '',
                         };
                     }),
                     shareholders: (data.shareholders?.length ? data.shareholders : [{}]).map((s: any) => ({
@@ -341,20 +378,35 @@ const MinuteBookBuilder: React.FC = () => {
                         corporateAccessNumber: s.corporateAccessNumber || '',
                         businessNumber: s.businessNumber || '',
                         address: s.address || '',
+                        city: s.city || '',
+                        province: s.province || '',
+                        postalCode: s.postalCode || '',
                         sharesClass: s.sharesClass || DEFAULT_SHARE_CLASS.name,
                         numberOfShares: s.numberOfShares ?? 100,
                         votingPercent: s.votingPercent ?? undefined,
+                        certificateNumber: s.certificateNumber ?? undefined,
+                        considerationPaid: s.considerationPaid ?? undefined,
+                        issuanceDate: toDateInput(s.issuanceDate),
+                        email: s.email || '',
+                        phone: s.phone || '',
                     })),
                     officers: (data.officers?.length ? data.officers : [{ name: '', title: 'President', appointedDate: '' }]).map((o: any) => ({
                         name: o.name || '',
                         title: o.title || 'President',
                         appointedDate: toDateInput(o.appointedDate),
+                        email: o.email || '',
+                        phone: o.phone || '',
                     })),
                     fiscalYearEnd: data.fiscalYearEnd || '12-31',
+                    annualReturnDueDate: data.annualReturnDueDate || '',
+                    incorporationDocumentFile: data.incorporationDocumentFile || '',
                 });
+                if (data.incorporationDocumentFile) {
+                    setIncorpFileName('__existing__');
+                }
             } catch (error) {
                 console.error('Failed to load company:', error);
-                alert('Failed to load company. Returning to dashboard.');
+                showSnackbar('Failed to load company. Returning to dashboard.', 'error');
                 navigate('/dashboard');
             } finally {
                 setLoading(false);
@@ -363,10 +415,139 @@ const MinuteBookBuilder: React.FC = () => {
         fetchCompany();
     }, [id, isEdit, navigate, reset]);
 
+    const handleIncorpUpload = async (file: File) => {
+        setUploadError('');
+        setParsedFields([]);
+        setShowParsed(false);
+        setUploadParsing(true);
+        try {
+            const formData = new FormData();
+            formData.append('incorporationDocument', file);
+            const { data } = await api.post('/incorporation/parse', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+            const p = data.parsedData;
+
+            // Apply parsed fields to the form
+            const applied: string[] = [];
+
+            if (p.name) { setValue('name', p.name, { shouldValidate: true }); applied.push('Company Name'); }
+            if (p.corporateAccessNumber) { setValue('corporateAccessNumber', p.corporateAccessNumber); applied.push('Corporate Access Number'); }
+            if (p.incorporationDate) { setValue('incorporationDate', p.incorporationDate); applied.push('Incorporation Date'); }
+            if (p.fiscalYearEnd) { setValue('fiscalYearEnd', p.fiscalYearEnd); applied.push('Fiscal Year End'); }
+            if (p.minDirectors) { setValue('minDirectors', p.minDirectors); applied.push('Min Directors'); }
+            if (p.maxDirectors) { setValue('maxDirectors', p.maxDirectors); applied.push('Max Directors'); }
+
+            if (p.registeredOfficeAddress?.street) {
+                setValue('registeredOfficeAddress.street', p.registeredOfficeAddress.street, { shouldValidate: true });
+                setValue('registeredOfficeAddress.city', p.registeredOfficeAddress.city || '');
+                setValue('registeredOfficeAddress.province', p.registeredOfficeAddress.province || '');
+                setValue('registeredOfficeAddress.postalCode', p.registeredOfficeAddress.postalCode || '');
+                setValue('registeredOfficeAddress.country', p.registeredOfficeAddress.country || 'Canada');
+                applied.push('Registered Office Address');
+            }
+
+            if (Array.isArray(p.directors) && p.directors.length > 0) {
+                const mapped = p.directors.map((d: any) => ({
+                    name: `${d.firstName || ''} ${d.lastName || ''}`.trim(),
+                    firstName: d.firstName || '',
+                    middleName: '',
+                    lastName: d.lastName || '',
+                    address: d.address || '',
+                    residentCanadian: d.residentCanadian ?? true,
+                    appointedDate: d.appointedDate || getValue('incorporationDate') || '',
+                }));
+                setValue('directors', mapped, { shouldValidate: false });
+                applied.push(`Directors (${mapped.length})`);
+            }
+
+            if (Array.isArray(p.shareClasses) && p.shareClasses.length > 0) {
+                const mapped = p.shareClasses.map((sc: any) => ({
+                    name: sc.name || '',
+                    type: sc.type || 'Common',
+                    voting: sc.voting ?? true,
+                    maxAuthorized: sc.maxAuthorized ?? null,
+                    parValue: sc.parValue ?? null,
+                }));
+                setValue('shareClasses', mapped, { shouldValidate: false });
+                applied.push(`Share Classes (${mapped.length})`);
+            }
+
+            if (p.restrictions) {
+                if (p.restrictions.restrictedTo) setValue('restrictions.restrictedTo', p.restrictions.restrictedTo);
+                if (p.restrictions.restrictedFrom) setValue('restrictions.restrictedFrom', p.restrictions.restrictedFrom);
+                if (p.restrictions.restrictedTo?.has || p.restrictions.restrictedFrom?.has) applied.push('Restrictions');
+            }
+
+            if (p.recordsAddress) {
+                setValue('recordsAddress.sameAsRegistered', p.recordsAddress.sameAsRegistered ?? true);
+                if (!p.recordsAddress.sameAsRegistered) {
+                    setValue('recordsAddress.street', p.recordsAddress.street || '');
+                    setValue('recordsAddress.city', p.recordsAddress.city || '');
+                    setValue('recordsAddress.province', p.recordsAddress.province || '');
+                    setValue('recordsAddress.postalCode', p.recordsAddress.postalCode || '');
+                    setValue('recordsAddress.country', p.recordsAddress.country || 'Canada');
+                    applied.push('Records Address');
+                }
+            }
+
+            if (p.addressForService) {
+                const afs = p.addressForService;
+                const afsSameAs = afs.sameAsRegistered ?? false;
+                setValue('addressForService.sameAsRegistered', afsSameAs);
+                setValue('addressForService.sameAsRecords', false);
+                if (!afsSameAs) {
+                    if (afs.poBox) setValue('addressForService.poBox', afs.poBox);
+                    if (afs.street) setValue('addressForService.street', afs.street);
+                    if (afs.city) setValue('addressForService.city', afs.city || '');
+                    if (afs.province) setValue('addressForService.province', afs.province || '');
+                    if (afs.postalCode) setValue('addressForService.postalCode', afs.postalCode || '');
+                    setValue('addressForService.country', afs.country || 'Canada');
+                    applied.push('Address for Service');
+                }
+            }
+
+            if (Array.isArray(p.shareholders) && p.shareholders.length > 0) {
+                const defaultShareClass = p.shareClasses?.[0]?.name || '';
+                const mapped = p.shareholders.map((s: any) => ({
+                    holderType: s.holderType || 'Individual',
+                    name: s.name || '',
+                    corporateAccessNumber: '',
+                    businessNumber: '',
+                    address: s.address || '',
+                    sharesClass: s.sharesClass || defaultShareClass,
+                    numberOfShares: s.numberOfShares ?? 100,
+                    votingPercent: s.votingPercent ?? undefined,
+                    certificateNumber: undefined,
+                    considerationPaid: undefined,
+                    issuanceDate: '',
+                }));
+                setValue('shareholders', mapped, { shouldValidate: false });
+                applied.push(`Shareholders (${mapped.length})`);
+            }
+
+            // Store the temp file reference
+            setValue('incorporationDocumentFile', data.tempFile);
+            setIncorpFileName(file.name);
+            setParsedFields(applied);
+            setShowParsed(true);
+        } catch (err: any) {
+            const msg = err?.response?.data?.error || 'Failed to parse document. Please fill the form manually.';
+            setUploadError(msg);
+        } finally {
+            setUploadParsing(false);
+        }
+    };
+
+    // helper used in handleIncorpUpload
+    const getValue = (field: string) => {
+        try { return (getValues as any)(field) || ''; } catch { return ''; }
+    };
+
     const handleRegistryLookup = async () => {
         const accessNumber = getValues('corporateAccessNumber');
         if (!accessNumber) {
-            alert('Enter a Corporate Access Number first.');
+            showSnackbar('Enter a Corporate Access Number first.', 'warning');
             return;
         }
         setLookupLoading(true);
@@ -383,7 +564,7 @@ const MinuteBookBuilder: React.FC = () => {
             }
         } catch (error) {
             console.error('Registry lookup failed:', error);
-            alert('Registry lookup failed. Verify the access number and try again.');
+            showSnackbar('Registry lookup failed. Verify the access number and try again.', 'error');
         } finally {
             setLookupLoading(false);
         }
@@ -410,7 +591,7 @@ const MinuteBookBuilder: React.FC = () => {
     const handleSaveClick = async () => {
         const isValid = await trigger();
         if (!isValid) {
-            alert('Some fields are missing or invalid. Use the step labels to navigate back and fix them.');
+            showSnackbar('Some fields are missing or invalid. Use the step labels to navigate back and fix them.', 'warning');
             return;
         }
         setConfirmOpen(true);
@@ -429,7 +610,7 @@ const MinuteBookBuilder: React.FC = () => {
             navigate('/dashboard');
         } catch (error) {
             console.error('Failed to save company:', error);
-            alert('Failed to save Company profile. Please try again.');
+            showSnackbar('Failed to save company profile. Please try again.', 'error');
         } finally {
             setSaving(false);
         }
@@ -474,6 +655,86 @@ const MinuteBookBuilder: React.FC = () => {
                     {/* ============ Step 0: Company ============ */}
                     {activeStep === 0 && (
                         <Box>
+                            {/* ---- Incorporation Document Upload ---- */}
+                            <Box
+                                sx={{
+                                    mb: 3, p: 2.5, border: '2px dashed', borderColor: 'primary.light',
+                                    borderRadius: 2, bgcolor: 'primary.50', position: 'relative',
+                                }}
+                            >
+                                <Box display="flex" alignItems="center" gap={1.5} mb={1}>
+                                    <UploadFileIcon color="primary" />
+                                    <Typography variant="subtitle1" fontWeight={600} color="primary.dark">
+                                        Already incorporated? Upload your Certificate of Incorporation
+                                    </Typography>
+                                </Box>
+                                <Typography variant="body2" color="text.secondary" mb={1.5}>
+                                    We'll read the document and auto-fill the form. Works with Alberta, BC, Ontario, Federal, and other Canadian provinces. The original document will be included in your minute book as proof of filing.
+                                </Typography>
+
+                                <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
+                                    <Button
+                                        component="label"
+                                        variant="outlined"
+                                        size="small"
+                                        startIcon={uploadParsing ? <CircularProgress size={16} /> : <UploadFileIcon />}
+                                        disabled={uploadParsing}
+                                    >
+                                        {uploadParsing ? 'Reading document…' : incorpFileName === '__existing__' ? 'Replace PDF' : 'Choose PDF'}
+                                        <input
+                                            hidden
+                                            type="file"
+                                            accept="application/pdf"
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0];
+                                                if (file) handleIncorpUpload(file);
+                                                e.target.value = '';
+                                            }}
+                                        />
+                                    </Button>
+                                    {incorpFileName === '__existing__' && !uploadParsing && (
+                                        <Box display="flex" alignItems="center" gap={0.5}>
+                                            <CheckCircleOutlineIcon sx={{ fontSize: 16, color: 'success.main' }} />
+                                            <Typography variant="caption" color="success.dark" fontWeight={600}>
+                                                Document attached — will be included in minute book
+                                            </Typography>
+                                        </Box>
+                                    )}
+                                    {incorpFileName && incorpFileName !== '__existing__' && !uploadParsing && (
+                                        <Typography variant="caption" color="text.secondary">
+                                            {incorpFileName}
+                                        </Typography>
+                                    )}
+                                </Box>
+
+                                {uploadError && (
+                                    <Alert severity="warning" sx={{ mt: 1.5 }} onClose={() => setUploadError('')}>
+                                        {uploadError}
+                                    </Alert>
+                                )}
+
+                                <Collapse in={showParsed}>
+                                    <Alert
+                                        severity="success"
+                                        icon={<CheckCircleOutlineIcon />}
+                                        sx={{ mt: 1.5 }}
+                                        onClose={() => setShowParsed(false)}
+                                    >
+                                        <Typography variant="body2" fontWeight={600} mb={0.5}>
+                                            Auto-filled {parsedFields.length} field{parsedFields.length !== 1 ? 's' : ''}:
+                                        </Typography>
+                                        <Box display="flex" flexWrap="wrap" gap={0.5}>
+                                            {parsedFields.map((f) => (
+                                                <Chip key={f} label={f} size="small" color="success" variant="outlined" />
+                                            ))}
+                                        </Box>
+                                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                                            Review each step and fill in anything that wasn't extracted.
+                                        </Typography>
+                                    </Alert>
+                                </Collapse>
+                            </Box>
+
                             <Typography variant="h6" gutterBottom>Company Details</Typography>
                             <Grid container spacing={2}>
                                 <Grid item xs={12}>
@@ -510,6 +771,11 @@ const MinuteBookBuilder: React.FC = () => {
                                 <Grid item xs={12} sm={6}>
                                     <Controller name="fiscalYearEnd" control={control} render={({ field }) => (
                                         <TextField {...field} fullWidth label="Fiscal Year End (MM-DD)" placeholder="12-31" />
+                                    )} />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <Controller name="annualReturnDueDate" control={control} render={({ field }) => (
+                                        <TextField {...field} fullWidth label="Annual Return Due Date (MM-DD)" placeholder="e.g. 06-15 — 30-day reminder will fire" helperText="Leave blank if not applicable" />
                                     )} />
                                 </Grid>
                                 <Grid item xs={12} sm={6}>
@@ -646,7 +912,14 @@ const MinuteBookBuilder: React.FC = () => {
                             <Grid container spacing={2}>
                                 <Grid item xs={12}>
                                     <Controller name="registeredOfficeAddress.street" control={control} render={({ field }) => (
-                                        <TextField {...field} fullWidth label="Street Address" error={!!errors.registeredOfficeAddress?.street} helperText={errors.registeredOfficeAddress?.street?.message} />
+                                        <PlacesTextField {...field} fullWidth label="Street Address" error={!!errors.registeredOfficeAddress?.street} helperText={errors.registeredOfficeAddress?.street?.message}
+                                            onPlaceSelected={(addr) => {
+                                                setValue('registeredOfficeAddress.city', addr.city, { shouldValidate: true });
+                                                setValue('registeredOfficeAddress.province', addr.province, { shouldValidate: true });
+                                                setValue('registeredOfficeAddress.postalCode', addr.postalCode, { shouldValidate: true });
+                                                setValue('registeredOfficeAddress.country', addr.country || 'Canada');
+                                            }}
+                                        />
                                     )} />
                                 </Grid>
                                 <Grid item xs={12} sm={4}>
@@ -685,7 +958,14 @@ const MinuteBookBuilder: React.FC = () => {
                                 <Grid container spacing={2} sx={{ mt: 1 }}>
                                     <Grid item xs={12}>
                                         <Controller name="recordsAddress.street" control={control} render={({ field }) => (
-                                            <TextField {...field} fullWidth label="Street Address" error={!!errors.recordsAddress?.street} helperText={errors.recordsAddress?.street?.message} />
+                                            <PlacesTextField {...field} fullWidth label="Street Address" error={!!errors.recordsAddress?.street} helperText={errors.recordsAddress?.street?.message}
+                                                onPlaceSelected={(addr) => {
+                                                    setValue('recordsAddress.city', addr.city, { shouldValidate: true });
+                                                    setValue('recordsAddress.province', addr.province, { shouldValidate: true });
+                                                    setValue('recordsAddress.postalCode', addr.postalCode, { shouldValidate: true });
+                                                    setValue('recordsAddress.country', addr.country || 'Canada');
+                                                }}
+                                            />
                                         )} />
                                     </Grid>
                                     <Grid item xs={12} sm={4}>
@@ -748,7 +1028,14 @@ const MinuteBookBuilder: React.FC = () => {
                                     </Grid>
                                     <Grid item xs={12} sm={6}>
                                         <Controller name="addressForService.street" control={control} render={({ field }) => (
-                                            <TextField {...field} fullWidth label="Street (if not PO Box)" />
+                                            <PlacesTextField {...field} fullWidth label="Street (if not PO Box)"
+                                                onPlaceSelected={(addr) => {
+                                                    setValue('addressForService.city', addr.city, { shouldValidate: true });
+                                                    setValue('addressForService.province', addr.province, { shouldValidate: true });
+                                                    setValue('addressForService.postalCode', addr.postalCode, { shouldValidate: true });
+                                                    setValue('addressForService.country', addr.country || 'Canada');
+                                                }}
+                                            />
                                         )} />
                                     </Grid>
                                     <Grid item xs={12} sm={4}>
@@ -781,7 +1068,7 @@ const MinuteBookBuilder: React.FC = () => {
                         <Box>
                             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                                 <Typography variant="h6">Directors</Typography>
-                                <Button type="button" startIcon={<AddIcon />} variant="outlined" size="small" onClick={() => appendDirector({ name: '', firstName: '', middleName: '', lastName: '', address: '', residentCanadian: true, appointedDate: '' })}>
+                                <Button type="button" startIcon={<AddIcon />} variant="outlined" size="small" onClick={() => appendDirector({ name: '', firstName: '', middleName: '', lastName: '', address: '', city: '', province: '', postalCode: '', residentCanadian: true, appointedDate: '', email: '', phone: '' })}>
                                     Add Director
                                 </Button>
                             </Box>
@@ -803,9 +1090,32 @@ const MinuteBookBuilder: React.FC = () => {
                                                 <TextField {...f} fullWidth label="Last Name" error={!!errors.directors?.[index]?.lastName} helperText={errors.directors?.[index]?.lastName?.message} />
                                             )} />
                                         </Grid>
-                                        <Grid item xs={12} sm={6}>
+                                        <Grid item xs={12}>
                                             <Controller name={`directors.${index}.address`} control={control} render={({ field: f }) => (
-                                                <TextField {...f} fullWidth label="Residential Address" error={!!errors.directors?.[index]?.address} helperText={errors.directors?.[index]?.address?.message} />
+                                                <PlacesTextField {...f} fullWidth label="Street Address"
+                                                    error={!!errors.directors?.[index]?.address}
+                                                    helperText={errors.directors?.[index]?.address?.message}
+                                                    onPlaceSelected={(addr) => {
+                                                        setValue(`directors.${index}.city`, addr.city, { shouldValidate: true });
+                                                        setValue(`directors.${index}.province`, addr.province, { shouldValidate: true });
+                                                        setValue(`directors.${index}.postalCode`, addr.postalCode, { shouldValidate: true });
+                                                    }}
+                                                />
+                                            )} />
+                                        </Grid>
+                                        <Grid item xs={12} sm={5}>
+                                            <Controller name={`directors.${index}.city`} control={control} render={({ field: f }) => (
+                                                <TextField {...f} fullWidth label="City" error={!!errors.directors?.[index]?.city} helperText={errors.directors?.[index]?.city?.message} />
+                                            )} />
+                                        </Grid>
+                                        <Grid item xs={12} sm={4}>
+                                            <Controller name={`directors.${index}.province`} control={control} render={({ field: f }) => (
+                                                <TextField {...f} fullWidth label="Province" error={!!errors.directors?.[index]?.province} helperText={errors.directors?.[index]?.province?.message} />
+                                            )} />
+                                        </Grid>
+                                        <Grid item xs={12} sm={3}>
+                                            <Controller name={`directors.${index}.postalCode`} control={control} render={({ field: f }) => (
+                                                <TextField {...f} fullWidth label="Postal Code" error={!!errors.directors?.[index]?.postalCode} helperText={errors.directors?.[index]?.postalCode?.message} />
                                             )} />
                                         </Grid>
                                         <Grid item xs={12} sm={3}>
@@ -826,6 +1136,19 @@ const MinuteBookBuilder: React.FC = () => {
                                                 <DeleteIcon />
                                             </IconButton>
                                         </Grid>
+                                        <Grid item xs={12} sm={5}>
+                                            <Controller name={`directors.${index}.email`} control={control} render={({ field: f }) => (
+                                                <TextField {...f} fullWidth label="Email (optional)" type="email" error={!!errors.directors?.[index]?.email} helperText={errors.directors?.[index]?.email?.message} />
+                                            )} />
+                                        </Grid>
+                                        <Grid item xs={12} sm={5}>
+                                            <Controller name={`directors.${index}.phone`} control={control} render={({ field: f }) => (
+                                                <TextField {...f} fullWidth label="Phone (optional)" />
+                                            )} />
+                                        </Grid>
+                                        <Grid item xs={12}>
+                                            <Typography variant="caption" color="text.secondary">{CONTACT_HINT}</Typography>
+                                        </Grid>
                                     </Grid>
                                 </Box>
                             ))}
@@ -837,7 +1160,7 @@ const MinuteBookBuilder: React.FC = () => {
                         <Box>
                             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                                 <Typography variant="h6">Officers</Typography>
-                                <Button type="button" startIcon={<AddIcon />} variant="outlined" size="small" onClick={() => appendOfficer({ name: '', title: 'President', appointedDate: '' })}>
+                                <Button type="button" startIcon={<AddIcon />} variant="outlined" size="small" onClick={() => appendOfficer({ name: '', title: 'President', appointedDate: '', email: '', phone: '' })}>
                                     Add Officer
                                 </Button>
                             </Box>
@@ -867,6 +1190,19 @@ const MinuteBookBuilder: React.FC = () => {
                                             <IconButton color="error" onClick={() => removeOfficer(index)} disabled={officerFields.length === 1}>
                                                 <DeleteIcon />
                                             </IconButton>
+                                        </Grid>
+                                        <Grid item xs={12} sm={5}>
+                                            <Controller name={`officers.${index}.email`} control={control} render={({ field: f }) => (
+                                                <TextField {...f} fullWidth label="Email (optional)" type="email" error={!!errors.officers?.[index]?.email} helperText={errors.officers?.[index]?.email?.message} />
+                                            )} />
+                                        </Grid>
+                                        <Grid item xs={12} sm={5}>
+                                            <Controller name={`officers.${index}.phone`} control={control} render={({ field: f }) => (
+                                                <TextField {...f} fullWidth label="Phone (optional)" />
+                                            )} />
+                                        </Grid>
+                                        <Grid item xs={12}>
+                                            <Typography variant="caption" color="text.secondary">{CONTACT_HINT}</Typography>
                                         </Grid>
                                     </Grid>
                                 </Box>
@@ -936,7 +1272,7 @@ const MinuteBookBuilder: React.FC = () => {
                         <Box>
                             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                                 <Typography variant="h6">Shareholders</Typography>
-                                <Button type="button" startIcon={<AddIcon />} variant="outlined" size="small" onClick={() => appendShareholder({ holderType: 'Individual', name: '', corporateAccessNumber: '', businessNumber: '', address: '', sharesClass: shareClassNames[0] || '', numberOfShares: 100, votingPercent: undefined })}>
+                                <Button type="button" startIcon={<AddIcon />} variant="outlined" size="small" onClick={() => appendShareholder({ holderType: 'Individual', name: '', corporateAccessNumber: '', businessNumber: '', address: '', city: '', province: '', postalCode: '', sharesClass: shareClassNames[0] || '', numberOfShares: 100, votingPercent: undefined, considerationPaid: undefined, issuanceDate: '', email: '', phone: '' })}>
                                     Add Shareholder
                                 </Button>
                             </Box>
@@ -984,7 +1320,28 @@ const MinuteBookBuilder: React.FC = () => {
                                             )}
                                             <Grid item xs={12}>
                                                 <Controller name={`shareholders.${index}.address`} control={control} render={({ field: f }) => (
-                                                    <TextField {...f} fullWidth label={holderType === 'Legal Entity' ? 'Registered Office Address' : 'Address'} />
+                                                    <PlacesTextField {...f} fullWidth label={holderType === 'Legal Entity' ? 'Street / Registered Office' : 'Street Address'}
+                                                        onPlaceSelected={(addr) => {
+                                                            setValue(`shareholders.${index}.city`, addr.city, { shouldValidate: true });
+                                                            setValue(`shareholders.${index}.province`, addr.province, { shouldValidate: true });
+                                                            setValue(`shareholders.${index}.postalCode`, addr.postalCode, { shouldValidate: true });
+                                                        }}
+                                                    />
+                                                )} />
+                                            </Grid>
+                                            <Grid item xs={12} sm={5}>
+                                                <Controller name={`shareholders.${index}.city`} control={control} render={({ field: f }) => (
+                                                    <TextField {...f} fullWidth label="City" />
+                                                )} />
+                                            </Grid>
+                                            <Grid item xs={12} sm={4}>
+                                                <Controller name={`shareholders.${index}.province`} control={control} render={({ field: f }) => (
+                                                    <TextField {...f} fullWidth label="Province" />
+                                                )} />
+                                            </Grid>
+                                            <Grid item xs={12} sm={3}>
+                                                <Controller name={`shareholders.${index}.postalCode`} control={control} render={({ field: f }) => (
+                                                    <TextField {...f} fullWidth label="Postal Code" />
                                                 )} />
                                             </Grid>
                                             <Grid item xs={12} sm={6}>
@@ -1004,6 +1361,38 @@ const MinuteBookBuilder: React.FC = () => {
                                                 <Controller name={`shareholders.${index}.numberOfShares`} control={control} render={({ field: f }) => (
                                                     <TextField {...f} fullWidth label="Number of Shares" type="number" error={!!errors.shareholders?.[index]?.numberOfShares} helperText={errors.shareholders?.[index]?.numberOfShares?.message} />
                                                 )} />
+                                            </Grid>
+                                            <Grid item xs={12} sm={6}>
+                                                <Controller name={`shareholders.${index}.considerationPaid`} control={control} render={({ field: f }) => (
+                                                    <TextField
+                                                        {...f}
+                                                        fullWidth
+                                                        label="Consideration Paid ($)"
+                                                        type="number"
+                                                        placeholder="Total amount paid for shares"
+                                                        value={f.value ?? ''}
+                                                        onChange={(e) => f.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
+                                                        inputProps={{ min: 0, step: 0.01 }}
+                                                    />
+                                                )} />
+                                            </Grid>
+                                            <Grid item xs={12} sm={6}>
+                                                <Controller name={`shareholders.${index}.issuanceDate`} control={control} render={({ field: f }) => (
+                                                    <TextField {...f} fullWidth label="Share Issuance Date" type="date" InputLabelProps={{ shrink: true }} helperText="Defaults to Incorporation Date if blank" />
+                                                )} />
+                                            </Grid>
+                                            <Grid item xs={12} sm={5}>
+                                                <Controller name={`shareholders.${index}.email`} control={control} render={({ field: f }) => (
+                                                    <TextField {...f} fullWidth label="Email (optional)" type="email" error={!!errors.shareholders?.[index]?.email} helperText={errors.shareholders?.[index]?.email?.message} />
+                                                )} />
+                                            </Grid>
+                                            <Grid item xs={12} sm={5}>
+                                                <Controller name={`shareholders.${index}.phone`} control={control} render={({ field: f }) => (
+                                                    <TextField {...f} fullWidth label="Phone (optional)" />
+                                                )} />
+                                            </Grid>
+                                            <Grid item xs={12}>
+                                                <Typography variant="caption" color="text.secondary">{CONTACT_HINT}</Typography>
                                             </Grid>
                                         </Grid>
                                     </Box>
@@ -1111,6 +1500,11 @@ const MinuteBookBuilder: React.FC = () => {
                             <Button type="button" disabled={activeStep === 0} onClick={handleBack}>
                                 Back
                             </Button>
+                            {isEdit && !isLastStep && (
+                                <Button type="button" variant="outlined" color="primary" onClick={handleSaveClick}>
+                                    Save Changes
+                                </Button>
+                            )}
                             {isLastStep ? (
                                 <Button type="button" variant="contained" color="primary" onClick={handleSaveClick}>
                                     {isEdit ? 'Save Changes' : 'Save Company'}
@@ -1166,6 +1560,7 @@ const ReviewStep: React.FC<{ values: CompanyFormValues }> = ({ values }) => (
             <ListItem disableGutters><ListItemText primary="Business Number" secondary={values.businessNumber || '—'} /></ListItem>
             <ListItem disableGutters><ListItemText primary="Incorporation Date" secondary={values.incorporationDate || '—'} /></ListItem>
             <ListItem disableGutters><ListItemText primary="Fiscal Year End" secondary={values.fiscalYearEnd || '—'} /></ListItem>
+            <ListItem disableGutters><ListItemText primary="Annual Return Due Date" secondary={values.annualReturnDueDate || '—'} /></ListItem>
             <ListItem disableGutters><ListItemText primary="Directors (min/max)" secondary={`${values.minDirectors ?? 1} / ${values.maxDirectors ?? 10}`} /></ListItem>
         </List>
 
@@ -1247,7 +1642,12 @@ const ReviewStep: React.FC<{ values: CompanyFormValues }> = ({ values }) => (
                 <ListItem key={i} disableGutters>
                     <ListItemText
                         primary={`${s.name}${s.holderType === 'Legal Entity' && s.corporateAccessNumber ? ` (CAN ${s.corporateAccessNumber})` : ''}`}
-                        secondary={`${s.numberOfShares} ${s.sharesClass}${s.votingPercent != null ? ` • ${s.votingPercent}% voting` : ''}`}
+                        secondary={[
+                            `${s.numberOfShares} ${s.sharesClass}`,
+                            s.votingPercent != null ? `${s.votingPercent}% voting` : null,
+                            s.considerationPaid != null ? `$${s.considerationPaid} consideration` : null,
+                            s.issuanceDate ? `issued ${s.issuanceDate}` : null,
+                        ].filter(Boolean).join(' • ')}
                     />
                 </ListItem>
             ))}

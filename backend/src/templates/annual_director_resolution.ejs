@@ -5,35 +5,59 @@
     <meta charset="UTF-8">
     <title>Annual Director Resolution - <%= company.name %></title>
     <style>
-        body { font-family: 'Helvetica', 'Arial', sans-serif; padding: 40px; line-height: 1.6; }
-        h1 { text-align: center; font-size: 22px; text-decoration: underline; }
-        h2 { text-align: center; font-size: 18px; margin-top: 10px; }
+        body { font-family: 'Helvetica', 'Arial', sans-serif; padding: 40px; line-height: 1.6; font-size: 11pt; color: #1a1a1a; }
+        h1 { text-align: center; font-size: 22px; text-decoration: underline; margin-bottom: 4px; }
+        h2 { text-align: center; font-size: 18px; margin-top: 8px; }
         .section { margin-top: 24px; }
         .clause { margin-bottom: 16px; text-align: justify; }
-        .bold { font-weight: bold; }
+        .bold { font-weight: bold; margin-bottom: 6px; }
         .signature { margin-top: 60px; }
-        .sig-line { border-top: 1px solid #000; width: 280px; margin-top: 50px; padding-top: 4px; }
+        .sig-line { border-top: 1px solid #000; width: 280px; margin-top: 50px; padding-top: 4px; font-size: 10.5pt; }
     </style>
 </head>
 
 <body>
+    <%
+        var res = (typeof resolution !== 'undefined' && resolution) ? resolution : {};
+        var resDate = res.resolutionDate ? new Date(res.resolutionDate) : new Date();
+        var fiscalYear = res.fiscalYear || new Date().getFullYear();
+
+        // Format fiscal year end: "12-31" → "December 31, 2024"
+        var fyParts = (company.fiscalYearEnd || '12-31').split('-');
+        var fyDate = new Date(fiscalYear, parseInt(fyParts[0]) - 1, parseInt(fyParts[1]));
+        var fyStr = fyDate.toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' });
+
+        var activeDirectors = (res.directors && res.directors.length > 0)
+            ? res.directors
+            : (company.directors || []).filter(function(d) { return !d.resignedDate; });
+
+        var dirName = function(d) {
+            return d.name || ([d.firstName, d.middleName, d.lastName].filter(Boolean).join(' ').trim());
+        };
+
+        var customItems = res.customResolutions || [];
+        var nextNum = 5;
+    %>
+
     <h1>RESOLUTION OF THE DIRECTORS</h1>
     <h2><%= company.name %></h2>
     <p style="text-align: center;">(the "Corporation")</p>
 
     <div class="section">
         <p>The undersigned, being all the directors of the Corporation, hereby consent in writing to the
-            following resolutions and certify that these resolutions have been duly passed:</p>
+            following resolutions pursuant to the applicable corporate legislation, and certify that these
+            resolutions have been duly passed:</p>
     </div>
 
     <div class="section">
         <div class="bold">1. CONFIRMATION OF DIRECTORS</div>
         <div class="clause">
             RESOLVED THAT the following persons, having consented to act, are confirmed as the directors of
-            the Corporation:
+            the Corporation to hold office until the next annual meeting of shareholders or until their
+            successors are duly appointed:
             <ul>
-                <% company.directors.forEach(function(director) { %>
-                    <li><%= director.name %> &mdash; appointed <%= new Date(director.appointedDate).toLocaleDateString() %></li>
+                <% activeDirectors.forEach(function(d) { %>
+                    <li><%= dirName(d) %><% if (d.appointedDate) { %> &mdash; appointed <%= new Date(d.appointedDate).toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' }) %><% } %></li>
                 <% }); %>
             </ul>
         </div>
@@ -42,7 +66,7 @@
     <div class="section">
         <div class="bold">2. REGISTERED OFFICE</div>
         <div class="clause">
-            RESOLVED THAT the registered office of the Corporation shall continue to be located at
+            RESOLVED THAT the registered office of the Corporation shall continue to be maintained at
             <%= company.registeredOfficeAddress.street %>, <%= company.registeredOfficeAddress.city %>,
             <%= company.registeredOfficeAddress.province %> <%= company.registeredOfficeAddress.postalCode %>.
         </div>
@@ -52,25 +76,33 @@
         <div class="bold">3. FINANCIAL STATEMENTS</div>
         <div class="clause">
             RESOLVED THAT the unaudited financial statements of the Corporation for the fiscal year ending
-            <%= company.fiscalYearEnd || 'December 31' %> are hereby approved as presented to the directors,
-            and the directors waive the requirement to appoint an auditor for the ensuing year pursuant to
-            applicable corporate legislation.
+            <%= fyStr %> are hereby approved as presented to the directors, and the directors waive the
+            requirement to appoint an auditor for the ensuing year pursuant to applicable corporate legislation.
         </div>
     </div>
 
     <div class="section">
         <div class="bold">4. GENERAL AUTHORIZATION</div>
         <div class="clause">
-            RESOLVED THAT any one director or officer of the Corporation is hereby authorized to execute and
-            deliver all such documents and to do all such acts and things as may be necessary or desirable to
-            give effect to the foregoing resolutions.
+            RESOLVED THAT any one director or officer of the Corporation is hereby authorized and directed to
+            execute and deliver all such documents and to do all such acts and things as may be necessary or
+            desirable to give full force and effect to the foregoing resolutions.
         </div>
     </div>
 
+    <% customItems.forEach(function(cr) { %>
+        <% if (cr.title || cr.text) { %>
+        <div class="section">
+            <div class="bold"><%= nextNum++ %>. <%= (cr.title || '').toUpperCase() %></div>
+            <div class="clause"><%= cr.text || '' %></div>
+        </div>
+        <% } %>
+    <% }); %>
+
     <div class="signature">
-        <p>DATED this <%= new Date().toLocaleDateString() %>.</p>
-        <% company.directors.forEach(function(director) { %>
-            <div class="sig-line"><%= director.name %>, Director</div>
+        <p>DATED this <%= resDate.toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' }) %>.</p>
+        <% activeDirectors.forEach(function(d) { %>
+            <div class="sig-line"><%= dirName(d) %>, Director</div>
         <% }); %>
     </div>
 </body>

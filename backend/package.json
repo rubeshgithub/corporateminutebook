@@ -5,25 +5,32 @@
   "main": "dist/server.js",
   "scripts": {
     "start": "node dist/server.js",
-    "dev": "nodemon src/server.ts",
-    "build": "tsc && cp -r src/templates dist/templates"
+    "dev": "npm run build && nodemon dist/server.js",
+    "build": "tsc && node -e \"require('fs').cpSync('src/templates','dist/templates',{recursive:true})\""
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.91.1",
+    "@aws-sdk/client-ses": "^3.1040.0",
+    "axios": "^1.15.2",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "ejs": "^5.0.1",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.4.1",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.2.4",
     "morgan": "^1.10.1",
     "multer": "^2.1.1",
+    "nodemailer": "^8.0.7",
     "pdf-lib": "^1.17.1",
-    "puppeteer": "^24.38.0"
+    "pdf-parse": "^2.4.5",
+    "puppeteer": "^24.38.0",
+    "uuid": "^14.0.0"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
@@ -34,7 +41,10 @@
     "@types/morgan": "^1.9.10",
     "@types/multer": "^2.1.0",
     "@types/node": "^25.3.5",
+    "@types/nodemailer": "^8.0.0",
+    "@types/pdf-parse": "^1.1.5",
     "@types/puppeteer": "^5.4.7",
+    "@types/uuid": "^10.0.0",
     "nodemon": "^3.1.14",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"

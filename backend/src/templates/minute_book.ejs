@@ -271,11 +271,12 @@
             <li><span><span class="num">V.</span><span class="label">Organizational Resolutions of the Shareholders</span></span></li>
             <li><span><span class="num">VI.</span><span class="label">Annual Resolutions of the Directors</span></span></li>
             <li><span><span class="num">VII.</span><span class="label">Annual Resolutions of the Shareholders</span></span></li>
-            <li><span><span class="num">VIII.</span><span class="label">Share Subscriptions</span></span></li>
-            <li><span><span class="num">IX.</span><span class="label">Share Ledgers</span></span></li>
-            <li><span><span class="num">X.</span><span class="label">Share Transfer Register</span></span></li>
-            <li><span><span class="num">XI.</span><span class="label">Corporate Registers</span></span></li>
-            <li><span><span class="num">XII.</span><span class="label">Share Certificates (Landscape Appendix)</span></span></li>
+            <li><span><span class="num">VIII.</span><span class="label">Corporate Resolutions &amp; Changes</span></span></li>
+            <li><span><span class="num">IX.</span><span class="label">Share Subscriptions</span></span></li>
+            <li><span><span class="num">X.</span><span class="label">Share Ledgers</span></span></li>
+            <li><span><span class="num">XI.</span><span class="label">Share Transfer Register</span></span></li>
+            <li><span><span class="num">XII.</span><span class="label">Corporate Registers</span></span></li>
+            <li><span><span class="num">XIII.</span><span class="label">Share Certificates (Landscape Appendix)</span></span></li>
         </ul>
     </div>
 
@@ -669,7 +670,131 @@
         </div>
     </div>
 
-    <!-- ============ VIII. SHARE SUBSCRIPTIONS ============ -->
+    <!-- ============ VIII. CORPORATE RESOLUTIONS & CHANGES ============ -->
+    <%
+        var CHANGE_EVENT_LABELS = {
+            director_appointed: 'Director Appointed',
+            director_resigned: 'Director Resigned',
+            director_address_changed: "Director's Address Changed",
+            address_changed: 'Registered Address Changed',
+            shares_issued: 'Shares Issued',
+            shares_transferred: 'Shares Transferred',
+            shares_cancelled: 'Shares Cancelled',
+            officer_appointed: 'Officer Appointed',
+            officer_resigned: 'Officer Resigned',
+            share_class_added: 'Share Class Added',
+            fiscal_year_end_changed: 'Fiscal Year End Changed',
+            name_changed: 'Company Name Changed',
+        };
+        var changeEventsForSection = (events || []).filter(function(e){ return e.eventType !== 'annual_return_filed'; });
+        var annualReturnEventsForSection = (events || []).filter(function(e){ return e.eventType === 'annual_return_filed'; });
+        function evtSummary(type, data) {
+            var d = data || {};
+            if (type === 'director_appointed') return [d.firstName, d.middleName, d.lastName].filter(Boolean).join(' ');
+            if (type === 'director_resigned') return d.directorName || '';
+            if (type === 'director_address_changed') return (d.directorName || '') + ' → ' + (d.newAddress || '');
+            if (type === 'address_changed') return (d.addressType === 'registered' ? 'Registered Office' : d.addressType === 'records' ? 'Records' : 'Service') + ' updated';
+            if (type === 'shares_issued') return (d.numberOfShares || '') + ' ' + (d.sharesClass || '') + ' → ' + (d.name || '');
+            if (type === 'shares_transferred') return (d.numberOfShares || '') + ' ' + (d.sharesClass || '') + ': ' + (d.fromName || '') + ' → ' + (d.toName || '');
+            if (type === 'shares_cancelled') return (d.numberOfShares || '') + ' ' + (d.sharesClass || '') + ' cancelled from ' + (d.holderName || '');
+            if (type === 'officer_appointed') return (d.name || '') + ' as ' + (d.title || '');
+            if (type === 'officer_resigned') return d.officerName || '';
+            if (type === 'share_class_added') return d.name || '';
+            if (type === 'fiscal_year_end_changed') return 'New year-end: ' + (d.newFiscalYearEnd || '');
+            if (type === 'name_changed') return 'New name: ' + (d.newName || '');
+            return '';
+        }
+    %>
+    <div class="page">
+        <div class="section-title">
+            <div class="num">Section VIII</div>
+            <div class="name">Corporate Resolutions &amp; Changes</div>
+            <div class="rule"></div>
+        </div>
+    </div>
+    <div class="page doc-content">
+        <h1>CORPORATE RESOLUTIONS &amp; CHANGES</h1>
+        <h2><%= company.name %></h2>
+        <p class="preamble">(the "Corporation")</p>
+        <p style="font-size: 10.5pt; color: #555; margin-bottom: 18px;">
+            This section records all corporate changes made after incorporation. Signed resolutions and official registry filing confirmations are attached as individual documents following this section.
+        </p>
+
+        <% if (changeEventsForSection.length === 0) { %>
+            <p style="font-style: italic; color: #888;">No corporate change events have been recorded.</p>
+        <% } else { %>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 100px;">Date</th>
+                        <th style="width: 160px;">Event Type</th>
+                        <th>Details</th>
+                        <th style="width: 90px; text-align:center;">Resolution</th>
+                        <th style="width: 90px; text-align:center;">Registry<br>Filing</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% changeEventsForSection.forEach(function(ev) { %>
+                        <%
+                            var hasRes = (ev.attachments || []).some(function(a){ return a.role === 'resolution'; });
+                            var hasReg = (ev.attachments || []).some(function(a){ return a.role === 'registry_filing'; });
+                            var registryTypes = ['director_appointed','director_resigned','director_address_changed','address_changed','name_changed','shares_transferred','shares_issued','shares_cancelled','share_class_added'];
+                            var needsReg = registryTypes.indexOf(ev.eventType) !== -1;
+                        %>
+                        <tr>
+                            <td><%= new Date(ev.effectiveDate).toLocaleDateString() %></td>
+                            <td><%= CHANGE_EVENT_LABELS[ev.eventType] || ev.eventType %></td>
+                            <td style="font-size: 10pt;">
+                                <%= evtSummary(ev.eventType, ev.data) %>
+                                <% if (ev.notes) { %><div style="color:#888; font-size:9.5pt;"><%= ev.notes %></div><% } %>
+                            </td>
+                            <td style="text-align:center; font-size: 10pt;">
+                                <%= hasRes ? '✓ Attached' : '—' %>
+                            </td>
+                            <td style="text-align:center; font-size: 10pt;">
+                                <% if (!needsReg) { %>
+                                    <span style="color:#aaa;">N/A</span>
+                                <% } else { %>
+                                    <%= hasReg ? '✓ Attached' : '—' %>
+                                <% } %>
+                            </td>
+                        </tr>
+                    <% }); %>
+                </tbody>
+            </table>
+        <% } %>
+
+        <% if (annualReturnEventsForSection.length > 0) { %>
+            <div class="section-block" style="margin-top: 28px;">
+                <div class="section-block-title">Annual Returns Filed</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 100px;">Date Filed</th>
+                            <th style="width: 80px;">FY</th>
+                            <th>Confirmation No.</th>
+                            <th style="width: 90px; text-align:center;">Document<br>Attached</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% annualReturnEventsForSection.forEach(function(ev) { %>
+                            <%
+                                var hasDoc = (ev.attachments || []).some(function(a){ return a.role === 'registry_filing'; });
+                            %>
+                            <tr>
+                                <td><%= new Date(ev.effectiveDate).toLocaleDateString() %></td>
+                                <td><%= (ev.data && ev.data.year) ? ev.data.year : '—' %></td>
+                                <td style="font-size: 10pt;"><%= (ev.data && ev.data.confirmationNumber) ? ev.data.confirmationNumber : '—' %></td>
+                                <td style="text-align:center; font-size: 10pt;"><%= hasDoc ? '✓ Attached' : '—' %></td>
+                            </tr>
+                        <% }); %>
+                    </tbody>
+                </table>
+            </div>
+        <% } %>
+    </div>
+
+    <!-- ============ IX. SHARE SUBSCRIPTIONS ============ -->
     <%
         var classByName = {};
         (company.shareClasses || []).forEach(function(sc){ classByName[sc.name] = sc; });
@@ -680,7 +805,7 @@
     %>
     <div class="page">
         <div class="section-title">
-            <div class="num">Section VIII</div>
+            <div class="num">Section IX</div>
             <div class="name">Share Subscriptions</div>
             <div class="rule"></div>
         </div>
@@ -705,10 +830,10 @@
         </div>
     <% }); %>
 
-    <!-- ============ IX. SHARE LEDGERS ============ -->
+    <!-- ============ X. SHARE LEDGERS ============ -->
     <div class="page">
         <div class="section-title">
-            <div class="num">Section IX</div>
+            <div class="num">Section X</div>
             <div class="name">Share Ledgers</div>
             <div class="rule"></div>
         </div>
@@ -752,10 +877,10 @@
         </div>
     <% }); %>
 
-    <!-- ============ X. SHARE TRANSFER REGISTER ============ -->
+    <!-- ============ XI. SHARE TRANSFER REGISTER ============ -->
     <div class="page">
         <div class="section-title">
-            <div class="num">Section X</div>
+            <div class="num">Section XI</div>
             <div class="name">Share Transfer Register</div>
             <div class="rule"></div>
         </div>
@@ -788,22 +913,22 @@
         </table>
     </div>
 
-    <!-- ============ XI. REGISTERS ============ -->
+    <!-- ============ XII. REGISTERS ============ -->
     <div class="page">
         <div class="section-title">
-            <div class="num">Section XI</div>
+            <div class="num">Section XII</div>
             <div class="name">Corporate Registers</div>
             <div class="rule"></div>
         </div>
     </div>
     <div class="page doc-content">
-        <%- include('_registers_body', { company: company }) %>
+        <%- include('_registers_body', { company: company, events: events || [] }) %>
     </div>
 
-    <!-- ============ XII. SHARE CERTIFICATES (DIVIDER ONLY — landscape pages appended via pdf-lib) ============ -->
+    <!-- ============ XIII. SHARE CERTIFICATES (DIVIDER ONLY — landscape pages appended via pdf-lib) ============ -->
     <div class="page">
         <div class="section-title">
-            <div class="num">Section XII</div>
+            <div class="num">Section XIII</div>
             <div class="name">Share Certificates</div>
             <div class="rule"></div>
             <p style="margin-top: 24px; font-style: italic; color: #555; font-size: 11pt;">The share certificates of the Corporation follow this page in landscape orientation.</p>

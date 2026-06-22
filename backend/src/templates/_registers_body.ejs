@@ -107,8 +107,12 @@
                     <td><%= s.name %></td>
                     <td><%= s.sharesClass %></td>
                     <td><%= s.numberOfShares %></td>
-                    <td>A<%= idx + 1 %></td>
-                    <td><%= company.incorporationDate ? new Date(company.incorporationDate).toLocaleDateString() : '' %></td>
+                    <td><%= s.certificateNumber ? 'A' + s.certificateNumber : 'A' + (idx + 1) %></td>
+                    <%
+                        var becameHolder = s.issuanceDate ? new Date(s.issuanceDate)
+                            : (company.incorporationDate ? new Date(company.incorporationDate) : null);
+                    %>
+                    <td><%= becameHolder ? becameHolder.toLocaleDateString() : '' %></td>
                 </tr>
             <% }); %>
         </tbody>

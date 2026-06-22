@@ -23,23 +23,38 @@
         (company.shareClasses || []).forEach(function(sc){ classByName[sc.name] = sc; });
         var lookupPar = function(className) {
             var sc = classByName[className];
-            return sc && sc.parValue != null ? sc.parValue : 1;
+            return sc && sc.parValue != null ? sc.parValue : null;
+        };
+        var fmtDate = function(d) {
+            return d ? new Date(d).toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' }) : '_________________';
         };
     %>
     <% (company.shareholders || []).forEach(function(s) { %>
-        <% var par = lookupPar(s.sharesClass); var total = (par * (s.numberOfShares || 0)).toFixed(2); %>
+        <%
+            var par = lookupPar(s.sharesClass);
+            var total = s.considerationPaid != null
+                ? Number(s.considerationPaid).toFixed(2)
+                : (par != null ? (par * (s.numberOfShares || 0)).toFixed(2) : null);
+            var issueDate = fmtDate(s.issuanceDate || company.incorporationDate);
+            var certNo = s.certificateNumber || '';
+        %>
         <div class="subscription">
             <h1>SHARE SUBSCRIPTION</h1>
+            <% if (certNo) { %><p style="text-align:right; font-size:10.5pt; color:#555;">Certificate No. <%= certNo %></p><% } %>
 
             <div class="to-line"><strong>TO:</strong> <%= company.name %> (the "Corporation")</div>
             <div class="to-line"><strong>TO:</strong> THE DIRECTORS OF <%= company.name.toUpperCase() %></div>
 
             <div class="body">
+                <% if (total != null) { %>
                 <p>The undersigned subscribes for and agrees to take <strong><%= s.numberOfShares %></strong> <strong><%= s.sharesClass %></strong> of the capital of the Corporation and tenders herewith the sum of <strong>$<%= total %></strong> in full payment of the subscription price for these shares.</p>
+                <% } else { %>
+                <p>The undersigned subscribes for and agrees to take <strong><%= s.numberOfShares %></strong> <strong><%= s.sharesClass %></strong> of the capital of the Corporation and tenders full payment of the subscription price for these shares.</p>
+                <% } %>
 
                 <p>The undersigned hereby requests that the said shares be allotted to the undersigned, that the shares be issued as fully paid and non-assessable, and that a certificate for the shares be issued to the undersigned.</p>
 
-                <p style="margin-top: 24px;">DATED effective <%= company.incorporationDate ? new Date(company.incorporationDate).toLocaleDateString() : '_________________' %>.</p>
+                <p style="margin-top: 24px;">DATED effective <%= issueDate %>.</p>
             </div>
 
             <div class="signature-block">

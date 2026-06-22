@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Board Resolution — <%= company.name %></title>
+    <style>
+        body { font-family: 'Helvetica', 'Arial', sans-serif; padding: 44px; line-height: 1.65; font-size: 11pt; color: #1a1a1a; }
+        .company-name { text-align: center; font-size: 21px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
+        .res-type { text-align: center; font-size: 15px; font-weight: bold; margin: 3px 0; }
+        .res-sub { text-align: center; font-size: 13px; color: #444; margin: 2px 0 6px 0; }
+        .eff-date { text-align: center; font-size: 12px; color: #555; margin-bottom: 20px; }
+        hr { border: none; border-top: 1.5px solid #333; margin: 18px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 14px 0 20px 0; font-size: 10.5pt; }
+        th { background: #2c3e50; color: #fff; padding: 8px 10px; text-align: left; font-size: 10pt; font-weight: 600; }
+        td { padding: 7px 10px; border: 1px solid #ccc; vertical-align: top; }
+        tr:nth-child(even) td { background: #f7f7f7; }
+        .section { margin: 18px 0; }
+        .resolved { font-weight: bold; text-transform: uppercase; font-size: 10.5pt; margin-bottom: 6px; }
+        .date-line { margin-top: 44px; font-size: 11pt; }
+        .sig-section { margin-top: 36px; }
+        .sig-grid { display: flex; gap: 28px; flex-wrap: wrap; margin-top: 10px; }
+        .sig-block { flex: 1; min-width: 160px; }
+        .sig-line { border-top: 1px solid #000; margin-top: 52px; padding-top: 5px; font-size: 10pt; line-height: 1.5; }
+    </style>
+</head>
+<body>
+<%
+    var ev = (typeof event !== 'undefined' && event) ? event : {};
+    var d = ev.data || {};
+    var effDate = ev.effectiveDate ? new Date(ev.effectiveDate) : new Date();
+    var effDateStr = effDate.toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' });
+
+    var activeDirectors = (company.directors || []).filter(function(dir) { return !dir.resignedDate; });
+    var dirName = function(dir) {
+        return dir.name || ([dir.firstName, dir.middleName, dir.lastName].filter(Boolean).join(' ').trim()) || '';
+    };
+
+    var isIssue = (ev.eventType === 'shares_issued' || ev.eventType === 'share_class_added');
+    var isCancel = (ev.eventType === 'shares_cancelled');
+    var isClassAdd = (ev.eventType === 'share_class_added');
+
+    var titleMap = {
+        'shares_issued': 'Issuance of Shares',
+        'shares_cancelled': 'Cancellation of Shares',
+        'share_class_added': 'Addition of Share Class',
+    };
+    var resolvedTitle = titleMap[ev.eventType] || 'Share Transaction';
+
+    var sharesDisplay = d.numberOfShares ? Number(d.numberOfShares).toLocaleString('en-CA') : '';
+    var holderName = d.name || d.holderName || '';
+    var consideration = d.considerationPaid ? '$' + Number(d.considerationPaid).toLocaleString('en-CA', { minimumFractionDigits: 2 }) : 'Nil';
+    var certNum = d.certificateNumber ? 'A' + d.certificateNumber : '—';
+%>
+
+<div class="company-name"><%= company.name %></div>
+<div class="res-type">Board Resolution</div>
+<div class="res-sub"><%= resolvedTitle %></div>
+<div class="eff-date">Effective <%= effDateStr %></div>
+
+<hr>
+
+<div class="section">
+    <p>The following resolution has been duly approved and enacted by the Directors of
+    <strong><%= company.name %></strong> (the "Corporation") effective <%= effDateStr %>:</p>
+</div>
+
+<% if (!isClassAdd) { %>
+<div class="section">
+    <div class="resolved"><%= isIssue ? 'Issuance' : 'Cancellation' %> of Shares:</div>
+    <table>
+        <thead>
+            <tr>
+                <th>Effective Date</th>
+                <th>Shareholder</th>
+                <th>Share Class</th>
+                <th>Shares</th>
+                <% if (isIssue) { %><th>Consideration</th><th>Certificate #</th><% } %>
+                <% if (isCancel) { %><th>Certificate # Cancelled</th><% } %>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><%= effDateStr %></td>
+                <td><%= holderName %></td>
+                <td><%= d.sharesClass || '' %></td>
+                <td><%= sharesDisplay %></td>
+                <% if (isIssue) { %>
+                    <td><%= consideration %></td>
+                    <td><%= certNum %></td>
+                <% } %>
+                <% if (isCancel) { %>
+                    <td><%= d.certificateNumber ? 'A' + d.certificateNumber : '—' %></td>
+                <% } %>
+            </tr>
+        </tbody>
+    </table>
+    <% if (isIssue && d.address) { %>
+        <p style="font-size:10.5pt;"><strong>Shareholder Address:</strong> <%= d.address %></p>
+    <% } %>
+</div>
+<% } %>
+
+<% if (isClassAdd) { %>
+<div class="section">
+    <div class="resolved">New Share Class:</div>
+    <table>
+        <thead>
+            <tr>
+                <th>Class Name</th>
+                <th>Type</th>
+                <th>Voting</th>
+                <th>Max Authorized</th>
+                <th>Par Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><%= d.name || '' %></td>
+                <td><%= d.type || 'Common' %></td>
+                <td><%= d.voting !== false ? 'Yes' : 'No' %></td>
+                <td><%= d.maxAuthorized || 'Unlimited' %></td>
+                <td><%= d.parValue ? '$' + d.parValue : 'No par value' %></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+<% } %>
+
+<div class="section">
+    <div class="resolved">It is hereby resolved that:</div>
+    <% if (ev.eventType === 'shares_issued') { %>
+        <p>The directors hereby approve the issuance of <strong><%= sharesDisplay %> <%= d.sharesClass || '' %></strong>
+        shares to <strong><%= holderName %></strong> for a consideration of <strong><%= consideration %></strong>,
+        effective <%= effDateStr %>. The said shares are hereby allotted and issued as fully paid and non-assessable.</p>
+    <% } else if (ev.eventType === 'shares_cancelled') { %>
+        <p>The directors hereby approve the cancellation of <strong><%= sharesDisplay %> <%= d.sharesClass || '' %></strong>
+        shares from <strong><%= holderName %></strong>, effective <%= effDateStr %>. The share certificate(s)
+        referenced above are to be surrendered and cancelled on the books of the Corporation.</p>
+    <% } else if (ev.eventType === 'share_class_added') { %>
+        <p>The directors hereby approve the addition of a new class of shares designated as
+        <strong>"<%= d.name || '' %>"</strong>, being <%= d.type || 'Common' %> shares
+        <%= d.voting !== false ? 'with voting rights' : 'without voting rights' %>,
+        effective <%= effDateStr %>. The authorized capital of the Corporation is hereby amended accordingly.</p>
+    <% } %>
+</div>
+
+<div class="section">
+    <div class="resolved">It is further resolved that:</div>
+    <p>Any changes to the Share Register will have to be approved and signed by the Shareholders and
+    Directors of the Corporation. Any officer or director of the Corporation is hereby authorized to
+    execute and deliver all such documents and to do all such acts and things as may be necessary or
+    desirable to give full force and effect to the foregoing resolutions.</p>
+</div>
+
+<% if (ev.notes) { %>
+<div class="section">
+    <p><strong>Notes:</strong> <%= ev.notes %></p>
+</div>
+<% } %>
+
+<div class="date-line">DATE: ___________________________________</div>
+
+<div class="sig-section">
+    <div class="resolved">Signed:</div>
+    <div class="sig-grid">
+        <% activeDirectors.forEach(function(dir) { %>
+        <div class="sig-block">
+            <div class="sig-line">
+                <strong><%= company.name %></strong><br>
+                <%= dirName(dir) %><br>
+                Director
+            </div>
+        </div>
+        <% }); %>
+        <% if (isIssue && holderName) { %>
+        <div class="sig-block">
+            <div class="sig-line">
+                <strong><%= company.name %></strong><br>
+                <%= holderName %><br>
+                Shareholder
+            </div>
+        </div>
+        <% } %>
+    </div>
+</div>
+
+</body>
+</html>

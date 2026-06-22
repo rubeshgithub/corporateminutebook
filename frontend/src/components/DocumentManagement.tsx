@@ -1,15 +1,26 @@
 import React, { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
     Box, Typography, Paper, List, ListItem, ListItemText, IconButton, Divider, CircularProgress,
     Chip, Dialog, DialogTitle, DialogContent, DialogActions, Button, Autocomplete, TextField,
-    Accordion, AccordionSummary, AccordionDetails, InputAdornment
+    Accordion, AccordionSummary, AccordionDetails, InputAdornment,
+    FormGroup, FormControlLabel, Checkbox, Alert
 } from "@mui/material";
 import DownloadIcon from "@mui/icons-material/Download";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import SearchIcon from "@mui/icons-material/Search";
+import AddIcon from "@mui/icons-material/Add";
+import DeleteIcon from "@mui/icons-material/Delete";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import api from "../utils/api";
+import { useSnackbar } from "../context/SnackbarContext";
+
+interface ComplianceWarning {
+    status: 'compliance_warning';
+    gaps: string[];
+}
 
 interface DocumentRecord {
     _id: string;
@@ -28,12 +39,28 @@ interface PreviewState {
 }
 
 const DocumentManagement = () => {
+    const location = useLocation();
+    const navigate = useNavigate();
+    const incomingCompanyId = (location.state as any)?.companyId || '';
+    const { showSnackbar } = useSnackbar();
     const [companies, setCompanies] = useState<any[]>([]);
     const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
     const [busy, setBusy] = useState<{ type: string; mode: 'preview' | 'download' } | null>(null);
     const [history, setHistory] = useState<DocumentRecord[]>([]);
     const [preview, setPreview] = useState<PreviewState | null>(null);
     const [docSearch, setDocSearch] = useState('');
+    const [complianceDialog, setComplianceDialog] = useState<{
+        open: boolean;
+        gaps: string[];
+        pendingMode: 'download' | 'preview';
+    }>({ open: false, gaps: [], pendingMode: 'download' });
+
+    // Annual resolution wizard state
+    const [resolutionDialog, setResolutionDialog] = useState<{ open: boolean; docType: string; pendingMode: 'preview' | 'download' }>({ open: false, docType: '', pendingMode: 'download' });
+    const [resYear, setResYear] = useState(new Date().getFullYear() - 1);
+    const [resDate, setResDate] = useState(new Date().toISOString().slice(0, 10));
+    const [resDirectors, setResDirectors] = useState<string[]>([]);
+    const [resCustom, setResCustom] = useState<{ title: string; text: string }[]>([]);
 
     const templates = [
         { id: 'glossary', name: 'Glossary' },
@@ -62,12 +89,18 @@ const DocumentManagement = () => {
             try {
                 const { data } = await api.get('/companies');
                 setCompanies(data);
-                if (data.length > 0) setSelectedCompanyId(data[0]._id);
+                if (data.length > 0) {
+                    const preselect = incomingCompanyId && data.some((c: any) => c._id === incomingCompanyId)
+                        ? incomingCompanyId
+                        : data[0]._id;
+                    setSelectedCompanyId(preselect);
+                }
             } catch (error) {
                 console.error('Error fetching companies:', error);
             }
         };
         fetchCompanies();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
@@ -87,13 +120,86 @@ const DocumentManagement = () => {
         fetchHistory();
     }, [selectedCompanyId]);
 
-    const generateBlob = async (documentType: string): Promise<Blob> => {
+    const ANNUAL_RESOLUTION_TYPES = new Set(['annual_director_resolution', 'annual_shareholder_resolution']);
+
+    const generateBlob = async (documentType: string, resolutionData?: object): Promise<Blob> => {
         const response = await api.post(
             '/documents/generate',
-            { companyId: selectedCompanyId, documentType },
+            { companyId: selectedCompanyId, documentType, ...(resolutionData ? { resolutionData } : {}) },
             { responseType: 'blob' }
         );
         return new Blob([response.data], { type: 'application/pdf' });
+    };
+
+    const openResolutionDialog = (docType: string, mode: 'preview' | 'download') => {
+        const company = companies.find((c) => c._id === selectedCompanyId);
+        const activeDirectors = (company?.directors || [])
+            .filter((d: any) => !d.resignedDate)
+            .map((d: any) => d.name || [d.firstName, d.middleName, d.lastName].filter(Boolean).join(' ').trim());
+        setResDirectors(activeDirectors);
+        setResYear(new Date().getFullYear() - 1);
+        setResDate(new Date().toISOString().slice(0, 10));
+        setResCustom([]);
+        setResolutionDialog({ open: true, docType, pendingMode: mode });
+    };
+
+    const confirmResolution = async () => {
+        const { docType, pendingMode } = resolutionDialog;
+        const company = companies.find((c) => c._id === selectedCompanyId);
+        const allDirectors = (company?.directors || []).map((d: any) => ({
+            name: d.name || [d.firstName, d.middleName, d.lastName].filter(Boolean).join(' ').trim(),
+            appointedDate: d.appointedDate,
+            resignedDate: d.resignedDate,
+        }));
+        const resolutionData = {
+            fiscalYear: resYear,
+            resolutionDate: resDate,
+            directors: allDirectors.filter((d: { name: string }) => resDirectors.includes(d.name)),
+            customResolutions: resCustom.filter((r) => r.title || r.text),
+        };
+        setResolutionDialog((prev) => ({ ...prev, open: false }));
+        if (pendingMode === 'preview') {
+            await handlePreviewWithData(docType, resolutionData);
+        } else {
+            await handleDownloadWithData(docType, resolutionData);
+        }
+    };
+
+    const handleDownloadWithData = async (documentType: string, resolutionData?: object) => {
+        if (!selectedCompanyId) return;
+        setBusy({ type: documentType, mode: 'download' });
+        try {
+            const blob = await generateBlob(documentType, resolutionData);
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `generated_${documentType}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+            await refreshHistory();
+        } catch (error) {
+            console.error('Failed to generate document:', error);
+            showSnackbar('Failed to generate document. Make sure all company details are complete.', 'error');
+        } finally {
+            setBusy(null);
+        }
+    };
+
+    const handlePreviewWithData = async (documentType: string, resolutionData?: object) => {
+        if (!selectedCompanyId) return;
+        setBusy({ type: documentType, mode: 'preview' });
+        try {
+            const blob = await generateBlob(documentType, resolutionData);
+            const url = window.URL.createObjectURL(blob);
+            setPreview({ url, title: titleFor(documentType), type: documentType, filename: `${documentType}.pdf` });
+        } catch (error) {
+            console.error('Failed to preview document:', error);
+            showSnackbar('Failed to generate preview.', 'error');
+        } finally {
+            setBusy(null);
+        }
     };
 
     const refreshHistory = async () => {
@@ -107,33 +213,27 @@ const DocumentManagement = () => {
 
     const handleDownload = async (documentType: string) => {
         if (!selectedCompanyId) return;
-        setBusy({ type: documentType, mode: 'download' });
-        try {
-            const blob = await generateBlob(documentType);
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `generated_${documentType}.pdf`);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            window.URL.revokeObjectURL(url);
-            await refreshHistory();
-        } catch (error) {
-            console.error('Failed to generate document:', error);
-            alert('Failed to generate document. Make sure the backend form data is complete.');
-        } finally {
-            setBusy(null);
-        }
+        if (ANNUAL_RESOLUTION_TYPES.has(documentType)) { openResolutionDialog(documentType, 'download'); return; }
+        await handleDownloadWithData(documentType);
     };
 
-    const handleCompileMinuteBook = async () => {
+    const parseComplianceError = async (error: any): Promise<ComplianceWarning | null> => {
+        if (error.response?.status !== 409) return null;
+        try {
+            const text = await (error.response.data as Blob).text();
+            const parsed = JSON.parse(text);
+            if (parsed?.status === 'compliance_warning') return parsed as ComplianceWarning;
+        } catch {}
+        return null;
+    };
+
+    const handleCompileMinuteBook = async (force = false) => {
         if (!selectedCompanyId) return;
         setBusy({ type: 'minute_book', mode: 'download' });
         try {
             const response = await api.post(
                 '/documents/compile',
-                { companyId: selectedCompanyId },
+                { companyId: selectedCompanyId, force },
                 { responseType: 'blob' }
             );
             const blob = new Blob([response.data], { type: 'application/pdf' });
@@ -146,21 +246,25 @@ const DocumentManagement = () => {
             link.remove();
             window.URL.revokeObjectURL(url);
             await refreshHistory();
-        } catch (error) {
-            console.error('Failed to compile minute book:', error);
-            alert('Failed to compile minute book. Make sure all company details are complete.');
+        } catch (error: any) {
+            const warning = await parseComplianceError(error);
+            if (warning) {
+                setComplianceDialog({ open: true, gaps: warning.gaps, pendingMode: 'download' });
+            } else {
+                showSnackbar('Failed to compile minute book. Make sure all company details are complete.', 'error');
+            }
         } finally {
             setBusy(null);
         }
     };
 
-    const handlePreviewMinuteBook = async () => {
+    const handlePreviewMinuteBook = async (force = false) => {
         if (!selectedCompanyId) return;
         setBusy({ type: 'minute_book', mode: 'preview' });
         try {
             const response = await api.post(
                 '/documents/compile',
-                { companyId: selectedCompanyId },
+                { companyId: selectedCompanyId, force },
                 { responseType: 'blob' }
             );
             const blob = new Blob([response.data], { type: 'application/pdf' });
@@ -172,9 +276,13 @@ const DocumentManagement = () => {
                 filename: 'minute_book.pdf',
             });
             await refreshHistory();
-        } catch (error) {
-            console.error('Failed to preview minute book:', error);
-            alert('Failed to compile minute book.');
+        } catch (error: any) {
+            const warning = await parseComplianceError(error);
+            if (warning) {
+                setComplianceDialog({ open: true, gaps: warning.gaps, pendingMode: 'preview' });
+            } else {
+                showSnackbar('Failed to compile minute book.', 'error');
+            }
         } finally {
             setBusy(null);
         }
@@ -182,23 +290,8 @@ const DocumentManagement = () => {
 
     const handlePreview = async (documentType: string) => {
         if (!selectedCompanyId) return;
-        setBusy({ type: documentType, mode: 'preview' });
-        try {
-            const blob = await generateBlob(documentType);
-            const url = window.URL.createObjectURL(blob);
-            setPreview({
-                url,
-                title: titleFor(documentType),
-                type: documentType,
-                filename: `generated_${documentType}.pdf`,
-            });
-            await refreshHistory();
-        } catch (error) {
-            console.error('Failed to preview document:', error);
-            alert('Failed to generate preview.');
-        } finally {
-            setBusy(null);
-        }
+        if (ANNUAL_RESOLUTION_TYPES.has(documentType)) { openResolutionDialog(documentType, 'preview'); return; }
+        await handlePreviewWithData(documentType);
     };
 
     const handleClosePreview = () => {
@@ -280,7 +373,7 @@ const DocumentManagement = () => {
                     <IconButton
                         title="Preview"
                         sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}
-                        onClick={handlePreviewMinuteBook}
+                        onClick={() => handlePreviewMinuteBook()}
                         disabled={!selectedCompanyId || isAnyBusy('minute_book')}
                     >
                         {isBusy('minute_book', 'preview') ? <CircularProgress size={20} sx={{ color: 'white' }} /> : <VisibilityIcon />}
@@ -289,7 +382,7 @@ const DocumentManagement = () => {
                         variant="contained"
                         sx={{ bgcolor: 'white', color: '#1a237e', '&:hover': { bgcolor: '#e8eaf6' } }}
                         startIcon={isBusy('minute_book', 'download') ? <CircularProgress size={16} /> : <DownloadIcon />}
-                        onClick={handleCompileMinuteBook}
+                        onClick={() => handleCompileMinuteBook()}
                         disabled={!selectedCompanyId || isAnyBusy('minute_book')}
                     >
                         Generate Minute Book
@@ -446,6 +539,170 @@ const DocumentManagement = () => {
                         startIcon={<DownloadIcon />}
                     >
                         Download
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* ── Compliance Warning Dialog ── */}
+            <Dialog
+                open={complianceDialog.open}
+                onClose={() => setComplianceDialog((p) => ({ ...p, open: false }))}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <WarningAmberIcon color="warning" />
+                    Compliance Issues Detected
+                </DialogTitle>
+                <DialogContent>
+                    <Alert severity="warning" sx={{ mb: 2 }}>
+                        The minute book cannot be fully compiled because the following compliance gaps exist.
+                        You can fix these first or proceed and generate an incomplete minute book.
+                    </Alert>
+                    <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
+                        {complianceDialog.gaps.map((gap, i) => (
+                            <li key={i}>
+                                <Typography variant="body2">{gap}</Typography>
+                            </li>
+                        ))}
+                    </Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        onClick={() => {
+                            setComplianceDialog((p) => ({ ...p, open: false }));
+                            navigate(`/records/${selectedCompanyId}`);
+                        }}
+                        color="primary"
+                    >
+                        Fix Issues First
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="warning"
+                        onClick={() => {
+                            setComplianceDialog((p) => ({ ...p, open: false }));
+                            if (complianceDialog.pendingMode === 'preview') {
+                                handlePreviewMinuteBook(true);
+                            } else {
+                                handleCompileMinuteBook(true);
+                            }
+                        }}
+                    >
+                        Proceed Anyway
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* ── Annual Resolutions Config Dialog ── */}
+            <Dialog open={resolutionDialog.open} onClose={() => setResolutionDialog((p) => ({ ...p, open: false }))} maxWidth="sm" fullWidth>
+                <DialogTitle>
+                    {resolutionDialog.docType === 'annual_director_resolution'
+                        ? 'Annual Director Resolution'
+                        : 'Annual Shareholder Resolution'}
+                </DialogTitle>
+                <DialogContent>
+                    <Box pt={1} display="flex" flexDirection="column" gap={2.5}>
+                        <Box display="flex" gap={2}>
+                            <TextField
+                                label="Fiscal Year"
+                                type="number"
+                                size="small"
+                                sx={{ width: 140 }}
+                                value={resYear}
+                                onChange={(e) => setResYear(Number(e.target.value))}
+                                helperText="Year the resolutions cover"
+                            />
+                            <TextField
+                                label="Resolution Date"
+                                type="date"
+                                size="small"
+                                sx={{ flex: 1 }}
+                                InputLabelProps={{ shrink: true }}
+                                value={resDate}
+                                onChange={(e) => setResDate(e.target.value)}
+                                helperText="Date the resolution is signed"
+                            />
+                        </Box>
+
+                        <Box>
+                            <Typography variant="subtitle2" mb={0.5}>Directors to include</Typography>
+                            <FormGroup>
+                                {(() => {
+                                    const company = companies.find((c) => c._id === selectedCompanyId);
+                                    return (company?.directors || []).map((d: Record<string, any>) => {
+                                        const name = d.name || [d.firstName, d.middleName, d.lastName].filter(Boolean).join(' ').trim();
+                                        return (
+                                            <FormControlLabel
+                                                key={name}
+                                                control={
+                                                    <Checkbox
+                                                        size="small"
+                                                        checked={resDirectors.includes(name)}
+                                                        onChange={(e) => setResDirectors((prev) =>
+                                                            e.target.checked ? [...prev, name] : prev.filter((n) => n !== name)
+                                                        )}
+                                                    />
+                                                }
+                                                label={
+                                                    <Typography variant="body2">
+                                                        {name}
+                                                        {d.resignedDate && <Chip label="resigned" size="small" color="error" sx={{ ml: 1, height: 16, fontSize: 10 }} />}
+                                                    </Typography>
+                                                }
+                                            />
+                                        );
+                                    });
+                                })()}
+                            </FormGroup>
+                        </Box>
+
+                        <Box>
+                            <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                                <Typography variant="subtitle2">Additional Resolutions</Typography>
+                                <Button size="small" startIcon={<AddIcon />} onClick={() => setResCustom((p) => [...p, { title: '', text: '' }])}>
+                                    Add
+                                </Button>
+                            </Box>
+                            {resCustom.map((cr, i) => (
+                                <Box key={i} display="flex" gap={1} mb={1.5} alignItems="flex-start">
+                                    <Box flex={1} display="flex" flexDirection="column" gap={1}>
+                                        <TextField
+                                            label="Resolution Title"
+                                            size="small"
+                                            fullWidth
+                                            placeholder="e.g. OFFICER COMPENSATION"
+                                            value={cr.title}
+                                            onChange={(e) => setResCustom((p) => p.map((r, j) => j === i ? { ...r, title: e.target.value } : r))}
+                                        />
+                                        <TextField
+                                            label="Resolution Text"
+                                            size="small"
+                                            fullWidth
+                                            multiline
+                                            rows={2}
+                                            placeholder="RESOLVED THAT…"
+                                            value={cr.text}
+                                            onChange={(e) => setResCustom((p) => p.map((r, j) => j === i ? { ...r, text: e.target.value } : r))}
+                                        />
+                                    </Box>
+                                    <IconButton size="small" onClick={() => setResCustom((p) => p.filter((_, j) => j !== i))} sx={{ mt: 0.5 }}>
+                                        <DeleteIcon fontSize="small" />
+                                    </IconButton>
+                                </Box>
+                            ))}
+                        </Box>
+                    </Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setResolutionDialog((p) => ({ ...p, open: false }))}>Cancel</Button>
+                    <Button
+                        variant="contained"
+                        startIcon={resolutionDialog.pendingMode === 'preview' ? <VisibilityIcon /> : <DownloadIcon />}
+                        onClick={confirmResolution}
+                        disabled={!!busy}
+                    >
+                        {resolutionDialog.pendingMode === 'preview' ? 'Preview' : 'Download'}
                     </Button>
                 </DialogActions>
             </Dialog>

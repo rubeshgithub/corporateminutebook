@@ -22,15 +22,96 @@
 
 <body>
     <%
+        var shareEvents = (events || []).filter(function(e) {
+            return e.eventType === 'shares_issued' || e.eventType === 'shares_transferred' || e.eventType === 'shares_cancelled';
+        });
+        var hasEvents = shareEvents.length > 0;
+
         var classByName = {};
         (company.shareClasses || []).forEach(function(sc){ classByName[sc.name] = sc; });
         var lookupPar = function(className) {
             var sc = classByName[className];
             return sc && sc.parValue != null ? sc.parValue : 1;
         };
+        var fmtDate = function(d) { return d ? new Date(d).toLocaleDateString() : ''; };
+        var fmtMoney = function(n) { return n != null ? '$' + Number(n).toFixed(2) : '—'; };
     %>
+
     <% (company.shareholders || []).forEach(function(s, holderIdx) { %>
-        <% var par = lookupPar(s.sharesClass); var paidUp = (par * (s.numberOfShares || 0)).toFixed(2); %>
+        <%
+            var par = lookupPar(s.sharesClass);
+            // Build rows from events for this holder+class, falling back to snapshot row
+            var rows = [];
+            if (hasEvents) {
+                shareEvents.forEach(function(e) {
+                    var d = e.data || {};
+                    if (e.eventType === 'shares_issued' && d.name === s.name && d.sharesClass === s.sharesClass) {
+                        rows.push({
+                            date: fmtDate(e.effectiveDate),
+                            certIssued: d.certificateNumber ? 'A' + d.certificateNumber : '',
+                            certCancelled: '—',
+                            transferNo: 'Initial',
+                            toFrom: 'From Treasury',
+                            paidUp: d.considerationPaid != null ? fmtMoney(d.considerationPaid) : fmtMoney(par * (d.numberOfShares || 0)),
+                            sold: '—',
+                            bought: d.numberOfShares || 0,
+                        });
+                    } else if (e.eventType === 'shares_transferred') {
+                        if (d.fromName === s.name && d.sharesClass === s.sharesClass) {
+                            rows.push({
+                                date: fmtDate(e.effectiveDate),
+                                certIssued: '—',
+                                certCancelled: d.certificateNumberSurrendered ? 'A' + d.certificateNumberSurrendered : '—',
+                                transferNo: 'Transfer',
+                                toFrom: 'To ' + (d.toName || ''),
+                                paidUp: d.consideration != null ? fmtMoney(d.consideration) : '—',
+                                sold: d.numberOfShares || 0,
+                                bought: '—',
+                            });
+                        }
+                        if (d.toName === s.name && d.sharesClass === s.sharesClass) {
+                            rows.push({
+                                date: fmtDate(e.effectiveDate),
+                                certIssued: d.certificateNumberIssued ? 'A' + d.certificateNumberIssued : '',
+                                certCancelled: '—',
+                                transferNo: 'Transfer',
+                                toFrom: 'From ' + (d.fromName || ''),
+                                paidUp: d.consideration != null ? fmtMoney(d.consideration) : '—',
+                                sold: '—',
+                                bought: d.numberOfShares || 0,
+                            });
+                        }
+                    } else if (e.eventType === 'shares_cancelled' && d.holderName === s.name && d.sharesClass === s.sharesClass) {
+                        rows.push({
+                            date: fmtDate(e.effectiveDate),
+                            certIssued: '—',
+                            certCancelled: d.certificateNumber ? 'A' + d.certificateNumber : '—',
+                            transferNo: 'Cancellation',
+                            toFrom: '—',
+                            paidUp: '—',
+                            sold: d.numberOfShares || 0,
+                            bought: '—',
+                        });
+                    }
+                });
+            }
+            if (rows.length === 0) {
+                // Fallback: single initial issuance row from Company snapshot
+                var initPaidUp = s.considerationPaid != null ? fmtMoney(s.considerationPaid) : fmtMoney(par * (s.numberOfShares || 0));
+                rows.push({
+                    date: fmtDate(s.issuanceDate || company.incorporationDate),
+                    certIssued: s.certificateNumber ? 'A' + s.certificateNumber : 'A' + (holderIdx + 1),
+                    certCancelled: '—',
+                    transferNo: 'Initial',
+                    toFrom: 'From Treasury',
+                    paidUp: initPaidUp,
+                    sold: '—',
+                    bought: s.numberOfShares,
+                });
+            }
+            // Compute running balance
+            var balance = 0;
+        %>
         <div class="ledger">
             <h1>SHARE LEDGER</h1>
             <div class="corp-name"><%= company.name %></div>
@@ -61,18 +142,25 @@
                     </tr>
                 </thead>
                 <tbody>
+                    <% rows.forEach(function(row) {
+                        var bought = parseInt(row.bought) || 0;
+                        var sold = parseInt(row.sold) || 0;
+                        balance = balance + bought - sold;
+                    %>
                     <tr>
-                        <td><%= company.incorporationDate ? new Date(company.incorporationDate).toLocaleDateString() : '' %></td>
-                        <td>A<%= holderIdx + 1 %></td>
-                        <td>—</td>
-                        <td>Initial</td>
-                        <td>From Treasury</td>
-                        <td>$<%= paidUp %></td>
-                        <td>—</td>
-                        <td><%= s.numberOfShares %></td>
-                        <td><strong><%= s.numberOfShares %></strong></td>
+                        <td><%= row.date %></td>
+                        <td><%= row.certIssued %></td>
+                        <td><%= row.certCancelled %></td>
+                        <td><%= row.transferNo %></td>
+                        <td><%= row.toFrom %></td>
+                        <td><%= row.paidUp %></td>
+                        <td><%= row.sold %></td>
+                        <td><%= row.bought %></td>
+                        <td><strong><%= balance %></strong></td>
                     </tr>
-                    <% for (var r = 0; r < 12; r++) { %>
+                    <% }); %>
+                    <% var blankRows = Math.max(0, 10 - rows.length); %>
+                    <% for (var r = 0; r < blankRows; r++) { %>
                         <tr class="empty-row"><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
                     <% } %>
                 </tbody>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Button, TextField, Typography, Paper } from '@mui/material';
+import { Box, Button, TextField, Typography, Paper, Alert } from '@mui/material';
 import { useDispatch } from 'react-redux';
 import { loginSuccess } from '../store/authSlice';
 import { useNavigate } from 'react-router-dom';
@@ -9,18 +9,20 @@ const Register: React.FC = () => {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
     const dispatch = useDispatch();
     const navigate = useNavigate();
 
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
+        setError('');
         try {
             const res = await api.post('/auth/register', { name, email, password });
             dispatch(loginSuccess(res.data));
             navigate('/dashboard');
-        } catch (error) {
-            console.error('Registration failed', error);
-            alert('Registration Failed');
+        } catch (err: any) {
+            const msg = err?.response?.data?.error || 'Registration failed. Please try again.';
+            setError(msg);
         }
     };
 
@@ -30,6 +32,7 @@ const Register: React.FC = () => {
                 <Typography variant="h5" align="center" gutterBottom>
                     Register for MinuteBook
                 </Typography>
+                {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
                 <form onSubmit={handleRegister}>
                     <TextField
                         fullWidth
