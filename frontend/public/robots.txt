@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /builder
+Disallow: /documents
+Disallow: /records
+Disallow: /events
+
+Sitemap: https://minutebook.corporateregistryservices.ca/sitemap.xml

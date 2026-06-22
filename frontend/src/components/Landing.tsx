@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { loginSuccess } from '../store/authSlice';
@@ -280,42 +280,6 @@ const FAQS = [
 const Landing: React.FC = () => {
     const isAuthenticated = useSelector((state: any) => state.auth?.isAuthenticated);
 
-    useEffect(() => {
-        document.title = 'MinuteBook — Court-Ready Canadian Corporate Minute Books in Minutes';
-        const setMeta = (name: string, content: string) => {
-            let el = document.querySelector(`meta[name="${name}"]`) as HTMLMetaElement | null;
-            if (!el) {
-                el = document.createElement('meta');
-                el.name = name;
-                document.head.appendChild(el);
-            }
-            el.content = content;
-        };
-        setMeta(
-            'description',
-            'Generate a complete, legally compliant Canadian corporate minute book in minutes — articles, by-laws, registers, certificates, and resolutions. CBCA + all 13 provinces. Flat-fee pricing from $299. No lawyer required.'
-        );
-        setMeta(
-            'keywords',
-            'corporate minute book Canada, minute book generator, CBCA minute book, Ontario minute book, Alberta minute book, BC minute book, minute book template, corporate records Canada'
-        );
-
-        // JSON-LD for FAQs
-        const ldScript = document.createElement('script');
-        ldScript.type = 'application/ld+json';
-        ldScript.text = JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'FAQPage',
-            mainEntity: FAQS.map((f) => ({
-                '@type': 'Question',
-                name: f.q,
-                acceptedAnswer: { '@type': 'Answer', text: f.a },
-            })),
-        });
-        document.head.appendChild(ldScript);
-        return () => { ldScript.remove(); };
-    }, []);
-
     if (isAuthenticated) return <Navigate to="/dashboard" replace />;
 
     return (
@@ -354,7 +318,7 @@ const Landing: React.FC = () => {
                                     marginBottom: '1.25rem',
                                 }}
                             >
-                                Court-Ready Corporate Records · All 13 Jurisdictions
+                                Compliance Ready · All 13 Jurisdictions
                             </span>
                             <h1
                                 style={{

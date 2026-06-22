@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Background: dark navy rounded square -->
+  <rect width="100" height="100" rx="16" fill="#0C3D61"/>
+  <!-- Canadian maple leaf (11-point) + stem -->
+  <path
+    fill="#C8952A"
+    d="
+      M50,9
+      L53,21 L64,14 L59,27
+      L73,25 L64,34
+      L79,40 L66,45
+      L72,59 L56,52
+      L54,69 L53,84 L47,84 L46,69
+      L44,52 L28,59
+      L34,45 L21,40
+      L36,34 L27,25
+      L41,27 L36,14 L47,21
+      Z
+    "
+  />
+</svg>
