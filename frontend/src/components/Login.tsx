@@ -1,140 +1,152 @@
-import React, { useState } from 'react';
-import { Box, Button, TextField, Typography, Paper, Alert, CircularProgress } from '@mui/material';
-import { useDispatch } from 'react-redux';
-import { loginSuccess } from '../store/authSlice';
-import { useNavigate } from 'react-router-dom';
-import api from '../utils/api';
+import React from 'react';
+import { Navigate, Link } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import LandingHeader from './LandingHeader';
+import LandingFooter from './LandingFooter';
+import OtpForm from './OtpForm';
 
-type Step = 'email' | 'otp';
+const TRUST_POINTS = [
+    'No passwords — sign in with a one-time code',
+    'Bank- and CRA-accepted minute books',
+    'CBCA + all 13 provincial and territorial statutes',
+    'Same-day delivery, flat-fee pricing',
+];
 
 const Login: React.FC = () => {
-    const [step, setStep] = useState<Step>('email');
-    const [email, setEmail] = useState('');
-    const [code, setCode] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-    const [info, setInfo] = useState('');
-    const dispatch = useDispatch();
-    const navigate = useNavigate();
-
-    const handleRequestOtp = async (e?: React.FormEvent) => {
-        e?.preventDefault();
-        setError('');
-        setLoading(true);
-        try {
-            await api.post('/auth/request-otp', { email });
-            setInfo(`A 6-digit code was sent to ${email}`);
-            setStep('otp');
-        } catch (err: any) {
-            setError(err?.response?.data?.error || 'Failed to send code. Try again.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleVerifyOtp = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setError('');
-        setLoading(true);
-        try {
-            const res = await api.post('/auth/verify-otp', { email, code });
-            dispatch(loginSuccess(res.data));
-            navigate('/dashboard');
-        } catch (err: any) {
-            setError(err?.response?.data?.error || 'Invalid code. Try again.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const resetToEmail = () => {
-        setStep('email');
-        setCode('');
-        setError('');
-        setInfo('');
-    };
+    const isAuthenticated = useSelector((state: any) => state.auth?.isAuthenticated);
+    if (isAuthenticated) return <Navigate to="/dashboard" replace />;
 
     return (
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
-            <Paper elevation={3} sx={{ padding: 4, width: '100%', maxWidth: 400 }}>
-                <Typography variant="h5" align="center" gutterBottom>
-                    Sign in to MinuteBook
-                </Typography>
-                <Typography variant="body2" align="center" color="text.secondary" sx={{ mb: 2 }}>
-                    {step === 'email'
-                        ? 'Enter your email — we\'ll send you a sign-in code.'
-                        : `Enter the code sent to ${email}`}
-                </Typography>
+        <div
+            style={{
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: '100vh',
+                background: '#fff',
+                color: '#1a1a1a',
+                fontFamily: '"Inter", system-ui, -apple-system, sans-serif',
+            }}
+        >
+            <LandingHeader />
 
-                {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
-                {info && <Alert severity="success" sx={{ mb: 2 }}>{info}</Alert>}
+            <main style={{ flex: 1 }}>
+                <section
+                    style={{
+                        background: 'linear-gradient(160deg, #CBE2EF 0%, #DCE9F2 35%, #F1F5F8 100%)',
+                        borderBottom: '1px solid #e5e7eb',
+                        padding: '4rem 1.5rem',
+                    }}
+                >
+                    <div
+                        className="login-grid"
+                        style={{
+                            maxWidth: '1000px',
+                            margin: '0 auto',
+                            display: 'grid',
+                            gridTemplateColumns: '1.05fr 1fr',
+                            gap: '3rem',
+                            alignItems: 'center',
+                        }}
+                    >
+                        {/* Left: brand + value props */}
+                        <div>
+                            <span
+                                style={{
+                                    display: 'inline-block',
+                                    fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 600,
+                                    color: '#C8952A',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.1em',
+                                    background: 'rgba(200, 149, 42, 0.12)',
+                                    padding: '0.3rem 0.7rem',
+                                    borderRadius: '4px',
+                                    marginBottom: '1rem',
+                                }}
+                            >
+                                Sign in to MinuteBook
+                            </span>
+                            <h1
+                                style={{
+                                    fontFamily: 'Georgia, serif',
+                                    fontSize: 'clamp(1.75rem, 3vw, 2.4rem)',
+                                    fontWeight: 700,
+                                    lineHeight: 1.15,
+                                    color: '#0C3D61',
+                                    marginBottom: '0.875rem',
+                                }}
+                            >
+                                Welcome back. Pick up where you left off.
+                            </h1>
+                            <div style={{ width: 40, height: 3, background: '#C8952A', marginBottom: '1.25rem', borderRadius: 2 }} />
+                            <p
+                                style={{
+                                    fontSize: '1rem',
+                                    lineHeight: 1.7,
+                                    color: '#334155',
+                                    marginBottom: '1.5rem',
+                                    maxWidth: '40ch',
+                                }}
+                            >
+                                Enter your email and we&apos;ll send a one-time sign-in code. New here?
+                                {' '}
+                                <Link to="/" style={{ color: '#0C3D61', fontWeight: 600 }}>
+                                    See what MinuteBook does
+                                </Link>
+                                {' '}— or just enter your email below; first sign-in creates your account automatically.
+                            </p>
 
-                {step === 'email' ? (
-                    <form onSubmit={handleRequestOtp}>
-                        <TextField
-                            fullWidth
-                            label="Email address"
-                            type="email"
-                            margin="normal"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            autoFocus
-                            required
-                        />
-                        <Button
-                            fullWidth
-                            variant="contained"
-                            color="primary"
-                            type="submit"
-                            sx={{ mt: 2 }}
-                            disabled={loading}
-                        >
-                            {loading ? <CircularProgress size={22} color="inherit" /> : 'Send Code'}
-                        </Button>
-                    </form>
-                ) : (
-                    <form onSubmit={handleVerifyOtp}>
-                        <TextField
-                            fullWidth
-                            label="6-digit code"
-                            margin="normal"
-                            value={code}
-                            onChange={(e) => setCode(e.target.value)}
-                            inputProps={{ maxLength: 6, inputMode: 'numeric', pattern: '[0-9]*' }}
-                            autoFocus
-                            required
-                        />
-                        <Button
-                            fullWidth
-                            variant="contained"
-                            color="primary"
-                            type="submit"
-                            sx={{ mt: 2 }}
-                            disabled={loading}
-                        >
-                            {loading ? <CircularProgress size={22} color="inherit" /> : 'Verify & Sign In'}
-                        </Button>
-                        <Button
-                            fullWidth
-                            variant="text"
-                            onClick={() => handleRequestOtp()}
-                            sx={{ mt: 1 }}
-                            disabled={loading}
-                        >
-                            Resend code
-                        </Button>
-                        <Button
-                            fullWidth
-                            variant="text"
-                            onClick={resetToEmail}
-                            sx={{ mt: 0.5 }}
-                        >
-                            Use a different email
-                        </Button>
-                    </form>
-                )}
-            </Paper>
-        </Box>
+                            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                {TRUST_POINTS.map((t) => (
+                                    <li
+                                        key={t}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.6rem',
+                                            fontSize: '0.88rem',
+                                            color: '#1e293b',
+                                        }}
+                                    >
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                            <circle cx="12" cy="12" r="10" fill="#C8952A" />
+                                            <path d="M7 12.5 L10.5 16 L17 9" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                                        </svg>
+                                        {t}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+
+                        {/* Right: OTP form */}
+                        <div style={{ maxWidth: '420px', width: '100%', justifySelf: 'end' }}>
+                            <OtpForm
+                                size="hero"
+                                eyebrow="Sign in or sign up"
+                                heading="Continue with email"
+                                subheading="We'll send a 6-digit code to verify it's you."
+                            />
+                        </div>
+                    </div>
+                </section>
+            </main>
+
+            <LandingFooter />
+
+            <style>{`
+                @media (max-width: 900px) {
+                    .login-grid {
+                        grid-template-columns: 1fr !important;
+                        gap: 2rem !important;
+                    }
+                    .login-grid > div:last-child {
+                        justify-self: stretch !important;
+                        max-width: 100% !important;
+                    }
+                }
+            `}</style>
+        </div>
     );
 };
 

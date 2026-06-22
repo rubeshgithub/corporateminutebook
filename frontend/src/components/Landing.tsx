@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, Navigate } from 'react-router-dom';
-import { loginSuccess } from '../store/authSlice';
-import api from '../utils/api';
+import React from 'react';
+import { useSelector } from 'react-redux';
+import { Navigate } from 'react-router-dom';
 import LandingHeader from './LandingHeader';
 import LandingFooter from './LandingFooter';
+import OtpForm from './OtpForm';
 
 /* ---------- shared style helpers ---------- */
 const SECTION_LABEL: React.CSSProperties = {
@@ -39,192 +38,6 @@ const CARD: React.CSSProperties = {
     border: '1px solid #e5e7eb',
     borderRadius: '0.75rem',
     padding: '1.5rem',
-};
-
-/* ---------- inline OTP form ---------- */
-const InlineOtpForm: React.FC<{ size?: 'hero' | 'compact' }> = ({ size = 'hero' }) => {
-    const [step, setStep] = useState<'email' | 'otp'>('email');
-    const [email, setEmail] = useState('');
-    const [code, setCode] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-    const [info, setInfo] = useState('');
-    const dispatch = useDispatch();
-    const navigate = useNavigate();
-
-    const requestCode = async (e?: React.FormEvent) => {
-        e?.preventDefault();
-        setError('');
-        setLoading(true);
-        try {
-            await api.post('/auth/request-otp', { email });
-            setInfo(`Code sent to ${email}. Check your inbox.`);
-            setStep('otp');
-        } catch (err: any) {
-            setError(err?.response?.data?.error || 'Failed to send code. Try again.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const verifyCode = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setError('');
-        setLoading(true);
-        try {
-            const res = await api.post('/auth/verify-otp', { email, code });
-            dispatch(loginSuccess(res.data));
-            navigate('/dashboard');
-        } catch (err: any) {
-            setError(err?.response?.data?.error || 'Invalid code. Try again.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const inputBase: React.CSSProperties = {
-        width: '100%',
-        padding: size === 'hero' ? '0.875rem 1rem' : '0.7rem 0.85rem',
-        fontSize: size === 'hero' ? '1rem' : '0.9rem',
-        borderRadius: '0.5rem',
-        border: '1.5px solid #cbd5e1',
-        outline: 'none',
-        boxSizing: 'border-box',
-        fontFamily: 'inherit',
-    };
-
-    const btn: React.CSSProperties = {
-        width: '100%',
-        padding: size === 'hero' ? '0.875rem 1rem' : '0.7rem 0.85rem',
-        fontSize: size === 'hero' ? '1rem' : '0.9rem',
-        borderRadius: '0.5rem',
-        background: '#0C3D61',
-        color: '#fff',
-        border: 'none',
-        fontWeight: 700,
-        cursor: loading ? 'not-allowed' : 'pointer',
-        opacity: loading ? 0.7 : 1,
-    };
-
-    return (
-        <div
-            style={{
-                background: '#fff',
-                border: '1px solid #e5e7eb',
-                borderRadius: '0.875rem',
-                padding: size === 'hero' ? '1.5rem' : '1.25rem',
-                boxShadow: '0 8px 24px -8px rgba(12, 61, 97, 0.18)',
-            }}
-        >
-            <div style={{ ...SECTION_LABEL, marginBottom: '0.5rem' }}>Start in 30 seconds</div>
-            <div
-                style={{
-                    fontFamily: 'Georgia, serif',
-                    fontSize: '1.15rem',
-                    fontWeight: 700,
-                    color: '#0C3D61',
-                    marginBottom: '0.5rem',
-                }}
-            >
-                {step === 'email' ? 'Get your minute book started' : 'Check your email'}
-            </div>
-            <p style={{ fontSize: '0.85rem', color: '#475569', marginBottom: '1.125rem', lineHeight: 1.5 }}>
-                {step === 'email'
-                    ? 'Enter your email — we\'ll send a one-time code. No passwords.'
-                    : `We sent a 6-digit code to ${email}.`}
-            </p>
-
-            {error && (
-                <div
-                    role="alert"
-                    style={{
-                        background: '#fef2f2',
-                        border: '1px solid #fecaca',
-                        color: '#991b1b',
-                        padding: '0.6rem 0.85rem',
-                        borderRadius: '0.5rem',
-                        fontSize: '0.85rem',
-                        marginBottom: '0.75rem',
-                    }}
-                >
-                    {error}
-                </div>
-            )}
-            {info && step === 'otp' && (
-                <div
-                    style={{
-                        background: '#f0fdf4',
-                        border: '1px solid #bbf7d0',
-                        color: '#166534',
-                        padding: '0.6rem 0.85rem',
-                        borderRadius: '0.5rem',
-                        fontSize: '0.8rem',
-                        marginBottom: '0.75rem',
-                    }}
-                >
-                    {info}
-                </div>
-            )}
-
-            {step === 'email' ? (
-                <form onSubmit={requestCode} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    <input
-                        type="email"
-                        required
-                        autoFocus={size === 'hero'}
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="you@yourcompany.ca"
-                        style={inputBase}
-                    />
-                    <button type="submit" style={btn} disabled={loading}>
-                        {loading ? 'Sending…' : 'Send me a sign-in code →'}
-                    </button>
-                </form>
-            ) : (
-                <form onSubmit={verifyCode} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    <input
-                        type="text"
-                        required
-                        autoFocus
-                        value={code}
-                        onChange={(e) => setCode(e.target.value)}
-                        placeholder="123456"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        maxLength={6}
-                        style={{ ...inputBase, textAlign: 'center', letterSpacing: '0.5em', fontSize: '1.25rem' }}
-                    />
-                    <button type="submit" style={btn} disabled={loading}>
-                        {loading ? 'Verifying…' : 'Verify & enter →'}
-                    </button>
-                    <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.78rem' }}>
-                        <button
-                            type="button"
-                            onClick={() => requestCode()}
-                            disabled={loading}
-                            style={{ flex: 1, background: 'none', border: 'none', color: '#0C3D61', cursor: 'pointer', padding: '0.25rem', fontWeight: 600 }}
-                        >
-                            Resend code
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => { setStep('email'); setCode(''); setError(''); setInfo(''); }}
-                            style={{ flex: 1, background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '0.25rem' }}
-                        >
-                            Change email
-                        </button>
-                    </div>
-                </form>
-            )}
-
-            <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '0.875rem', textAlign: 'center' }}>
-                By continuing, you agree to our{' '}
-                <a href="https://www.corporateregistryservices.ca/terms" style={{ color: '#0C3D61' }}>Terms</a> &amp;{' '}
-                <a href="https://www.corporateregistryservices.ca/privacy" style={{ color: '#0C3D61' }}>Privacy</a>.
-            </div>
-        </div>
-    );
 };
 
 /* ---------- content data ---------- */
@@ -379,7 +192,7 @@ const Landing: React.FC = () => {
 
                         {/* Right column: inline OTP */}
                         <div>
-                            <InlineOtpForm size="hero" />
+                            <OtpForm size="hero" />
                         </div>
                     </div>
                 </section>
@@ -646,7 +459,7 @@ const Landing: React.FC = () => {
                                 No calls, no quotes, no waiting. Enter your email and you&apos;ll be inside the app in 30 seconds.
                             </p>
                         </div>
-                        <InlineOtpForm size="compact" />
+                        <OtpForm size="compact" eyebrow="Sign in" heading="Continue with email" subheading="We'll email you a 6-digit code." />
                     </div>
                 </section>
 
