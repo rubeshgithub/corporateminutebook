@@ -13,6 +13,29 @@ const LandingHeader: React.FC = () => {
                 backdropFilter: 'saturate(180%) blur(8px)',
             }}
         >
+            {/* Parent-brand strip */}
+            <div
+                style={{
+                    background: '#0C3D61',
+                    color: '#fff',
+                    fontSize: '0.72rem',
+                    fontWeight: 500,
+                    padding: '0.35rem 1.5rem',
+                    textAlign: 'center',
+                    letterSpacing: '0.01em',
+                }}
+            >
+                A service of{' '}
+                <a
+                    href="https://www.corporateregistryservices.ca"
+                    style={{ color: '#C8952A', fontWeight: 600, textDecoration: 'none' }}
+                >
+                    Corporate Registry Services
+                </a>
+                <span style={{ opacity: 0.65, marginLeft: '0.4rem' }}>
+                    — Canadian federal &amp; all 13 provincial registries
+                </span>
+            </div>
             <div
                 style={{
                     maxWidth: '1200px',

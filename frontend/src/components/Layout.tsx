@@ -18,7 +18,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
     const handleLogout = () => {
         dispatch(logout());
-        navigate('/login');
+        navigate('/');
     };
 
     const isActive = (path: string) => {

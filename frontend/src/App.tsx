@@ -34,7 +34,7 @@ const theme = createTheme({
 
 const PrivateRoute = ({ children }: { children: JSX.Element }) => {
     const isAuthenticated = useSelector((state: any) => state.auth?.isAuthenticated);
-    return isAuthenticated ? <Layout>{children}</Layout> : <Navigate to="/login" />;
+    return isAuthenticated ? <Layout>{children}</Layout> : <Navigate to="/" />;
 };
 
 function App() {
