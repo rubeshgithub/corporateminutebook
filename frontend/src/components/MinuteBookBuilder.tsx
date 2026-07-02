@@ -7,12 +7,15 @@ import {
     Stepper, Step, StepLabel, StepButton, Divider, List, ListItem, ListItemText,
     Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
     MenuItem, FormControlLabel, Switch, RadioGroup, Radio, FormControl, FormLabel,
-    Checkbox, Alert, Chip, Collapse
+    Checkbox, Alert, Chip, Collapse,
+    Table, TableHead, TableBody, TableRow, TableCell, TableContainer,
+    Select, InputLabel,
 } from '@mui/material';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import SearchIcon from '@mui/icons-material/Search';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '../utils/api';
 import { useSnackbar } from '../context/SnackbarContext';
@@ -24,6 +27,17 @@ const toDateInput = (value?: string | Date) => {
     if (!value) return '';
     const d = new Date(value);
     return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+};
+
+// Annual return recurs each year on the anniversary of the incorporation date.
+// We store it as MM-DD (the reminder trigger date).
+const deriveAnnualReturnMMDD = (value?: string | Date) => {
+    if (!value) return '';
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return '';
+    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(d.getUTCDate()).padStart(2, '0');
+    return `${mm}-${dd}`;
 };
 
 const buildName = (parts: { firstName?: string; middleName?: string; lastName?: string; name?: string }) => {
@@ -192,6 +206,37 @@ const STEPS: Array<{ label: string; fields: FieldPath<CompanyFormValues>[] }> = 
 ];
 
 const OFFICER_TITLES = ['President', 'Vice-President', 'Secretary', 'Treasurer', 'CEO', 'CFO', 'COO', 'Chair', 'Other'];
+
+interface RegistryHit {
+    name:             string;
+    businessNumber:   string;
+    registryId:       string;
+    location:         string;
+    status:           'Active' | 'Inactive';
+    statusNotes:      string;
+    entityType:       string;
+    registrationDate: string;
+    jurisdiction:     string;
+    provinceKey:      string;
+    source:           'cbr' | 'orgbook';
+}
+
+const JURISDICTIONS: Array<{ value: string; label: string }> = [
+    { value: 'all',     label: 'All of Canada' },
+    { value: 'federal', label: 'Federal (CBCA)' },
+    { value: 'ab',      label: 'Alberta' },
+    { value: 'bc',      label: 'British Columbia' },
+    { value: 'mb',      label: 'Manitoba' },
+    { value: 'nb',      label: 'New Brunswick' },
+    { value: 'nl',      label: 'Newfoundland & Labrador' },
+    { value: 'ns',      label: 'Nova Scotia' },
+    { value: 'nt',      label: 'Northwest Territories' },
+    { value: 'nu',      label: 'Nunavut' },
+    { value: 'on',      label: 'Ontario' },
+    { value: 'pe',      label: 'Prince Edward Island' },
+    { value: 'sk',      label: 'Saskatchewan' },
+    { value: 'yt',      label: 'Yukon' },
+];
 const DEFAULT_SHARE_CLASS = {
     name: 'Class A Common Voting Shares',
     type: 'Common' as const,
@@ -206,7 +251,33 @@ const MinuteBookBuilder: React.FC = () => {
     const isEdit = Boolean(id);
     const { showSnackbar } = useSnackbar();
     const [loading, setLoading] = useState(isEdit);
-    const [lookupLoading, setLookupLoading] = useState(false);
+
+    // Registry search dialog
+    const [searchOpen, setSearchOpen]           = useState(false);
+    const [searchQuery, setSearchQuery]         = useState('');
+    const [searchProvince, setSearchProvince]   = useState('all');
+    const [searchLoading, setSearchLoading]     = useState(false);
+    const [searchResults, setSearchResults]     = useState<RegistryHit[]>([]);
+    const [searchAttempted, setSearchAttempted] = useState(false);
+    const [searchError, setSearchError]         = useState('');
+
+    // Set of field paths that were populated from the last registry search.
+    // Used to visually highlight those inputs so the client sees exactly
+    // what came from the registry vs. what they still need to enter.
+    const [regFilledSet, setRegFilledSet] = useState<Set<string>>(new Set());
+
+    // Extra info returned by the registry that we surface for context but
+    // deliberately do NOT persist to the DB (kept in component state only).
+    const [regInfoLocation, setRegInfoLocation]     = useState('');
+    const [regInfoEntityType, setRegInfoEntityType] = useState('');
+
+    const regHighlightSx = (fieldName: string) =>
+        regFilledSet.has(fieldName)
+            ? {
+                  '& .MuiOutlinedInput-root':          { backgroundColor: 'rgba(76, 175, 80, 0.10)' },
+                  '& .MuiOutlinedInput-notchedOutline': { borderColor: 'success.light' },
+              }
+            : undefined;
     const [activeStep, setActiveStep] = useState(0);
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -285,6 +356,27 @@ const MinuteBookBuilder: React.FC = () => {
     const restrictedFromHas = watch('restrictions.restrictedFrom.has');
     const hasSchedules = scheduleFields.length > 0;
     const watchedShareClasses = watch('shareClasses');
+    const watchedIncorporationDate = watch('incorporationDate');
+
+    // Whenever incorporation date changes, derive the Annual Return Due Date (MM-DD)
+    // from its anniversary — but never overwrite a value the client has already entered.
+    // If the incorporation date came from the registry search, extend the green highlight
+    // to the derived annual return field.
+    useEffect(() => {
+        if (!watchedIncorporationDate) return;
+        if (getValues('annualReturnDueDate')) return;
+        const mmdd = deriveAnnualReturnMMDD(watchedIncorporationDate);
+        if (!mmdd) return;
+        setValue('annualReturnDueDate', mmdd);
+        setRegFilledSet((prev) => {
+            if (!prev.has('incorporationDate')) return prev;
+            if (prev.has('annualReturnDueDate')) return prev;
+            const next = new Set(prev);
+            next.add('annualReturnDueDate');
+            return next;
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [watchedIncorporationDate]);
 
     useEffect(() => {
         if (!isEdit) return;
@@ -544,30 +636,60 @@ const MinuteBookBuilder: React.FC = () => {
         try { return (getValues as any)(field) || ''; } catch { return ''; }
     };
 
-    const handleRegistryLookup = async () => {
-        const accessNumber = getValues('corporateAccessNumber');
-        if (!accessNumber) {
-            showSnackbar('Enter a Corporate Access Number first.', 'warning');
+    // Free-text registry search — accepts company name, Corporate Access Number, or Business Number.
+    const runRegistrySearch = async () => {
+        const q = searchQuery.trim();
+        if (q.length < 2) {
+            setSearchError('Enter at least 2 characters — a company name, Corporate Access Number, or Business Number.');
             return;
         }
-        setLookupLoading(true);
+        setSearchError('');
+        setSearchLoading(true);
+        setSearchAttempted(true);
         try {
-            const { data } = await api.get('/registry/fetch', { params: { accessNumber } });
-            setValue('name', data.name || '', { shouldValidate: true });
-            setValue('incorporationDate', toDateInput(data.incorporationDate));
-            if (data.registeredOfficeAddress) {
-                setValue('registeredOfficeAddress.street', data.registeredOfficeAddress.street || '', { shouldValidate: true });
-                setValue('registeredOfficeAddress.city', data.registeredOfficeAddress.city || '', { shouldValidate: true });
-                setValue('registeredOfficeAddress.province', data.registeredOfficeAddress.province || '', { shouldValidate: true });
-                setValue('registeredOfficeAddress.postalCode', data.registeredOfficeAddress.postalCode || '', { shouldValidate: true });
-                setValue('registeredOfficeAddress.country', data.registeredOfficeAddress.country || 'Canada');
-            }
+            const { data } = await api.get('/registry/search', { params: { q, province: searchProvince } });
+            setSearchResults(data.results ?? []);
         } catch (error) {
-            console.error('Registry lookup failed:', error);
-            showSnackbar('Registry lookup failed. Verify the access number and try again.', 'error');
+            console.error('Registry search failed:', error);
+            setSearchResults([]);
+            setSearchError('Registry search is temporarily unavailable. Please try again.');
         } finally {
-            setLookupLoading(false);
+            setSearchLoading(false);
         }
+    };
+
+    // Fill the form from a picked search hit and record which fields were populated
+    // so the inputs can be visually highlighted.
+    const applyRegistryHit = (hit: RegistryHit) => {
+        const filled = new Set<string>();
+
+        setValue('name', hit.name, { shouldValidate: true });
+        filled.add('name');
+
+        if (hit.registryId)       { setValue('corporateAccessNumber', hit.registryId);            filled.add('corporateAccessNumber'); }
+        if (hit.businessNumber)   { setValue('businessNumber', hit.businessNumber);               filled.add('businessNumber'); }
+        if (hit.registrationDate) { setValue('incorporationDate', toDateInput(hit.registrationDate)); filled.add('incorporationDate'); }
+
+        // location is "City, Province" (CBR) or "British Columbia" (BC OrgBook)
+        const [city = '', prov = ''] = hit.location.split(',').map((s) => s.trim());
+        if (city) { setValue('registeredOfficeAddress.city',     city, { shouldValidate: true }); filled.add('registeredOfficeAddress.city'); }
+        if (prov) { setValue('registeredOfficeAddress.province', prov, { shouldValidate: true }); filled.add('registeredOfficeAddress.province'); }
+        setValue('registeredOfficeAddress.country', 'Canada');
+
+        setRegFilledSet(filled);
+        setRegInfoLocation(hit.location ?? '');
+        setRegInfoEntityType(hit.entityType ?? '');
+        showSnackbar(`Loaded ${hit.name} from the registry. Highlighted fields came from the search — the rest are for you to enter.`, 'success');
+        setSearchOpen(false);
+    };
+
+    const openRegistrySearch = () => {
+        setSearchQuery(getValues('corporateAccessNumber') || getValues('businessNumber') || getValues('name') || '');
+        setSearchProvince('all');
+        setSearchResults([]);
+        setSearchAttempted(false);
+        setSearchError('');
+        setSearchOpen(true);
     };
 
     // Build composed `name` from parts before submission
@@ -655,6 +777,34 @@ const MinuteBookBuilder: React.FC = () => {
                     {/* ============ Step 0: Company ============ */}
                     {activeStep === 0 && (
                         <Box>
+                            {/* ---- Government Registry Search ---- */}
+                            <Box
+                                sx={{
+                                    mb: 2, p: 2.5, border: '1px solid', borderColor: 'primary.light',
+                                    borderRadius: 2, bgcolor: 'primary.50',
+                                }}
+                            >
+                                <Box display="flex" alignItems="center" gap={1.5} mb={0.5}>
+                                    <SearchIcon color="primary" />
+                                    <Typography variant="subtitle1" fontWeight={600} color="primary.dark">
+                                        Find your company in the government registry
+                                    </Typography>
+                                </Box>
+                                <Typography variant="body2" color="text.secondary" mb={1.5}>
+                                    Search Canadian federal &amp; provincial registries by <strong>company name</strong>, <strong>Corporate Access Number</strong>, or <strong>Business Number (BN)</strong>. Pick a result and we'll auto-fill the company details below.
+                                </Typography>
+                                <Button
+                                    type="button"
+                                    variant="contained"
+                                    color="primary"
+                                    size="small"
+                                    startIcon={<SearchIcon />}
+                                    onClick={openRegistrySearch}
+                                >
+                                    Search Canadian registries
+                                </Button>
+                            </Box>
+
                             {/* ---- Incorporation Document Upload ---- */}
                             <Box
                                 sx={{
@@ -665,7 +815,7 @@ const MinuteBookBuilder: React.FC = () => {
                                 <Box display="flex" alignItems="center" gap={1.5} mb={1}>
                                     <UploadFileIcon color="primary" />
                                     <Typography variant="subtitle1" fontWeight={600} color="primary.dark">
-                                        Already incorporated? Upload your Certificate of Incorporation
+                                        Or upload your Certificate of Incorporation
                                     </Typography>
                                 </Box>
                                 <Typography variant="body2" color="text.secondary" mb={1.5}>
@@ -739,35 +889,58 @@ const MinuteBookBuilder: React.FC = () => {
                             <Grid container spacing={2}>
                                 <Grid item xs={12}>
                                     <Controller name="name" control={control} render={({ field }) => (
-                                        <TextField {...field} fullWidth label="Company Name" error={!!errors.name} helperText={errors.name?.message} />
+                                        <TextField {...field} fullWidth label="Company Name" error={!!errors.name} helperText={errors.name?.message} sx={regHighlightSx('name')} />
                                     )} />
                                 </Grid>
                                 <Grid item xs={12} sm={6}>
-                                    <Box display="flex" gap={1} alignItems="flex-start">
-                                        <Controller name="corporateAccessNumber" control={control} render={({ field }) => (
-                                            <TextField {...field} fullWidth label="Corporate Access Number (CAN)" />
-                                        )} />
-                                        <Button
-                                            type="button"
-                                            variant="outlined"
-                                            onClick={handleRegistryLookup}
-                                            disabled={lookupLoading}
-                                            sx={{ height: 56, whiteSpace: 'nowrap' }}
-                                        >
-                                            {lookupLoading ? <CircularProgress size={20} /> : 'Lookup'}
-                                        </Button>
-                                    </Box>
+                                    <Controller name="corporateAccessNumber" control={control} render={({ field }) => (
+                                        <TextField {...field} fullWidth label="Corporate Access Number (CAN)" helperText="Or use the government registry search above to fill this in automatically." sx={regHighlightSx('corporateAccessNumber')} />
+                                    )} />
                                 </Grid>
                                 <Grid item xs={12} sm={6}>
                                     <Controller name="businessNumber" control={control} render={({ field }) => (
-                                        <TextField {...field} fullWidth label="Business Number (BN)" />
+                                        <TextField {...field} fullWidth label="Business Number (BN)" sx={regHighlightSx('businessNumber')} />
                                     )} />
                                 </Grid>
                                 <Grid item xs={12} sm={6}>
                                     <Controller name="incorporationDate" control={control} render={({ field }) => (
-                                        <TextField {...field} fullWidth label="Incorporation Date" type="date" InputLabelProps={{ shrink: true }} />
+                                        <TextField {...field} fullWidth label="Incorporation Date" type="date" InputLabelProps={{ shrink: true }} sx={regHighlightSx('incorporationDate')} />
                                     )} />
                                 </Grid>
+                                {(regInfoLocation || regInfoEntityType) && (
+                                    <>
+                                        {regInfoLocation && (
+                                            <Grid item xs={12} sm={6}>
+                                                <TextField
+                                                    fullWidth
+                                                    label="Registered Office Location"
+                                                    value={regInfoLocation}
+                                                    InputProps={{ readOnly: true }}
+                                                    helperText="From registry — not saved"
+                                                    sx={{
+                                                        '& .MuiOutlinedInput-root':          { backgroundColor: 'rgba(76, 175, 80, 0.10)' },
+                                                        '& .MuiOutlinedInput-notchedOutline': { borderColor: 'success.light' },
+                                                    }}
+                                                />
+                                            </Grid>
+                                        )}
+                                        {regInfoEntityType && (
+                                            <Grid item xs={12} sm={6}>
+                                                <TextField
+                                                    fullWidth
+                                                    label="Business Type"
+                                                    value={regInfoEntityType}
+                                                    InputProps={{ readOnly: true }}
+                                                    helperText="From registry — not saved"
+                                                    sx={{
+                                                        '& .MuiOutlinedInput-root':          { backgroundColor: 'rgba(76, 175, 80, 0.10)' },
+                                                        '& .MuiOutlinedInput-notchedOutline': { borderColor: 'success.light' },
+                                                    }}
+                                                />
+                                            </Grid>
+                                        )}
+                                    </>
+                                )}
                                 <Grid item xs={12} sm={6}>
                                     <Controller name="fiscalYearEnd" control={control} render={({ field }) => (
                                         <TextField {...field} fullWidth label="Fiscal Year End (MM-DD)" placeholder="12-31" />
@@ -775,7 +948,7 @@ const MinuteBookBuilder: React.FC = () => {
                                 </Grid>
                                 <Grid item xs={12} sm={6}>
                                     <Controller name="annualReturnDueDate" control={control} render={({ field }) => (
-                                        <TextField {...field} fullWidth label="Annual Return Due Date (MM-DD)" placeholder="e.g. 06-15 — 30-day reminder will fire" helperText="Leave blank if not applicable" />
+                                        <TextField {...field} fullWidth label="Annual Return Due Date (MM-DD)" placeholder="e.g. 06-15 — 30-day reminder will fire" helperText="Defaults to the incorporation anniversary. Leave blank if not applicable." sx={regHighlightSx('annualReturnDueDate')} />
                                     )} />
                                 </Grid>
                                 <Grid item xs={12} sm={6}>
@@ -924,12 +1097,12 @@ const MinuteBookBuilder: React.FC = () => {
                                 </Grid>
                                 <Grid item xs={12} sm={4}>
                                     <Controller name="registeredOfficeAddress.city" control={control} render={({ field }) => (
-                                        <TextField {...field} fullWidth label="City" error={!!errors.registeredOfficeAddress?.city} helperText={errors.registeredOfficeAddress?.city?.message} />
+                                        <TextField {...field} fullWidth label="City" error={!!errors.registeredOfficeAddress?.city} helperText={errors.registeredOfficeAddress?.city?.message} sx={regHighlightSx('registeredOfficeAddress.city')} />
                                     )} />
                                 </Grid>
                                 <Grid item xs={12} sm={4}>
                                     <Controller name="registeredOfficeAddress.province" control={control} render={({ field }) => (
-                                        <TextField {...field} fullWidth label="Province/State" error={!!errors.registeredOfficeAddress?.province} helperText={errors.registeredOfficeAddress?.province?.message} />
+                                        <TextField {...field} fullWidth label="Province/State" error={!!errors.registeredOfficeAddress?.province} helperText={errors.registeredOfficeAddress?.province?.message} sx={regHighlightSx('registeredOfficeAddress.province')} />
                                     )} />
                                 </Grid>
                                 <Grid item xs={12} sm={4}>
@@ -1517,6 +1690,114 @@ const MinuteBookBuilder: React.FC = () => {
                         </Box>
                     </Box>
                 </form>
+
+                {/* ---- Registry Search Dialog ---- */}
+                <Dialog
+                    open={searchOpen}
+                    onClose={() => setSearchOpen(false)}
+                    fullWidth
+                    maxWidth="md"
+                >
+                    <DialogTitle>Search Canadian Corporate Registries</DialogTitle>
+                    <DialogContent>
+                        <DialogContentText sx={{ mb: 2 }}>
+                            Enter your <strong>company name</strong>, <strong>Corporate Access Number</strong>, or <strong>Business Number (BN)</strong>. Choose a jurisdiction to narrow results, or leave it as <em>All of Canada</em>. QC is not covered by the public federal registry API.
+                        </DialogContentText>
+
+                        <Box display="flex" gap={1.5} alignItems="flex-start" flexWrap="wrap">
+                            <TextField
+                                autoFocus
+                                label="Name, CAN, or BN"
+                                placeholder="e.g. Acme Holdings, 2094832, or 123456789RC0001"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); runRegistrySearch(); } }}
+                                sx={{ flex: '2 1 260px' }}
+                            />
+                            <FormControl sx={{ flex: '1 1 180px' }}>
+                                <InputLabel id="reg-search-prov-label">Jurisdiction</InputLabel>
+                                <Select
+                                    labelId="reg-search-prov-label"
+                                    label="Jurisdiction"
+                                    value={searchProvince}
+                                    onChange={(e) => setSearchProvince(e.target.value as string)}
+                                >
+                                    {JURISDICTIONS.map((j) => (
+                                        <MenuItem key={j.value} value={j.value}>{j.label}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                            <Button
+                                type="button"
+                                variant="contained"
+                                onClick={runRegistrySearch}
+                                disabled={searchLoading}
+                                startIcon={searchLoading ? <CircularProgress size={16} color="inherit" /> : <SearchIcon />}
+                                sx={{ height: 56 }}
+                            >
+                                Search
+                            </Button>
+                        </Box>
+
+                        {searchError && (
+                            <Alert severity="warning" sx={{ mt: 2 }}>{searchError}</Alert>
+                        )}
+
+                        {searchAttempted && !searchLoading && !searchError && searchResults.length === 0 && (
+                            <Alert severity="info" sx={{ mt: 2 }}>
+                                No matching records. Try the company's exact registered name, or switch jurisdiction.
+                            </Alert>
+                        )}
+
+                        {searchResults.length > 0 && (
+                            <TableContainer sx={{ mt: 2, maxHeight: 380 }}>
+                                <Table size="small" stickyHeader>
+                                    <TableHead>
+                                        <TableRow>
+                                            <TableCell>Company Name</TableCell>
+                                            <TableCell>Jurisdiction</TableCell>
+                                            <TableCell>Registry ID</TableCell>
+                                            <TableCell>BN</TableCell>
+                                            <TableCell>Status</TableCell>
+                                            <TableCell align="right"></TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {searchResults.map((hit, i) => (
+                                            <TableRow key={`${hit.source}-${hit.registryId}-${i}`} hover>
+                                                <TableCell>
+                                                    <Typography variant="body2" fontWeight={600}>{hit.name}</Typography>
+                                                    {hit.entityType && (
+                                                        <Typography variant="caption" color="text.secondary">{hit.entityType}</Typography>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell>{hit.jurisdiction}</TableCell>
+                                                <TableCell>{hit.registryId || '—'}</TableCell>
+                                                <TableCell>{hit.businessNumber || '—'}</TableCell>
+                                                <TableCell>
+                                                    <Chip
+                                                        label={hit.status}
+                                                        size="small"
+                                                        color={hit.status === 'Active' ? 'success' : 'default'}
+                                                        variant="outlined"
+                                                    />
+                                                </TableCell>
+                                                <TableCell align="right">
+                                                    <Button size="small" variant="outlined" onClick={() => applyRegistryHit(hit)}>
+                                                        Use this
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        )}
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setSearchOpen(false)}>Close</Button>
+                    </DialogActions>
+                </Dialog>
 
                 <Dialog open={confirmOpen} onClose={() => !saving && setConfirmOpen(false)}>
                     <DialogTitle>{isEdit ? 'Confirm changes' : 'Confirm new company'}</DialogTitle>

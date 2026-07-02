@@ -526,11 +526,6 @@ const Dashboard: React.FC = () => {
                                                         <FolderOpenIcon sx={{ fontSize: 17 }} />
                                                     </IconButton>
                                                 </Tooltip>
-                                                <Tooltip title="Records Vault" placement="top">
-                                                    <IconButton size="small" onClick={() => navigate(`/records/${company._id}`)} sx={{ color: 'text.secondary', '&:hover': { color: 'secondary.main' } }}>
-                                                        <TimelineIcon sx={{ fontSize: 17 }} />
-                                                    </IconButton>
-                                                </Tooltip>
                                                 <Tooltip title="Edit" placement="top">
                                                     <IconButton size="small" onClick={() => navigate(`/builder/${company._id}`)} sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}>
                                                         <EditIcon sx={{ fontSize: 17 }} />
