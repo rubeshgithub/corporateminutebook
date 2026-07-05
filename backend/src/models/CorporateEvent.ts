@@ -13,7 +13,9 @@ export type CorporateEventType =
     | 'share_class_added'
     | 'annual_return_filed'
     | 'fiscal_year_end_changed'
-    | 'name_changed';
+    | 'name_changed'
+    | 'voluntary_dissolution_filed'
+    | 'revival_filed';
 
 export type AttachmentRole = 'resolution' | 'registry_filing' | 'supporting';
 
@@ -77,6 +79,7 @@ const corporateEventSchema = new Schema<ICorporateEvent>(
                 'address_changed', 'shares_issued', 'shares_transferred', 'shares_cancelled',
                 'officer_appointed', 'officer_resigned', 'share_class_added',
                 'annual_return_filed', 'fiscal_year_end_changed', 'name_changed',
+                'voluntary_dissolution_filed', 'revival_filed',
             ],
         },
         effectiveDate: { type: Date, required: true },

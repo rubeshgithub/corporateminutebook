@@ -20,7 +20,13 @@ app.use(cors({
 }));
 app.use(helmet());
 app.use(morgan('dev'));
-app.use(express.json());
+// JSON parser — the verify hook stashes the raw bytes on req.rawBody so
+// the CRS feed endpoint can HMAC-verify against exactly what was sent.
+app.use(express.json({
+    verify: (req, _res, buf) => {
+        (req as unknown as { rawBody?: Buffer }).rawBody = buf;
+    },
+}));
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
@@ -32,6 +38,7 @@ import activityRoutes from './routes/activityRoutes';
 import statsRoutes from './routes/statsRoutes';
 import incorporationRoutes from './routes/incorporationRoutes';
 import eventRoutes from './routes/eventRoutes';
+import crsFeedRoutes from './routes/crsFeedRoutes';
 
 // Basic Route
 app.use('/api/auth', authRoutes);
@@ -42,6 +49,7 @@ app.use('/api/activity', activityRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/incorporation', incorporationRoutes);
 app.use('/api/events', eventRoutes);
+app.use('/api/crs-feed', crsFeedRoutes);
 
 app.get('/api/health', (req: Request, res: Response) => {
     res.status(200).json({ status: 'ok', message: 'Corporate Minute Book API is running' });
