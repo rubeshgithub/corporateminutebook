@@ -166,6 +166,7 @@ const Dashboard: React.FC = () => {
     const [compliance, setCompliance] = React.useState<ComplianceEntry[]>([]);
     const [activity, setActivity] = React.useState<any[]>([]);
     const [stats, setStats] = React.useState<Stats | null>(null);
+    const [upsell, setUpsell] = React.useState<Array<{ companyId: string; name: string; jurisdiction: string; eventCount: number }>>([]);
     const [search, setSearch] = React.useState('');
     const [page, setPage] = React.useState(0);
     const [rowsPerPage, setRowsPerPage] = React.useState(10);
@@ -175,16 +176,18 @@ const Dashboard: React.FC = () => {
 
     const fetchAll = async () => {
         try {
-            const [companiesRes, complianceRes, activityRes, statsRes] = await Promise.all([
+            const [companiesRes, complianceRes, activityRes, statsRes, upsellRes] = await Promise.all([
                 api.get('/companies'),
                 api.get('/companies/compliance'),
                 api.get('/activity', { params: { limit: 15 } }),
                 api.get('/stats'),
+                api.get('/companies/upsell-candidates'),
             ]);
             setCompanies(companiesRes.data);
             setCompliance(complianceRes.data);
             setActivity(activityRes.data);
             setStats(statsRes.data);
+            setUpsell(upsellRes.data ?? []);
         } catch (error) {
             console.error('Dashboard load error:', error);
         }
@@ -327,6 +330,47 @@ const Dashboard: React.FC = () => {
                     </Box>
                 </Box>
             )}
+
+            {/* CRS upsell banner — appears once per crs_seeded company with
+                ≥2 filings on record. Encourages the customer to complete
+                their minute book using data CRS already pushed here. */}
+            {upsell.map((u) => (
+                <Box
+                    key={u.companyId}
+                    sx={{
+                        mb: 2.5, p: 1.5, px: 2.25, borderRadius: 2,
+                        background: 'linear-gradient(135deg, rgba(212,175,55,0.14) 0%, rgba(212,175,55,0.04) 100%)',
+                        border: '1px solid #d4af37',
+                        display: 'flex', alignItems: 'center', gap: 1.5,
+                        flexWrap: 'wrap',
+                    }}
+                >
+                    <DescriptionIcon sx={{ color: '#8a6d1f', fontSize: 22, flexShrink: 0 }} />
+                    <Box sx={{ flex: '1 1 260px' }}>
+                        <Typography variant="body2" fontWeight={700} color="text.primary">
+                            {u.eventCount} filing{u.eventCount === 1 ? '' : 's'} on record for {u.name}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
+                            Complete your compliance-ready minute book with the data already on file. Review, fill in a few missing details, and you&apos;re done.
+                        </Typography>
+                    </Box>
+                    <Button
+                        variant="contained"
+                        size="small"
+                        onClick={() => navigate(`/builder/${u.companyId}`)}
+                        sx={{
+                            bgcolor: '#8a6d1f',
+                            color: '#fff',
+                            fontWeight: 700,
+                            textTransform: 'none',
+                            whiteSpace: 'nowrap',
+                            '&:hover': { bgcolor: '#6f571b' },
+                        }}
+                    >
+                        Build minute book →
+                    </Button>
+                </Box>
+            ))}
 
             {/* Stats strip */}
             <Grid container spacing={1.5} mb={2.5}>

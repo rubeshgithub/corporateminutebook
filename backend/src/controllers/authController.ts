@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User';
+import { Company } from '../models/Company';
 import { sendOtpEmail } from '../services/emailService';
 
 const generateToken = (id: string, role: string) =>
@@ -55,6 +56,20 @@ export const verifyOtp = async (req: Request, res: Response) => {
         user.otpCode = undefined;
         user.otpExpiry = undefined;
         if (!user.name) user.name = email.split('@')[0];
+
+        // First successful OTP verify is the "claim" moment for accounts that
+        // were seeded from a paid CRS order. We stamp firstLoggedInAt on the
+        // user and mark every crs_seeded company they own as claimed, so the
+        // dashboard can distinguish "still an anonymous seed" from "the real
+        // owner is now signed in."
+        const isFirstLogin = user.origin === 'crs_seeded' && !user.firstLoggedInAt;
+        if (isFirstLogin) {
+            user.firstLoggedInAt = new Date();
+            await Company.updateMany(
+                { userId: user._id, origin: 'crs_seeded', claimedAt: null },
+                { $set: { claimedAt: new Date() } },
+            );
+        }
         await user.save();
 
         res.json({
@@ -63,6 +78,7 @@ export const verifyOtp = async (req: Request, res: Response) => {
             email: user.email,
             role: user.role,
             token: generateToken(user._id.toString(), user.role),
+            justClaimed: isFirstLogin,  // frontend uses this to show a welcome flash
         });
     } catch (error: any) {
         res.status(500).json({ error: error.message });

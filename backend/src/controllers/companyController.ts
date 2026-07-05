@@ -337,3 +337,48 @@ export const getComplianceSummary = async (req: AuthRequest, res: Response) => {
         return res.status(500).json({ error: error.message });
     }
 };
+
+/**
+ * GET /api/companies/upsell-candidates
+ *
+ * Returns crs_seeded companies that have enough CRS-fed filings on record
+ * to justify prompting the user to build a complete minute book. Used by
+ * the dashboard to render a per-company banner: "You have N filings on
+ * record for ACME INC. — build your minute book."
+ *
+ * A company is eligible when:
+ *   - it's owned by the requesting user
+ *   - origin === 'crs_seeded'
+ *   - it has at least 2 CorporateEvent rows
+ */
+const UPSELL_EVENT_THRESHOLD = 2;
+
+export const getUpsellCandidates = async (req: AuthRequest, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        const seeded = await Company.find({ userId, origin: 'crs_seeded', ...ACTIVE }).lean();
+        if (seeded.length === 0) return res.json([]);
+
+        const companyIds = seeded.map((c) => c._id);
+        const counts = await CorporateEvent.aggregate([
+            { $match: { companyId: { $in: companyIds } } },
+            { $group: { _id: '$companyId', count: { $sum: 1 } } },
+        ]);
+        const countByCompany: Record<string, number> = {};
+        for (const row of counts) countByCompany[String(row._id)] = row.count;
+
+        const candidates = seeded
+            .map((c) => ({
+                companyId:   c._id,
+                name:        c.name,
+                jurisdiction: c.registeredOfficeAddress?.province ?? '',
+                eventCount:  countByCompany[String(c._id)] ?? 0,
+                claimedAt:   c.claimedAt,
+            }))
+            .filter((c) => c.eventCount >= UPSELL_EVENT_THRESHOLD);
+
+        return res.json(candidates);
+    } catch (error: any) {
+        return res.status(500).json({ error: error.message });
+    }
+};
