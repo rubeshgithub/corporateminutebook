@@ -1,15 +1,13 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
 import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import Anthropic from '@anthropic-ai/sdk';
+import { putFile, getFile } from '../services/uploadStorage';
 
-const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads');
-if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-
-// Memory storage — we only write to disk after a successful parse
+// Memory storage — we only persist to uploadStorage (S3 or disk) after a
+// successful parse. Old code wrote to backend/uploads/ directly, which
+// meant every Render deploy wiped customer files.
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB
@@ -163,9 +161,17 @@ export const parseIncorporationDocument = async (req: AuthRequest, res: Response
             });
         }
 
-        // Save file to disk only after successful parse
+        // Persist the PDF only after a successful parse — via uploadStorage
+        // so S3 (in prod) or disk (in dev) receives the bytes.
         const filename = `${uuidv4()}.pdf`;
-        fs.writeFileSync(path.join(UPLOADS_DIR, filename), req.file.buffer);
+        try {
+            await putFile(filename, req.file.buffer, 'application/pdf');
+        } catch (e: any) {
+            console.error('[incorporationController] failed to persist parsed PDF:', e?.message ?? e);
+            // Non-fatal for the user — they still get the parsed data. They
+            // just won't have the source PDF in their minute book. Ops sees
+            // the log line.
+        }
 
         return res.json({ parsedData, tempFile: filename });
     } catch (error: any) {
@@ -180,16 +186,21 @@ export const parseIncorporationDocument = async (req: AuthRequest, res: Response
 };
 
 // ─── Serve stored PDF (auth-protected) ──────────────────────────────────────
-export const serveIncorporationDocument = (req: AuthRequest, res: Response) => {
+export const serveIncorporationDocument = async (req: AuthRequest, res: Response) => {
     const filename = String(req.params.filename);
+    // Path-traversal defence held over from the old disk-serve path — the
+    // storage layer keys by filename verbatim, so we still reject anything
+    // that looks like a subpath even though S3 wouldn't act on it.
     if (filename.includes('/') || filename.includes('\\') || !filename.endsWith('.pdf')) {
         return res.status(400).json({ error: 'Invalid filename.' });
     }
-    const filePath = path.join(UPLOADS_DIR, filename);
-    if (!fs.existsSync(filePath)) {
+    let bytes: Buffer;
+    try {
+        bytes = await getFile(filename);
+    } catch {
         return res.status(404).json({ error: 'File not found.' });
     }
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
-    fs.createReadStream(filePath).pipe(res);
+    res.send(bytes);
 };

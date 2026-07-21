@@ -2,33 +2,30 @@ import { Response } from 'express';
 import mongoose from 'mongoose';
 import multer from 'multer';
 import path from 'path';
-import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { CorporateEvent, CorporateEventType } from '../models/CorporateEvent';
 import { Company } from '../models/Company';
 import { ActivityLog } from '../models/ActivityLog';
+import { putFile, getFile } from '../services/uploadStorage';
 import { generatePDFBuffer } from '../services/documentGenerator';
 import { sendResolutionEmail } from '../services/emailService';
 import { createESignRequest, getSubmissionStatus, createTemplateWithFields, createBuilderToken } from '../services/docusealService';
 
-// ─── Multer: disk storage for event attachments ───────────────────────────────
+// ─── Multer: memory storage — bytes go to uploadStorage (S3 or disk) ─────────
 
-const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads');
-if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-
-const storage = multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
-    filename: (_req, file, cb) => {
-        const ext = path.extname(file.originalname);
-        cb(null, `evt_${uuidv4()}${ext}`);
-    },
-});
-
+// Files land in memory just long enough to hand off to uploadStorage.
+// putFile decides where they actually persist (S3 in prod, local disk in
+// dev) via the S3_ATTACHMENTS_BUCKET env var. Old diskStorage path was
+// unsafe on Render — the container filesystem is wiped on every deploy.
 export const eventAttachMiddleware = multer({
-    storage,
-    limits: { fileSize: 20 * 1024 * 1024 },
+    storage: multer.memoryStorage(),
+    limits:  { fileSize: 20 * 1024 * 1024 },
 }).single('file');
+
+function makeAttachmentFileId(originalName: string): string {
+    return `evt_${uuidv4()}${path.extname(originalName)}`;
+}
 
 // ─── Resolution template mapping ─────────────────────────────────────────────
 
@@ -245,25 +242,29 @@ export const attachEvent = async (req: AuthRequest, res: Response) => {
 
         if (!file) return res.status(400).json({ error: 'No file uploaded.' });
         if (!['resolution', 'registry_filing', 'supporting'].includes(role)) {
-            fs.unlinkSync(file.path);
             return res.status(400).json({ error: 'Invalid role. Use: resolution, registry_filing, or supporting.' });
         }
 
         const event = await CorporateEvent.findById(id);
-        if (!event) {
-            fs.unlinkSync(file.path);
-            return res.status(404).json({ error: 'Event not found.' });
-        }
+        if (!event) return res.status(404).json({ error: 'Event not found.' });
 
         const company = await Company.findOne({ _id: event.companyId, userId, deletedAt: null });
-        if (!company) {
-            fs.unlinkSync(file.path);
-            return res.status(403).json({ error: 'Forbidden.' });
+        if (!company) return res.status(403).json({ error: 'Forbidden.' });
+
+        // Persist the bytes via the storage layer (S3 in prod, disk in dev).
+        // fileId is the durable identifier we store on the event and later
+        // pass to getFile / fileExists — never a raw disk path.
+        const fileId = makeAttachmentFileId(file.originalname);
+        try {
+            await putFile(fileId, file.buffer, file.mimetype);
+        } catch (e: any) {
+            console.error('[eventController] failed to persist attachment:', e?.message ?? e);
+            return res.status(500).json({ error: 'Failed to save attachment. Please try again.' });
         }
 
         event.attachments.push({
             role,
-            fileId: file.filename,
+            fileId,
             originalName: file.originalname,
             uploadedAt: new Date(),
         });
@@ -292,11 +293,16 @@ export const serveAttachment = async (req: AuthRequest, res: Response) => {
         const attachment = event.attachments.find((a) => a.fileId === fileId);
         if (!attachment) return res.status(404).json({ error: 'Attachment not found.' });
 
-        const filePath = path.join(UPLOADS_DIR, fileId);
-        if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found on disk.' });
+        let bytes: Buffer;
+        try {
+            bytes = await getFile(fileId);
+        } catch {
+            return res.status(404).json({ error: 'File not found in storage.' });
+        }
 
         res.setHeader('Content-Disposition', `attachment; filename="${attachment.originalName}"`);
-        return res.sendFile(filePath);
+        res.setHeader('Content-Type', 'application/pdf');
+        return res.send(bytes);
     } catch (error: any) {
         return res.status(500).json({ error: error.message });
     }

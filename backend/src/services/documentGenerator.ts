@@ -5,9 +5,9 @@ import fs from 'fs';
 import os from 'os';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { ICompany } from '../models/Company';
+import { tryGetFile } from './uploadStorage';
 
 const TEMPLATES_DIR = path.join(__dirname, '..', 'templates');
-const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads');
 
 // ─── Singleton browser — avoids Windows lockfile conflicts ────────────────────
 let _browser: Browser | null = null;
@@ -41,16 +41,19 @@ const renderTemplate = (templateName: string, data: Record<string, unknown>): st
  * Returns true on success, false when skipped — callers can log which
  * attachments failed to make it into the compiled minute book, instead of
  * customers opening the output and finding critical resolutions missing.
+ *
+ * Reads via uploadStorage so the same code works whether files live in S3
+ * (production) or on the local disk (dev / legacy migration window).
  */
 const appendUploadedDoc = async (merged: PDFDocument, filename?: string): Promise<boolean> => {
     if (!filename) return false;
-    const filePath = path.join(UPLOADS_DIR, filename);
-    if (!fs.existsSync(filePath)) {
-        console.warn(`[documentGenerator] attachment file missing on disk, skipped: ${filename}`);
+    const bytes = await tryGetFile(filename);
+    if (!bytes) {
+        console.warn(`[documentGenerator] attachment file missing, skipped: ${filename}`);
         return false;
     }
     try {
-        const uploaded = await PDFDocument.load(fs.readFileSync(filePath));
+        const uploaded = await PDFDocument.load(bytes);
         const pages = await merged.copyPages(uploaded, uploaded.getPageIndices());
         pages.forEach((p) => merged.addPage(p));
         return true;
