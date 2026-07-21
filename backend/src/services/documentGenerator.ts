@@ -36,19 +36,36 @@ const renderTemplate = (templateName: string, data: Record<string, unknown>): st
     return ejs.render(templateHtml, data, { filename: templatePath });
 };
 
-/** Append pages from a stored upload PDF into an existing merged PDFDocument. Silently skips if file missing or encrypted. */
-const appendUploadedDoc = async (merged: PDFDocument, filename?: string): Promise<void> => {
-    if (!filename) return;
+/**
+ * Append pages from a stored upload PDF into an existing merged PDFDocument.
+ * Returns true on success, false when skipped — callers can log which
+ * attachments failed to make it into the compiled minute book, instead of
+ * customers opening the output and finding critical resolutions missing.
+ */
+const appendUploadedDoc = async (merged: PDFDocument, filename?: string): Promise<boolean> => {
+    if (!filename) return false;
     const filePath = path.join(UPLOADS_DIR, filename);
-    if (!fs.existsSync(filePath)) return;
+    if (!fs.existsSync(filePath)) {
+        console.warn(`[documentGenerator] attachment file missing on disk, skipped: ${filename}`);
+        return false;
+    }
     try {
         const uploaded = await PDFDocument.load(fs.readFileSync(filePath));
         const pages = await merged.copyPages(uploaded, uploaded.getPageIndices());
         pages.forEach((p) => merged.addPage(p));
-    } catch {
-        // encrypted or malformed — skip
+        return true;
+    } catch (e: any) {
+        // Typically an encrypted or malformed PDF. Log so ops sees it — a
+        // silent skip means the customer's compiled minute book has a
+        // missing resolution and no one knows why.
+        console.warn(`[documentGenerator] attachment PDF invalid/encrypted, skipped: ${filename} — ${e?.message ?? 'unknown error'}`);
+        return false;
     }
 };
+
+/** Hard cap on any single page's render + PDF cycle so a hung template can't
+ *  keep the browser page open forever and starve the pool. */
+const PAGE_TIMEOUT_MS = 60_000;
 
 const addHeadersFooters = (
     merged: PDFDocument,
@@ -94,12 +111,14 @@ export const generatePDFBuffer = async (
 
     const browser = await getBrowser();
     const page = await browser.newPage();
+    page.setDefaultTimeout(PAGE_TIMEOUT_MS);
     try {
-        await page.setContent(compiledHtml, { waitUntil: 'domcontentloaded' });
+        await page.setContent(compiledHtml, { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT_MS });
         const pdfBuffer = await page.pdf({
             format: 'Letter',
             printBackground: true,
             margin: { top: '1in', right: '1in', bottom: '1in', left: '1in' },
+            timeout: PAGE_TIMEOUT_MS,
             ...TEMPLATE_OPTIONS[templateName],
         });
         return Buffer.from(pdfBuffer);
@@ -118,21 +137,25 @@ export const generateMinuteBookPDF = async (company: ICompany, events: unknown[]
     const browser = await getBrowser();
     const mainPage = await browser.newPage();
     const certPage = await browser.newPage();
+    mainPage.setDefaultTimeout(PAGE_TIMEOUT_MS);
+    certPage.setDefaultTimeout(PAGE_TIMEOUT_MS);
     let mainPdfBytes: Buffer = Buffer.alloc(0);
     let certPdfBytes: Buffer = Buffer.alloc(0);
     try {
-        await mainPage.setContent(mainHtml, { waitUntil: 'domcontentloaded' });
+        await mainPage.setContent(mainHtml, { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT_MS });
         mainPdfBytes = Buffer.from(await mainPage.pdf({
             format: 'Letter',
             printBackground: true,
             margin: { top: '0.7in', right: '0.7in', bottom: '0.7in', left: '0.7in' },
+            timeout: PAGE_TIMEOUT_MS,
         }));
-        await certPage.setContent(certHtml, { waitUntil: 'domcontentloaded' });
+        await certPage.setContent(certHtml, { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT_MS });
         certPdfBytes = Buffer.from(await certPage.pdf({
             format: 'Letter',
             landscape: true,
             printBackground: true,
             margin: { top: '1in', right: '1in', bottom: '1in', left: '1in' },
+            timeout: PAGE_TIMEOUT_MS,
         }));
     } finally {
         await mainPage.close().catch(() => {});
@@ -178,50 +201,57 @@ const INAUGURAL_POST_INCORP = [
     'share_subscription',
 ];
 
+/**
+ * Renders one template on a fresh page, then closes the page in a finally so
+ * a mid-render crash never leaks. Uses the shared browser singleton — the
+ * old inaugural path launched a whole new browser (~100 MB) per request,
+ * with no timeout and no browser.close() in a finally, so a template crash
+ * left the Chrome process orphaned. Under real signup load, that's a fast
+ * path to OOM on Render.
+ */
+const renderTemplateToPdf = async (
+    browser: Browser,
+    templateName: string,
+    data: Record<string, unknown>,
+    pdfOpts: Partial<PDFOptions> = {},
+): Promise<Uint8Array> => {
+    const html = renderTemplate(templateName, data);
+    const page = await browser.newPage();
+    page.setDefaultTimeout(PAGE_TIMEOUT_MS);
+    try {
+        await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT_MS });
+        return await page.pdf({
+            format: 'Letter',
+            printBackground: true,
+            margin: { top: '0.7in', right: '0.7in', bottom: '0.7in', left: '0.7in' },
+            timeout: PAGE_TIMEOUT_MS,
+            ...pdfOpts,
+        });
+    } finally {
+        await page.close().catch(() => {});
+    }
+};
+
 export const generateInauguralPackagePDF = async (company: ICompany, events: unknown[] = []): Promise<Buffer> => {
-    const browser = await puppeteer.launch({
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
-    });
+    const browser = await getBrowser();
 
-    const renderPortraitBatch = async (templates: string[]): Promise<Uint8Array[]> => {
-        const results: Uint8Array[] = [];
-        for (const tpl of templates) {
-            const html = renderTemplate(tpl, { company });
-            const pg = await browser.newPage();
-            await pg.setContent(html, { waitUntil: 'domcontentloaded' });
-            const pdf = await pg.pdf({
-                format: 'Letter',
-                printBackground: true,
-                margin: { top: '0.7in', right: '0.7in', bottom: '0.7in', left: '0.7in' },
-            });
-            results.push(pdf);
-            await pg.close();
-        }
-        return results;
-    };
+    const preBuffers: Uint8Array[] = [];
+    for (const tpl of INAUGURAL_PRE_INCORP) {
+        preBuffers.push(await renderTemplateToPdf(browser, tpl, { company }));
+    }
+    const postBuffers: Uint8Array[] = [];
+    for (const tpl of INAUGURAL_POST_INCORP) {
+        postBuffers.push(await renderTemplateToPdf(browser, tpl, { company }));
+    }
 
-    const preBuffers = await renderPortraitBatch(INAUGURAL_PRE_INCORP);
-    const postBuffers = await renderPortraitBatch(INAUGURAL_POST_INCORP);
-
-    // Share certificates — landscape
-    const certPg = await browser.newPage();
-    await certPg.setContent(renderTemplate('share_certificate', { company }), { waitUntil: 'domcontentloaded' });
-    const certPdf = await certPg.pdf({
-        format: 'Letter', landscape: true, printBackground: true,
+    // Share certificates — landscape.
+    const certPdf = await renderTemplateToPdf(browser, 'share_certificate', { company }, {
+        landscape: true,
         margin: { top: '1in', right: '1in', bottom: '1in', left: '1in' },
     });
-    await certPg.close();
 
-    // Corporate Registers — portrait
-    const regPg = await browser.newPage();
-    await regPg.setContent(renderTemplate('registers', { company, events }), { waitUntil: 'domcontentloaded' });
-    const regPdf = await regPg.pdf({
-        format: 'Letter', printBackground: true,
-        margin: { top: '0.7in', right: '0.7in', bottom: '0.7in', left: '0.7in' },
-    });
-    await regPg.close();
-
-    await browser.close();
+    // Corporate Registers — portrait.
+    const regPdf = await renderTemplateToPdf(browser, 'registers', { company, events });
 
     // Merge: Articles → Uploaded Incorp Doc (proof of filing) → rest of inaugural docs
     const merged = await PDFDocument.create();

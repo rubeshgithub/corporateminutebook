@@ -13,10 +13,12 @@ import {
     eventAttachMiddleware,
 } from '../controllers/eventController';
 import { protect } from '../middleware/authMiddleware';
+import { validateBody } from '../middleware/validate';
+import { createEventSchema } from '../schemas/event.schema';
 
 const router = express.Router();
 
-router.post('/', protect, createEvent);
+router.post('/', protect, validateBody(createEventSchema), createEvent);
 router.get('/:companyId', protect, getEvents);
 router.post('/:id/attach', protect, eventAttachMiddleware, attachEvent);
 router.get('/:id/attachment/:fileId', protect, serveAttachment);

@@ -10,6 +10,11 @@ dotenv.config();
 const app: Express = express();
 const PORT = process.env.PORT || 5000;
 
+// Render is a single-hop reverse proxy — trust it so express-rate-limit sees
+// the real client IP from X-Forwarded-For instead of bucketing every request
+// under the proxy's address. Number matches Render's exactly-one-hop setup.
+app.set('trust proxy', 1);
+
 // Connect to MongoDB
 connectDB();
 

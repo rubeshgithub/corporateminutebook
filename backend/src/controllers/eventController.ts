@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import mongoose from 'mongoose';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -49,39 +50,56 @@ const RESOLUTION_TEMPLATES: Partial<Record<CorporateEventType, string>> = {
 // ─── Create event ─────────────────────────────────────────────────────────────
 
 export const createEvent = async (req: AuthRequest, res: Response) => {
+    const userId = req.user?.id;
+    const { companyId, eventType, effectiveDate, data, notes } = req.body;
+
+    if (!companyId || !eventType || !effectiveDate) {
+        return res.status(400).json({ error: 'companyId, eventType, and effectiveDate are required.' });
+    }
+
+    // Ownership + existence check runs outside the transaction so we can 404
+    // early without paying the session-start cost.
+    const companyPreCheck = await Company.findOne({ _id: companyId, userId, deletedAt: null }).lean();
+    if (!companyPreCheck) return res.status(404).json({ error: 'Company not found.' });
+
+    // Event + company-snapshot are a single atomic unit. Without the
+    // transaction, a failed company.save() leaves the event on record while
+    // the snapshot never advances — the compliance summary and generated
+    // minute book then disagree with the event log forever.
+    const session = await mongoose.startSession();
     try {
-        const userId = req.user?.id;
-        const { companyId, eventType, effectiveDate, data, notes } = req.body;
+        let createdEvent: any;
+        await session.withTransaction(async () => {
+            // Re-fetch inside the session so mutations are attached to it.
+            const company = await Company.findOne({ _id: companyId, userId, deletedAt: null }).session(session);
+            if (!company) throw new Error('Company not found.');
 
-        if (!companyId || !eventType || !effectiveDate) {
-            return res.status(400).json({ error: 'companyId, eventType, and effectiveDate are required.' });
-        }
+            const [event] = await CorporateEvent.create([{
+                companyId,
+                userId,
+                eventType,
+                effectiveDate: new Date(effectiveDate),
+                data: data || {},
+                notes,
+            }], { session });
 
-        const company = await Company.findOne({ _id: companyId, userId, deletedAt: null });
-        if (!company) return res.status(404).json({ error: 'Company not found.' });
+            applyEventToCompany(company, eventType as CorporateEventType, data || {}, new Date(effectiveDate));
+            await company.save({ session });
 
-        const event = await CorporateEvent.create({
-            companyId,
-            userId,
-            eventType,
-            effectiveDate: new Date(effectiveDate),
-            data: data || {},
-            notes,
+            await ActivityLog.create([{
+                userId,
+                companyId,
+                action: 'RECORDED_EVENT',
+                details: `${eventType} recorded for ${company.name}.`,
+            }], { session });
+
+            createdEvent = event;
         });
-
-        applyEventToCompany(company, eventType as CorporateEventType, data || {}, new Date(effectiveDate));
-        await company.save();
-
-        await ActivityLog.create({
-            userId,
-            companyId,
-            action: 'RECORDED_EVENT',
-            details: `${eventType} recorded for ${company.name}.`,
-        });
-
-        return res.status(201).json(event);
+        return res.status(201).json(createdEvent);
     } catch (error: any) {
         return res.status(500).json({ error: error.message });
+    } finally {
+        await session.endSession();
     }
 };
 
