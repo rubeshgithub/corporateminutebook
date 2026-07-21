@@ -6,9 +6,10 @@ export interface AuthRequest extends Request {
         id: string;
         role: string;
     };
-    // cookies is added by cookie-parser at runtime; declaring here so TS
-    // sees it in protect() without having to widen the whole Request type.
-    cookies?: Record<string, string>;
+    // req.cookies is contributed by cookie-parser's type augmentation of
+    // Express.Request — no local redeclaration needed. Declaring it here as
+    // Record<string, string> | undefined collided with the base type's
+    // Record<string, any>, breaking the build on Render.
 }
 
 /**
@@ -18,7 +19,7 @@ export interface AuthRequest extends Request {
  * XSS can no longer read the credential.
  */
 export const protect = (req: AuthRequest, res: Response, next: NextFunction) => {
-    const token = req.cookies?.mb_auth;
+    const token = (req.cookies ?? {}).mb_auth;
     if (!token) return res.status(401).json({ error: 'Not authorized, no session.' });
 
     try {
