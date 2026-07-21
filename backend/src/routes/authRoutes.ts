@@ -1,5 +1,5 @@
 import express from 'express';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { requestOtp, verifyOtp, logout, me } from '../controllers/authController';
 import { protect } from '../middleware/authMiddleware';
 
@@ -30,7 +30,10 @@ const otpRequestEmailLimiter = rateLimit({
     // IP so we still get *some* bucketing.
     keyGenerator: (req) => {
         const email = String(req.body?.email ?? '').toLowerCase().trim();
-        return email || `no-email:${req.ip}`;
+        // Fall back to IP-bucketing (IPv6-safe via ipKeyGenerator — buckets
+        // /64 subnets so IPv6 users can't trivially bypass by cycling
+        // low-order bits) when no email is on the request body.
+        return email || `no-email:${ipKeyGenerator(req.ip ?? '')}`;
     },
     message: { error: 'This email has requested too many codes. Please try again in an hour.' },
 });

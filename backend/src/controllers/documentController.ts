@@ -224,6 +224,104 @@ export const compileMinuteBook = async (req: AuthRequest, res: Response) => {
     }
 };
 
+// ─── Purpose-driven bundles ─────────────────────────────────────────────────
+
+/**
+ * Bundle presets — each audience wants a different subset of the corporate
+ * record, not the giant everything-in-one compile:
+ *
+ *   bank    — a lender's credit file: proof the corp exists + current status.
+ *             We include only the most-recent annual return + any
+ *             signing-authority events (Wave 2). Historical resolutions are
+ *             noise for underwriting.
+ *   dd      — buyer's counsel due-diligence: the full historical record. All
+ *             events, all resolutions, all filings. This is the current
+ *             compileMinuteBook behaviour.
+ *   cra     — CRA audit: annual returns + anything affecting shareholders or
+ *             share structure (dividends, transfers, issuances). Directors
+ *             changes matter too — they touch personal-tax attribution.
+ *
+ * Each bundle reuses the existing generateMinuteBookPDF pipeline; the only
+ * knob is which events are surfaced to the template + attached.
+ */
+type BundleType = 'bank' | 'dd' | 'cra';
+
+const CRA_EVENT_TYPES = new Set([
+    'annual_return_filed',
+    'shares_issued', 'shares_transferred', 'shares_cancelled', 'share_class_added',
+    'director_appointed', 'director_resigned', 'name_changed', 'fiscal_year_end_changed',
+]);
+
+function filterEventsForBundle(events: any[], bundleType: BundleType): any[] {
+    if (bundleType === 'dd') return events;
+
+    if (bundleType === 'bank') {
+        // Latest annual return only (banks want proof of current standing,
+        // not history). Any future signing-authority events land here too
+        // once Wave 2 adds them.
+        const annualReturns = events.filter((e) => e.eventType === 'annual_return_filed');
+        const latestAR = annualReturns
+            .sort((a, b) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime())
+            .slice(0, 1);
+        return latestAR;
+    }
+
+    // cra
+    return events.filter((e) => CRA_EVENT_TYPES.has(e.eventType));
+}
+
+const BUNDLE_META: Record<BundleType, { label: string; type: string; slug: string }> = {
+    bank: { label: 'Bank / Lender Package',      type: 'bundle_bank', slug: 'bank_package' },
+    dd:   { label: 'Due Diligence Package',      type: 'bundle_dd',   slug: 'due_diligence_package' },
+    cra:  { label: 'CRA Audit Package',          type: 'bundle_cra',  slug: 'cra_audit_package' },
+};
+
+export const generateBundle = async (req: AuthRequest, res: Response) => {
+    try {
+        const { companyId } = req.body;
+        const bundleType = String(req.params.bundleType) as BundleType;
+        const userId = req.user?.id;
+
+        if (!(['bank', 'dd', 'cra'] as BundleType[]).includes(bundleType)) {
+            return res.status(400).json({ error: 'Unknown bundle type. Use bank / dd / cra.' });
+        }
+
+        const company = await Company.findOne({ _id: companyId, userId, deletedAt: null });
+        if (!company) return res.status(404).json({ message: 'Company not found' });
+
+        const allEvents = await fetchEvents(companyId);
+        const filteredEvents = filterEventsForBundle(allEvents, bundleType);
+
+        const pdfBuffer = await generateMinuteBookPDF(company, filteredEvents);
+
+        const meta = BUNDLE_META[bundleType];
+        const previousCount = await DocumentModel.countDocuments({ companyId, type: meta.type });
+        await DocumentModel.create({
+            companyId,
+            title:       meta.label,
+            type:        meta.type,
+            version:     previousCount + 1,
+            generatedAt: new Date(),
+            generatedBy: userId,
+        });
+
+        await ActivityLog.create({
+            userId,
+            companyId,
+            action:  'COMPILED_MINUTE_BOOK',
+            details: `${meta.label} generated for ${company.name}.`,
+        });
+
+        const safeName = company.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename=${safeName}_${meta.slug}.pdf`);
+        return res.send(pdfBuffer);
+    } catch (error: any) {
+        console.error('Failed to generate bundle:', error);
+        return res.status(500).json({ error: error.message });
+    }
+};
+
 export const generateInauguralPackage = async (req: AuthRequest, res: Response) => {
     try {
         const { companyId } = req.body;

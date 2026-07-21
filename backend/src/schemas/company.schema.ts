@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import {
-    shortString, mediumString, longString,
+    shortString, mediumString, xlString,
     emailField, phoneField, postalField,
     optionalIsoDate, addressBlock,
 } from './common';
@@ -66,7 +66,9 @@ const officer = z.object({
 
 const schedule = z.object({
     name:    shortString.min(1),
-    content: longString,
+    // Schedule A / B free-text can be long-form legal prose (share class
+    // terms, rights, restrictions) that legitimately runs many pages.
+    content: xlString,
 });
 
 const authorizedBy = z.object({

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
     Box, Typography, Paper, IconButton, CircularProgress, Chip, Tooltip,
     Divider, Button, Stack, TextField,
@@ -225,6 +225,19 @@ const RecordsVault: React.FC = () => {
     const [sendingESign, setSendingESign] = useState(false);
 
     const [recordEventOpen, setRecordEventOpen] = useState(false);
+
+    // Dashboard "+ Record event" fast-path passes ?openEvent=1 to bypass the
+    // vault landing and open the dialog straight away. Consume + strip the
+    // param so a page refresh doesn't reopen the dialog.
+    const [searchParams, setSearchParams] = useSearchParams();
+    useEffect(() => {
+        if (searchParams.get('openEvent') === '1') {
+            setRecordEventOpen(true);
+            const next = new URLSearchParams(searchParams);
+            next.delete('openEvent');
+            setSearchParams(next, { replace: true });
+        }
+    }, [searchParams, setSearchParams]);
 
     const [logReturnDialog, setLogReturnDialog] = useState<{ year: number } | null>(null);
     const [logReturnDate, setLogReturnDate] = useState('');

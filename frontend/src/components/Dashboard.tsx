@@ -91,6 +91,65 @@ const ACTION_COLORS: Record<string, string> = {
     RECORDED_EVENT: '#4527a0',
 };
 
+// ─── Purpose-driven readiness ────────────────────────────────────────────────
+
+/**
+ * Computes 3 purpose-specific readiness flags from the compliance entry.
+ * Rooted in what each audience actually asks for:
+ *   - Bank: does the corporation legally exist + is it current on filings?
+ *     (bank loans are refused when the annual return is overdue and the
+ *     registry lists the corp as "in default".)
+ *   - Audit (CRA): can you produce every filed annual return + all resolutions
+ *     for the fiscal years under review?
+ *   - Sale/M&A: buyer's counsel demands the complete book — annual returns +
+ *     every signed resolution + every registry filing attached.
+ */
+function computeReadiness(c: ComplianceEntry | undefined) {
+    if (!c) return { bank: false, audit: false, sale: false };
+    const noOverdue = c.annualReturnStatus !== 'overdue';
+    const filingsCurrent = (c.missingAnnualReturnYears?.length ?? 0) === 0;
+    const bank  = noOverdue && !c.missingIncorpDoc;
+    const audit = noOverdue && filingsCurrent;
+    const sale  = audit && c.missingResolutions === 0 && c.missingRegistryFilings === 0 && !c.missingIncorpDoc;
+    return { bank, audit, sale };
+}
+
+const ReadinessRow: React.FC<{ c: ComplianceEntry | undefined }> = ({ c }) => {
+    const r = computeReadiness(c);
+    const items: Array<{ label: string; ok: boolean; tip: string }> = [
+        { label: 'Bank',  ok: r.bank,  tip: 'Ready to hand to a lender — no overdue annual return, incorporation doc on file.' },
+        { label: 'Audit', ok: r.audit, tip: 'Ready for a CRA audit — all annual returns filed, no missing years.' },
+        { label: 'Sale',  ok: r.sale,  tip: 'Ready for buyer due diligence — all resolutions signed + registry filings attached.' },
+    ];
+    return (
+        <Box sx={{ display: 'flex', gap: 0.3, mt: 0.4, flexWrap: 'wrap' }}>
+            {items.map((it) => (
+                <Tooltip key={it.label} title={it.tip} arrow>
+                    <Chip
+                        label={it.label}
+                        size="small"
+                        icon={it.ok
+                            ? <CheckCircleIcon sx={{ fontSize: '10px !important', color: (it.ok ? '#2e7d32' : '#c62828') + ' !important' }} />
+                            : <WarningAmberIcon sx={{ fontSize: '10px !important', color: '#c62828 !important' }} />}
+                        sx={{
+                            height: 16,
+                            fontSize: 9.5,
+                            fontWeight: 600,
+                            bgcolor: it.ok ? 'rgba(46,125,50,0.08)' : 'rgba(198,40,40,0.08)',
+                            color:   it.ok ? '#2e7d32' : '#c62828',
+                            border: '1px solid',
+                            borderColor: it.ok ? 'rgba(46,125,50,0.35)' : 'rgba(198,40,40,0.35)',
+                            '& .MuiChip-icon': { ml: '4px', mr: '-2px' },
+                            '& .MuiChip-label': { px: 0.6 },
+                            cursor: 'default',
+                        }}
+                    />
+                </Tooltip>
+            ))}
+        </Box>
+    );
+};
+
 // ─── Compliance badge ─────────────────────────────────────────────────────────
 
 const ComplianceBadge: React.FC<{ c: ComplianceEntry | undefined; onClick: () => void }> = ({ c, onClick }) => {
@@ -457,8 +516,63 @@ const Dashboard: React.FC = () => {
                         <TableBody>
                             {paginatedCompanies.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={7} align="center" sx={{ py: 6, color: 'text.secondary', fontSize: 13 }}>
-                                        {search ? `No companies match "${search}"` : 'No companies yet — create your first one.'}
+                                    <TableCell colSpan={7} sx={{ py: search ? 5 : 8, border: 'none' }}>
+                                        {search ? (
+                                            <Box textAlign="center" color="text.secondary" fontSize={13}>
+                                                No companies match &ldquo;{search}&rdquo;
+                                            </Box>
+                                        ) : (
+                                            /* First-run hero — proper landing when the dashboard is
+                                               empty. Beats a one-line "No companies yet" that gives
+                                               a new signup nothing to grab onto. */
+                                            <Box sx={{ maxWidth: 560, mx: 'auto', textAlign: 'center', px: 2 }}>
+                                                <Box sx={{
+                                                    width: 64, height: 64, borderRadius: '50%',
+                                                    mx: 'auto', mb: 2,
+                                                    bgcolor: '#e8eaf6',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                }}>
+                                                    <BusinessIcon sx={{ fontSize: 32, color: '#1a237e' }} />
+                                                </Box>
+                                                <Typography variant="h6" fontWeight={700} color="text.primary" mb={0.75}>
+                                                    Add your first corporation
+                                                </Typography>
+                                                <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5, lineHeight: 1.6 }}>
+                                                    Enter a corporation name or number — we&apos;ll pull the live registry
+                                                    data, you fill the rest. Once saved, record events like director
+                                                    changes or share issuances and download your compiled minute book
+                                                    any time.
+                                                </Typography>
+                                                <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap">
+                                                    <Button
+                                                        variant="contained"
+                                                        size="medium"
+                                                        startIcon={<AddIcon />}
+                                                        onClick={() => navigate('/builder')}
+                                                        sx={{ fontWeight: 700, textTransform: 'none' }}
+                                                    >
+                                                        Add corporation
+                                                    </Button>
+                                                    <Button
+                                                        variant="text"
+                                                        size="medium"
+                                                        onClick={() => window.open('https://minutebook.corporateregistryservices.ca', '_blank')}
+                                                        sx={{ fontWeight: 600, textTransform: 'none', color: 'text.secondary' }}
+                                                    >
+                                                        What&apos;s a minute book?
+                                                    </Button>
+                                                </Stack>
+                                                <Box sx={{
+                                                    mt: 3.5, pt: 2.5, borderTop: '1px dashed', borderColor: 'divider',
+                                                    display: 'flex', gap: 2.5, justifyContent: 'center', flexWrap: 'wrap',
+                                                    fontSize: 11, color: 'text.disabled',
+                                                }}>
+                                                    <span>1. Enter corp &rarr; auto-fill from registry</span>
+                                                    <span>2. Record events over time</span>
+                                                    <span>3. Download signed minute book</span>
+                                                </Box>
+                                            </Box>
+                                        )}
                                     </TableCell>
                                 </TableRow>
                             ) : (
@@ -557,10 +671,24 @@ const Dashboard: React.FC = () => {
                                                     c={comp}
                                                     onClick={() => navigate(`/records/${company._id}`)}
                                                 />
+                                                <ReadinessRow c={comp} />
                                             </TableCell>
 
                                             <TableCell align="right" sx={{ py: 0.75, pr: 1 }}>
-                                                <Tooltip title="Records Vault" placement="top">
+                                                {/* Primary verb: recording an event is the most-repeated
+                                                    action for a live company. Fast-path direct to the
+                                                    Record dialog via ?openEvent=1 so users don't have to
+                                                    load the Vault → click "New event" → confirm every time. */}
+                                                <Tooltip title="Record a corporate event" placement="top">
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => navigate(`/records/${company._id}?openEvent=1`)}
+                                                        sx={{ color: '#2e7d32', '&:hover': { color: '#1b5e20', bgcolor: 'rgba(46,125,50,0.08)' } }}
+                                                    >
+                                                        <AddIcon sx={{ fontSize: 18 }} />
+                                                    </IconButton>
+                                                </Tooltip>
+                                                <Tooltip title="Corporate records" placement="top">
                                                     <IconButton size="small" onClick={() => navigate(`/records/${company._id}`)} sx={{ color: 'text.secondary', '&:hover': { color: '#2e7d32' } }}>
                                                         <ArchiveIcon sx={{ fontSize: 17 }} />
                                                     </IconButton>
@@ -570,12 +698,12 @@ const Dashboard: React.FC = () => {
                                                         <FolderOpenIcon sx={{ fontSize: 17 }} />
                                                     </IconButton>
                                                 </Tooltip>
-                                                <Tooltip title="Edit" placement="top">
+                                                <Tooltip title="Edit corporation" placement="top">
                                                     <IconButton size="small" onClick={() => navigate(`/builder/${company._id}`)} sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}>
                                                         <EditIcon sx={{ fontSize: 17 }} />
                                                     </IconButton>
                                                 </Tooltip>
-                                                <Tooltip title="Delete" placement="top">
+                                                <Tooltip title="Delete corporation" placement="top">
                                                     <IconButton size="small" onClick={() => handleDelete(company._id, company.name)} sx={{ color: 'text.secondary', '&:hover': { color: 'error.main' } }}>
                                                         <DeleteIcon sx={{ fontSize: 17 }} />
                                                     </IconButton>

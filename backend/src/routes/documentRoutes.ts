@@ -1,6 +1,6 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
-import { generateDocument, getDocuments, compileMinuteBook, generateInauguralPackage } from '../controllers/documentController';
+import { generateDocument, getDocuments, compileMinuteBook, generateInauguralPackage, generateBundle } from '../controllers/documentController';
 import { protect } from '../middleware/authMiddleware';
 
 const router = express.Router();
@@ -30,6 +30,9 @@ const compileLimiter = rateLimit({
 router.post('/generate', protect, generationLimiter, generateDocument);
 router.post('/compile', protect, compileLimiter, compileMinuteBook);
 router.post('/inaugural', protect, compileLimiter, generateInauguralPackage);
+// Purpose-driven bundles (bank / dd / cra) share the compile pipeline —
+// same rate cap because they're the same underlying render cost.
+router.post('/bundle/:bundleType', protect, compileLimiter, generateBundle);
 router.get('/:companyId', protect, getDocuments);
 
 export default router;

@@ -227,6 +227,41 @@ const DocumentManagement = () => {
         return null;
     };
 
+    /**
+     * Purpose-driven bundle downloads. Each is a filtered slice of the full
+     * minute book aimed at a specific audience — a bank credit file, a
+     * buyer's due-diligence data room, or a CRA audit response — instead
+     * of the everything-in-one compile. Backend filters the event list
+     * per bundle type; the render pipeline is shared.
+     */
+    const [bundleBusy, setBundleBusy] = React.useState<'bank' | 'dd' | 'cra' | null>(null);
+    const handleDownloadBundle = async (bundleType: 'bank' | 'dd' | 'cra') => {
+        if (!selectedCompanyId) return;
+        setBundleBusy(bundleType);
+        try {
+            const response = await api.post(
+                `/documents/bundle/${bundleType}`,
+                { companyId: selectedCompanyId },
+                { responseType: 'blob' },
+            );
+            const blob = new Blob([response.data], { type: 'application/pdf' });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            const filenames = { bank: 'bank_package.pdf', dd: 'due_diligence_package.pdf', cra: 'cra_audit_package.pdf' };
+            link.setAttribute('download', filenames[bundleType]);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+            await refreshHistory();
+        } catch {
+            showSnackbar('Failed to generate the bundle. Please try again.', 'error');
+        } finally {
+            setBundleBusy(null);
+        }
+    };
+
     const handleCompileMinuteBook = async (force = false) => {
         if (!selectedCompanyId) return;
         setBusy({ type: 'minute_book', mode: 'download' });
@@ -387,6 +422,77 @@ const DocumentManagement = () => {
                     >
                         Generate Minute Book
                     </Button>
+                </Box>
+
+                {/* Purpose-driven bundles — each is a curated slice aimed at a
+                    specific audience (lender / buyer / CRA), so the person
+                    receiving it doesn't have to skim through a hundred-page
+                    everything-book to find the five documents they care about. */}
+                <Box sx={{ mt: 3 }}>
+                    <Typography variant="subtitle2" fontWeight={700} color="text.secondary" textTransform="uppercase" letterSpacing={0.6} sx={{ mb: 1.25, fontSize: 11 }}>
+                        Purpose-driven bundles
+                    </Typography>
+                    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 1.5 }}>
+                        {([
+                            {
+                                key:  'bank' as const,
+                                title: 'Bank / Lender package',
+                                body:  'Articles + registers + most-recent annual return. What a credit officer actually needs to open a loan file.',
+                                accent: '#1565c0',
+                            },
+                            {
+                                key:  'dd' as const,
+                                title: 'Due Diligence package',
+                                body:  'Full historical minute book. Every resolution, every filing, in order — buyer\'s counsel edition.',
+                                accent: '#8a6d1f',
+                            },
+                            {
+                                key:  'cra' as const,
+                                title: 'CRA Audit package',
+                                body:  'Annual returns + shareholder + director + share-structure history. What CRA looks at first.',
+                                accent: '#2e7d32',
+                            },
+                        ]).map((b) => (
+                            <Box
+                                key={b.key}
+                                sx={{
+                                    p: 2,
+                                    borderRadius: 2,
+                                    border: '1px solid',
+                                    borderColor: 'divider',
+                                    borderLeft: `4px solid ${b.accent}`,
+                                    bgcolor: 'white',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: 1,
+                                }}
+                            >
+                                <Typography variant="subtitle2" fontWeight={700} color="text.primary">
+                                    {b.title}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" sx={{ flex: 1, lineHeight: 1.55 }}>
+                                    {b.body}
+                                </Typography>
+                                <Button
+                                    variant="outlined"
+                                    size="small"
+                                    startIcon={bundleBusy === b.key ? <CircularProgress size={14} /> : <DownloadIcon fontSize="small" />}
+                                    onClick={() => handleDownloadBundle(b.key)}
+                                    disabled={!selectedCompanyId || bundleBusy !== null}
+                                    sx={{
+                                        alignSelf: 'flex-start',
+                                        textTransform: 'none',
+                                        fontWeight: 600,
+                                        color: b.accent,
+                                        borderColor: b.accent,
+                                        '&:hover': { borderColor: b.accent, bgcolor: `${b.accent}0d` },
+                                    }}
+                                >
+                                    Download
+                                </Button>
+                            </Box>
+                        ))}
+                    </Box>
                 </Box>
 
                 {/* Generate New Document accordion */}

@@ -9,6 +9,10 @@ import { z } from 'zod';
 export const shortString = z.string().trim().max(120);      // names, single-line labels
 export const mediumString = z.string().trim().max(500);     // titles, single-paragraph
 export const longString = z.string().trim().max(5000);      // descriptions, purposes, notes
+// Schedule A share-class terms and other legal prose regularly run several
+// pages — cap at 100K chars so real minute books fit, but still prevent
+// someone from PUTing a 10 MB blob into a single field.
+export const xlString = z.string().trim().max(100_000);
 
 export const emailField = z.string().trim().toLowerCase().email().max(254);
 export const phoneField = z.string().trim().max(30);
