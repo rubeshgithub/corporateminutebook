@@ -113,8 +113,122 @@ export const getEvents = async (req: AuthRequest, res: Response) => {
         const company = await Company.findOne({ _id: companyId, userId, deletedAt: null });
         if (!company) return res.status(404).json({ error: 'Company not found.' });
 
-        const events = await CorporateEvent.find({ companyId }).sort({ effectiveDate: -1, recordedAt: -1 });
+        // Filter out soft-deleted events. `deletedAt: null` includes docs
+        // predating the field (Mongo treats missing = null in equality).
+        const events = await CorporateEvent
+            .find({ companyId, deletedAt: null })
+            .sort({ effectiveDate: -1, recordedAt: -1 });
         return res.json(events);
+    } catch (error: any) {
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+// ─── Update event (corrections; snapshot NOT re-applied) ─────────────────────
+
+/**
+ * PUT /api/events/:id — allow the user to correct notes, effective date, or
+ * the event payload after the fact. We do NOT re-apply the delta to the
+ * company snapshot: most events are lossy (they don't record the pre-state
+ * they overwrote), so a safe re-apply isn't possible without a bigger
+ * event-sourced refactor. Response includes a `snapshotWarning` flag when
+ * the changes could materially affect state, so the UI can prompt the user
+ * to also edit the company directly.
+ */
+export const updateEvent = async (req: AuthRequest, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        const id = String(req.params.id);
+        const { notes, effectiveDate, data } = req.body ?? {};
+
+        const event = await CorporateEvent.findById(id);
+        if (!event || event.deletedAt) return res.status(404).json({ error: 'Event not found.' });
+
+        // Ownership check via company.
+        const company = await Company.findOne({ _id: event.companyId, userId, deletedAt: null });
+        if (!company) return res.status(403).json({ error: 'Forbidden.' });
+
+        let snapshotWarning = false;
+        if (typeof notes === 'string' || notes === null) event.notes = notes || undefined;
+        if (effectiveDate) {
+            const d = new Date(effectiveDate);
+            if (!Number.isNaN(d.getTime())) event.effectiveDate = d;
+        }
+        // Only mutate data if the caller sent an object. Any data change
+        // could materially affect the company snapshot — warn.
+        if (data && typeof data === 'object') {
+            event.data = data;
+            snapshotWarning = true;
+        }
+
+        await event.save();
+        await ActivityLog.create({
+            userId,
+            companyId: event.companyId,
+            action: 'RECORDED_EVENT',
+            details: `Event ${event.eventType} updated.`,
+        });
+
+        return res.json({
+            event,
+            snapshotWarning,
+            snapshotMessage: snapshotWarning
+                ? 'Company snapshot was not automatically re-applied. If this correction changes directors, shareholders, addresses or share structure, edit the company directly to keep the snapshot accurate.'
+                : undefined,
+        });
+    } catch (error: any) {
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+// ─── Delete event (soft, does NOT rewind snapshot) ───────────────────────────
+
+/**
+ * DELETE /api/events/:id — soft-delete. Sets deletedAt and drops the event
+ * from event listings + PDF compilation. Does NOT reverse the event's
+ * effect on the company snapshot (same lossy-events reason as updateEvent).
+ * Response carries `snapshotWarning: true` when the event was one of the
+ * types that mutated company state, so the UI can steer the user to the
+ * company editor.
+ */
+export const deleteEvent = async (req: AuthRequest, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        const id = String(req.params.id);
+
+        const event = await CorporateEvent.findById(id);
+        if (!event || event.deletedAt) return res.status(404).json({ error: 'Event not found.' });
+
+        const company = await Company.findOne({ _id: event.companyId, userId, deletedAt: null });
+        if (!company) return res.status(403).json({ error: 'Forbidden.' });
+
+        event.deletedAt = new Date();
+        await event.save();
+
+        await ActivityLog.create({
+            userId,
+            companyId: event.companyId,
+            action: 'RECORDED_EVENT',
+            details: `Event ${event.eventType} deleted.`,
+        });
+
+        // Types that mutate company state — everything except annual_return_filed
+        // (which only sets the filedThisPeriod flag derived from the event list).
+        const mutatingTypes = new Set([
+            'director_appointed', 'director_resigned', 'director_address_changed',
+            'officer_appointed', 'officer_resigned',
+            'address_changed', 'name_changed', 'fiscal_year_end_changed',
+            'shares_issued', 'shares_transferred', 'shares_cancelled', 'share_class_added',
+        ]);
+        const snapshotWarning = mutatingTypes.has(event.eventType);
+
+        return res.json({
+            ok: true,
+            snapshotWarning,
+            snapshotMessage: snapshotWarning
+                ? 'The event was removed from the log, but the company\'s current directors, shareholders, or address were not automatically rewound. If deleting this event should change the company state, edit the company directly.'
+                : undefined,
+        });
     } catch (error: any) {
         return res.status(500).json({ error: error.message });
     }

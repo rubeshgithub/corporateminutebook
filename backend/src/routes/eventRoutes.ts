@@ -1,6 +1,8 @@
 import express from 'express';
 import {
     createEvent,
+    updateEvent,
+    deleteEvent,
     getEvents,
     attachEvent,
     serveAttachment,
@@ -14,11 +16,13 @@ import {
 } from '../controllers/eventController';
 import { protect } from '../middleware/authMiddleware';
 import { validateBody } from '../middleware/validate';
-import { createEventSchema } from '../schemas/event.schema';
+import { createEventSchema, updateEventSchema } from '../schemas/event.schema';
 
 const router = express.Router();
 
 router.post('/', protect, validateBody(createEventSchema), createEvent);
+router.put('/:id', protect, validateBody(updateEventSchema), updateEvent);
+router.delete('/:id', protect, deleteEvent);
 router.get('/:companyId', protect, getEvents);
 router.post('/:id/attach', protect, eventAttachMiddleware, attachEvent);
 router.get('/:id/attachment/:fileId', protect, serveAttachment);

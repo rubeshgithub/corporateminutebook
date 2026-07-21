@@ -45,6 +45,12 @@ export interface ICorporateEvent extends Document {
     notes?: string;
     attachments: IEventAttachment[];
     eSign: IESign;
+    /** Soft-delete marker. Nulled events stay in the DB but are filtered from
+     *  reads + PDF compilation. Applying an inverse to the company snapshot
+     *  isn't safe (most events are lossy — they don't preserve pre-state), so
+     *  the deletion is a bookkeeping action, not a state rewind. The UI
+     *  warns the user to correct the company directly if needed. */
+    deletedAt?: Date | null;
 }
 
 const attachmentSchema = new Schema<IEventAttachment>(
@@ -88,6 +94,7 @@ const corporateEventSchema = new Schema<ICorporateEvent>(
         notes: { type: String },
         attachments: { type: [attachmentSchema], default: [] },
         eSign: { type: eSignSchema, default: () => ({ status: 'none' }) },
+        deletedAt: { type: Date, default: null, index: true },
     },
     { timestamps: false },
 );

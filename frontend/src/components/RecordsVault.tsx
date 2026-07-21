@@ -17,6 +17,7 @@ import EventIcon from '@mui/icons-material/Event';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import AutorenewIcon from '@mui/icons-material/Autorenew';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import api from '../utils/api';
 import { useSnackbar } from '../context/SnackbarContext';
 import RecordEventDialog from './RecordEventDialog';
@@ -231,6 +232,12 @@ const RecordsVault: React.FC = () => {
     const [logReturnFile, setLogReturnFile] = useState<File | null>(null);
     const [loggingReturn, setLoggingReturn] = useState(false);
 
+    // Delete-event confirmation. Snapshot warning surfaces the honest
+    // caveat: deleting the event removes it from the log + PDF compilation
+    // but does NOT rewind the company snapshot (most events are lossy).
+    const [deleteEventDialog, setDeleteEventDialog] = useState<{ eventId: string; label: string; summary: string; mutatesState: boolean } | null>(null);
+    const [deletingEvent, setDeletingEvent] = useState(false);
+
     const section1Ref = useRef<HTMLDivElement>(null);
     const section2Ref = useRef<HTMLDivElement>(null);
     const section3Ref = useRef<HTMLDivElement>(null);
@@ -252,6 +259,27 @@ const RecordsVault: React.FC = () => {
         };
         load();
     }, [companyId]);
+
+    const handleConfirmDeleteEvent = async () => {
+        if (!deleteEventDialog) return;
+        setDeletingEvent(true);
+        try {
+            const res = await api.delete(`/events/${deleteEventDialog.eventId}`);
+            setEvents((prev) => prev.filter((e) => e._id !== deleteEventDialog.eventId));
+            setDeleteEventDialog(null);
+            // Surface the snapshot warning inline (not just the ok toast) —
+            // the honest version of "we removed the record but didn't rewind".
+            if (res.data?.snapshotWarning && res.data?.snapshotMessage) {
+                showSnackbar(res.data.snapshotMessage, 'warning');
+            } else {
+                showSnackbar('Event deleted.', 'success');
+            }
+        } catch {
+            showSnackbar('Failed to delete event.', 'error');
+        } finally {
+            setDeletingEvent(false);
+        }
+    };
 
     const handleDownloadAttachment = async (eventId: string, fileId: string, originalName: string) => {
         try {
@@ -900,6 +928,22 @@ const RecordsVault: React.FC = () => {
                                             {ev.notes === 'Founding' && (
                                                 <Chip label="Founding" size="small" sx={{ bgcolor: '#e8eaf6', color: '#3949ab', fontSize: 10, height: 18 }} />
                                             )}
+                                            <Box sx={{ ml: 'auto' }}>
+                                                <Tooltip title="Delete event">
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => setDeleteEventDialog({
+                                                            eventId: ev._id,
+                                                            label: EVENT_LABELS[ev.eventType],
+                                                            summary: eventSummary(ev.eventType, ev.data),
+                                                            mutatesState: RESOLUTION_EVENT_TYPES.has(ev.eventType),
+                                                        })}
+                                                        sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}
+                                                    >
+                                                        <DeleteOutlineIcon sx={{ fontSize: 15 }} />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            </Box>
                                         </Box>
 
                                         {/* Resolution row */}
@@ -1346,6 +1390,52 @@ const RecordsVault: React.FC = () => {
                 company={company}
                 onSuccess={handleEventRecorded}
             />
+
+            {/* Delete-event confirmation. The snapshot caveat is up-front:
+                the event is dropped from the log + PDF compilation, but the
+                company snapshot (directors, shareholders, etc.) is not
+                automatically rewound because most events are lossy. */}
+            <Dialog
+                open={!!deleteEventDialog}
+                onClose={() => !deletingEvent && setDeleteEventDialog(null)}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle>Delete event</DialogTitle>
+                <DialogContent dividers>
+                    <Typography variant="body2" mb={1.5}>
+                        Delete this event from the record?
+                    </Typography>
+                    {deleteEventDialog && (
+                        <Box sx={{ p: 1.5, bgcolor: '#f5f5f5', borderRadius: 1, mb: 2 }}>
+                            <Typography variant="caption" fontWeight={700} color="text.secondary" textTransform="uppercase" letterSpacing={0.5} display="block">
+                                {deleteEventDialog.label}
+                            </Typography>
+                            <Typography variant="body2">{deleteEventDialog.summary}</Typography>
+                        </Box>
+                    )}
+                    {deleteEventDialog?.mutatesState && (
+                        <Box sx={{ p: 1.5, bgcolor: '#fff8e1', border: '1px solid #ffe082', borderRadius: 1, display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                            <WarningAmberIcon sx={{ color: '#f57f17', fontSize: 18, mt: 0.25, flexShrink: 0 }} />
+                            <Typography variant="caption" color="#8a6d1f" lineHeight={1.55}>
+                                <strong>Snapshot won&apos;t rewind automatically.</strong> The event will be removed from the log, resolutions, and compiled minute book — but the company&apos;s current directors, shareholders, share structure, or address will stay as they are. If this deletion should also change the company state, use the company editor.
+                            </Typography>
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setDeleteEventDialog(null)} disabled={deletingEvent}>Cancel</Button>
+                    <Button
+                        onClick={handleConfirmDeleteEvent}
+                        color="error"
+                        variant="contained"
+                        disabled={deletingEvent}
+                        startIcon={deletingEvent ? <CircularProgress size={16} /> : <DeleteOutlineIcon />}
+                    >
+                        Delete event
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };

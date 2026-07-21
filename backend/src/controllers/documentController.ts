@@ -27,7 +27,7 @@ const TEMPLATE_LABELS: Record<string, string> = {
 const HISTORY_TEMPLATES = new Set(['share_ledger', 'share_transfer_register', 'registers', 'minute_book']);
 
 const fetchEvents = async (companyId: string) =>
-    CorporateEvent.find({ companyId }).sort({ effectiveDate: 1, recordedAt: 1 }).lean();
+    CorporateEvent.find({ companyId, deletedAt: null }).sort({ effectiveDate: 1, recordedAt: 1 }).lean();
 
 // ─── Compliance helpers (used for minute book gate) ──────────────────────────
 

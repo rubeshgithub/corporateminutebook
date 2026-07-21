@@ -237,7 +237,7 @@ export const getComplianceSummary = async (req: AuthRequest, res: Response) => {
         if (companies.length === 0) return res.json([]);
 
         const companyIds = companies.map((c) => c._id);
-        const events = await CorporateEvent.find({ companyId: { $in: companyIds } }).lean();
+        const events = await CorporateEvent.find({ companyId: { $in: companyIds }, deletedAt: null }).lean();
 
         // Group events by company
         const byCompany: Record<string, typeof events> = {};
@@ -361,7 +361,7 @@ export const getUpsellCandidates = async (req: AuthRequest, res: Response) => {
 
         const companyIds = seeded.map((c) => c._id);
         const counts = await CorporateEvent.aggregate([
-            { $match: { companyId: { $in: companyIds } } },
+            { $match: { companyId: { $in: companyIds }, deletedAt: null } },
             { $group: { _id: '$companyId', count: { $sum: 1 } } },
         ]);
         const countByCompany: Record<string, number> = {};
