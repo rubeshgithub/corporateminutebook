@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
+import cookieParser from 'cookie-parser';
 import { connectDB } from './config/db';
 
 dotenv.config();
@@ -52,6 +53,9 @@ app.use(express.json({
     },
 }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+// Auth token is stored in an httpOnly cookie — cookie-parser hydrates
+// req.cookies so authMiddleware.protect can read it.
+app.use(cookieParser());
 
 // Routes
 import authRoutes from './routes/authRoutes';

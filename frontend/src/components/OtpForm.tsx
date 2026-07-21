@@ -56,7 +56,12 @@ const OtpForm: React.FC<Props> = ({
         setLoading(true);
         try {
             const res = await api.post('/auth/verify-otp', { email, code });
-            dispatch(loginSuccess(res.data));
+            // Backend now sets the httpOnly cookie in the Set-Cookie header
+            // — response body only carries public user metadata. Strip any
+            // extra one-time flags (justClaimed) so they don't get cached
+            // in localStorage across sessions.
+            const { _id, name, email: userEmail, role } = res.data;
+            dispatch(loginSuccess({ _id, name, email: userEmail, role }));
             navigate('/dashboard');
         } catch (err: any) {
             setError(err?.response?.data?.error || 'Invalid code. Try again.');

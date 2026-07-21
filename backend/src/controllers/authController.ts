@@ -3,11 +3,42 @@ import jwt from 'jsonwebtoken';
 import { User } from '../models/User';
 import { Company } from '../models/Company';
 import { sendOtpEmail } from '../services/emailService';
+import { AuthRequest } from '../middleware/authMiddleware';
 
 const generateToken = (id: string, role: string) =>
     jwt.sign({ id, role }, process.env.JWT_SECRET as string, { expiresIn: '30d' });
 
 const OTP_TTL_MINUTES = 10;
+const AUTH_COOKIE = 'mb_auth';
+const COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;   // matches the JWT expiry
+
+/**
+ * Cookie config. In production the SPA and API are on separate Render
+ * domains, which is cross-origin — the cookie has to be sameSite: 'none'
+ * with secure: true to be sent on those XHRs. In dev we run on
+ * http://localhost, so sameSite: 'lax' + secure: false is the working
+ * combo. NODE_ENV=production drives the switch.
+ */
+function setAuthCookie(res: Response, token: string) {
+    const isProd = process.env.NODE_ENV === 'production';
+    res.cookie(AUTH_COOKIE, token, {
+        httpOnly: true,
+        secure:   isProd,
+        sameSite: isProd ? 'none' : 'lax',
+        maxAge:   COOKIE_MAX_AGE_MS,
+        path:     '/',
+    });
+}
+
+function clearAuthCookie(res: Response) {
+    const isProd = process.env.NODE_ENV === 'production';
+    res.clearCookie(AUTH_COOKIE, {
+        httpOnly: true,
+        secure:   isProd,
+        sameSite: isProd ? 'none' : 'lax',
+        path:     '/',
+    });
+}
 
 export const requestOtp = async (req: Request, res: Response) => {
     try {
@@ -72,14 +103,40 @@ export const verifyOtp = async (req: Request, res: Response) => {
         }
         await user.save();
 
+        // Token now rides in an httpOnly cookie — no longer returned in the
+        // body. XSS in the SPA can't read it. The client keeps user metadata
+        // in localStorage as a cache for UI; the cookie is the source of
+        // truth, and any 401 bounces to login.
+        setAuthCookie(res, generateToken(user._id.toString(), user.role));
+
         res.json({
             _id: user._id,
             name: user.name,
             email: user.email,
             role: user.role,
-            token: generateToken(user._id.toString(), user.role),
             justClaimed: isFirstLogin,  // frontend uses this to show a welcome flash
         });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+export const logout = (_req: Request, res: Response) => {
+    clearAuthCookie(res);
+    res.json({ ok: true });
+};
+
+/**
+ * Returns the current user's public profile — used by the SPA on boot to
+ * decide whether the cached user in localStorage is still logged in
+ * server-side. If the cookie is missing/expired, `protect` returns 401
+ * and the frontend clears its cache.
+ */
+export const me = async (req: AuthRequest, res: Response) => {
+    try {
+        const user = await User.findById(req.user!.id).select('_id name email role');
+        if (!user) return res.status(404).json({ error: 'User not found.' });
+        res.json({ _id: user._id, name: user.name, email: user.email, role: user.role });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }

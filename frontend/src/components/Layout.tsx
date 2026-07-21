@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../store/authSlice';
 import LandingFooter from './LandingFooter';
+import api from '../utils/api';
 
 const NAV_ITEMS = [
     { label: 'Dashboard', path: '/dashboard' },
@@ -42,7 +43,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const dispatch = useDispatch();
     const { user } = useSelector((state: any) => state.auth);
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
+        // Fire-and-forget — even if the network call fails, we still clear
+        // client-side state so the visitor doesn't see a stuck-signed-in
+        // shell. The httpOnly cookie is server-cleared here; if the request
+        // never lands, the cookie expires on its own after 30 days.
+        try { await api.post('/auth/logout'); } catch { /* network noop */ }
         dispatch(logout());
         navigate('/');
     };
