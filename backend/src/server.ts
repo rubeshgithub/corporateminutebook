@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
+import rateLimit from 'express-rate-limit';
 import { connectDB } from './config/db';
 
 dotenv.config();
@@ -25,14 +26,32 @@ app.use(cors({
 }));
 app.use(helmet());
 app.use(morgan('dev'));
-// JSON parser — the verify hook stashes the raw bytes on req.rawBody so
-// the CRS feed endpoint can HMAC-verify against exactly what was sent.
+
+// Global rate limit — generous. Catches broad scraping / abuse without
+// impacting legitimate use (a full session of dashboard + builder + records
+// is well under 200 req/min per IP).
+const globalLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 200,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests. Slow down and try again.' },
+});
+app.use('/api', globalLimiter);
+
+// Body size caps — before this, express.json() defaulted to a 100 KB soft
+// limit that many client bugs can exceed silently. Multer routes get their
+// own file-size limits; these caps only affect application/json bodies.
+// 1 MB is plenty for the largest write (a company with many shareholders).
 app.use(express.json({
+    limit: '1mb',
+    // JSON verify hook stashes raw bytes on req.rawBody so the CRS feed
+    // endpoint can HMAC-verify against exactly what was sent.
     verify: (req, _res, buf) => {
         (req as unknown as { rawBody?: Buffer }).rawBody = buf;
     },
 }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // Routes
 import authRoutes from './routes/authRoutes';

@@ -190,6 +190,38 @@ const companySchema = z.object({
     fiscalYearEnd: z.string().optional(),
     annualReturnDueDate: z.string().optional(),
     incorporationDocumentFile: z.string().optional(),
+}).superRefine((data, ctx) => {
+    // Cross-field rules that the individual field schemas can't express.
+    // Backend validates identically (see backend/src/schemas/company.schema.ts)
+    // — this frontend version just gives instant feedback in the wizard.
+
+    if (
+        typeof data.minDirectors === 'number' &&
+        typeof data.maxDirectors === 'number' &&
+        data.minDirectors > data.maxDirectors
+    ) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['maxDirectors'],
+            message: 'Must be at least the minimum number of directors.',
+        });
+    }
+
+    // Every shareholder must reference a share class that actually exists.
+    // Deleting or renaming a share class would otherwise leave orphaned
+    // references that later crash the share certificate template.
+    if (Array.isArray(data.shareholders) && Array.isArray(data.shareClasses)) {
+        const classNames = new Set(data.shareClasses.map((c) => c.name));
+        data.shareholders.forEach((sh, i) => {
+            if (sh.sharesClass && !classNames.has(sh.sharesClass)) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    path: ['shareholders', i, 'sharesClass'],
+                    message: `Share class "${sh.sharesClass}" is not defined. Add it in the Share Classes step or pick an existing one.`,
+                });
+            }
+        });
+    }
 });
 
 type CompanyFormValues = z.infer<typeof companySchema>;
@@ -680,7 +712,7 @@ const MinuteBookBuilder: React.FC = () => {
         setRegInfoLocation(hit.location ?? '');
         setRegInfoEntityType(hit.entityType ?? '');
         showSnackbar(`Loaded ${hit.name} from the registry. Highlighted fields came from the search — the rest are for you to enter.`, 'success');
-        setSearchOpen(false);
+        closeRegistrySearch();
     };
 
     const openRegistrySearch = () => {
@@ -690,6 +722,16 @@ const MinuteBookBuilder: React.FC = () => {
         setSearchAttempted(false);
         setSearchError('');
         setSearchOpen(true);
+    };
+
+    // Wipe the dialog's transient state on close so reopening starts fresh
+    // instead of surfacing yesterday's stale hits + errors.
+    const closeRegistrySearch = () => {
+        setSearchOpen(false);
+        setSearchQuery('');
+        setSearchResults([]);
+        setSearchAttempted(false);
+        setSearchError('');
     };
 
     // Build composed `name` from parts before submission
@@ -1694,7 +1736,7 @@ const MinuteBookBuilder: React.FC = () => {
                 {/* ---- Registry Search Dialog ---- */}
                 <Dialog
                     open={searchOpen}
-                    onClose={() => setSearchOpen(false)}
+                    onClose={closeRegistrySearch}
                     fullWidth
                     maxWidth="md"
                 >
@@ -1795,7 +1837,7 @@ const MinuteBookBuilder: React.FC = () => {
                         )}
                     </DialogContent>
                     <DialogActions>
-                        <Button onClick={() => setSearchOpen(false)}>Close</Button>
+                        <Button onClick={closeRegistrySearch}>Close</Button>
                     </DialogActions>
                 </Dialog>
 
