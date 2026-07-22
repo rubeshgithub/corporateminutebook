@@ -6,6 +6,8 @@ import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
 import { connectDB } from './config/db';
+import { startNotificationScheduler } from './services/notificationScheduler';
+import { startRegistryDriftChecker } from './services/registryDriftChecker';
 
 dotenv.config();
 
@@ -91,4 +93,9 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
+    // Boot the background scheduled jobs after the HTTP listener is up so
+    // failures in a job don't prevent health checks from responding.
+    // Each scheduler is env-guarded — dev boots without them.
+    startNotificationScheduler();
+    startRegistryDriftChecker();
 });

@@ -318,6 +318,12 @@ export const getComplianceSummary = async (req: AuthRequest, res: Response) => {
                 + (missingIncorpDoc ? 1 : 0)
                 + missingAnnualReturnYears.length;
 
+            // Registry-drift state — surfaced to the dashboard banner. The
+            // scheduled poller flips `drift.detectedAt` when the government
+            // registry snapshot no longer matches this record.
+            const drift = (company as any).drift;
+            const driftDetected = !!(drift?.detectedAt && !drift?.resolvedAt);
+
             return {
                 companyId: cid,
                 issues,
@@ -329,6 +335,8 @@ export const getComplianceSummary = async (req: AuthRequest, res: Response) => {
                 expectedAnnualReturns: expectedYears.length,
                 filedAnnualReturns,
                 missingAnnualReturnYears,
+                driftDetected,
+                driftFields: driftDetected ? (drift?.fields ?? []) : [],
             };
         });
 
@@ -382,3 +390,40 @@ export const getUpsellCandidates = async (req: AuthRequest, res: Response) => {
         return res.status(500).json({ error: error.message });
     }
 };
+
+/**
+ * POST /api/companies/:id/resolve-drift
+ *
+ * User action: "I've reconciled the drift with the government registry
+ * (updated the internal record, or confirmed the registry state)." Clears
+ * the drift flag so the dashboard banner disappears until the next weekly
+ * scan re-detects a divergence.
+ */
+export const resolveDrift = async (req: AuthRequest, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        const id = String(req.params.id);
+        const company = await Company.findOne({ _id: id, userId, deletedAt: null });
+        if (!company) return res.status(404).json({ error: 'Company not found.' });
+
+        (company as any).drift = {
+            ...(company as any).drift,
+            detectedAt: null,
+            fields:     [],
+            resolvedAt: new Date(),
+        };
+        await company.save();
+
+        await ActivityLog.create({
+            userId,
+            companyId: id,
+            action:    'UPDATED_COMPANY',
+            details:   `Registry drift acknowledged for ${company.name}.`,
+        });
+
+        return res.json({ ok: true });
+    } catch (error: any) {
+        return res.status(500).json({ error: error.message });
+    }
+};
+

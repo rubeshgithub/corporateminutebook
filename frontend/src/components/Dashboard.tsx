@@ -45,6 +45,8 @@ interface ComplianceEntry {
     expectedAnnualReturns: number;
     filedAnnualReturns: number;
     missingAnnualReturnYears: number[];
+    driftDetected?: boolean;
+    driftFields?: string[];
 }
 
 type Order = 'asc' | 'desc';
@@ -333,6 +335,25 @@ const Dashboard: React.FC = () => {
             .sort((a, b) => (a._c?.daysUntilAnnualReturn ?? 999) - (b._c?.daysUntilAnnualReturn ?? 999));
     }, [companies, complianceMap]);
 
+    // Companies where the government registry has drifted from MinuteBook's
+    // internal record. Weekly poller sets driftDetected on the compliance
+    // entry; user hits "reconciled" to clear it.
+    const driftedCompanies = React.useMemo(() => {
+        return companies
+            .map((c) => ({ ...c, _c: complianceMap[c._id] }))
+            .filter((c) => c._c?.driftDetected);
+    }, [companies, complianceMap]);
+
+    const handleResolveDrift = async (companyId: string) => {
+        try {
+            await api.post(`/companies/${companyId}/resolve-drift`);
+            fetchAll();
+            showSnackbar('Drift acknowledged. Banner cleared.', 'success');
+        } catch {
+            showSnackbar('Failed to clear drift flag.', 'error');
+        }
+    };
+
     return (
         <Box sx={{ p: 3, bgcolor: '#f5f6fa', minHeight: '100vh' }}>
 
@@ -389,6 +410,52 @@ const Dashboard: React.FC = () => {
                     </Box>
                 </Box>
             )}
+
+            {/* Registry drift banner — the weekly drift-check found that the
+                government registry no longer agrees with what MinuteBook holds
+                (name, status, or registered city). Big signal for owners who
+                filed changes directly with the registry and forgot to update
+                the internal record. Clicking "Reconciled" clears the flag. */}
+            {driftedCompanies.map((c) => (
+                <Box
+                    key={`drift-${c._id}`}
+                    sx={{
+                        mb: 2.5, p: 1.5, px: 2.25, borderRadius: 2,
+                        bgcolor: '#fff3e0',
+                        border: '1px solid #ffb74d',
+                        borderLeft: '4px solid #e65100',
+                        display: 'flex', alignItems: 'center', gap: 1.5,
+                        flexWrap: 'wrap',
+                    }}
+                >
+                    <WarningAmberIcon sx={{ color: '#e65100', fontSize: 22, flexShrink: 0 }} />
+                    <Box sx={{ flex: '1 1 260px', minWidth: 0 }}>
+                        <Typography variant="body2" fontWeight={700} color="#bf360c">
+                            {c.name}: government registry has drifted from MinuteBook
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
+                            Differences detected in: <strong>{(c._c?.driftFields ?? []).join(', ')}</strong>.
+                            {' '}Update the internal record to match, or confirm the registry state and click reconciled.
+                        </Typography>
+                    </Box>
+                    <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => navigate(`/builder/${c._id}`)}
+                        sx={{ borderColor: '#e65100', color: '#e65100', textTransform: 'none', fontWeight: 600, whiteSpace: 'nowrap' }}
+                    >
+                        Edit corporation
+                    </Button>
+                    <Button
+                        variant="contained"
+                        size="small"
+                        onClick={() => handleResolveDrift(c._id)}
+                        sx={{ bgcolor: '#e65100', textTransform: 'none', fontWeight: 700, whiteSpace: 'nowrap', '&:hover': { bgcolor: '#bf360c' } }}
+                    >
+                        Reconciled
+                    </Button>
+                </Box>
+            ))}
 
             {/* CRS upsell banner — appears once per crs_seeded company with
                 ≥2 filings on record. Encourages the customer to complete

@@ -80,6 +80,16 @@ export interface RegistryHit {
     source:           'cbr' | 'orgbook';
 }
 
+// Exported for the registry-drift scheduler which needs to look up
+// current registry state without going through the HTTP layer.
+export async function searchCBRDirect(q: string, provinceCode?: string) {
+    return searchCBR(q, provinceCode);
+}
+export async function searchBCDirect(q: string) {
+    return searchBC(q);
+}
+export const PROVINCE_CBR_MAP = PROVINCE_CBR;
+
 async function searchCBR(q: string, provinceCode?: string): Promise<{ total: number; results: RegistryHit[] }> {
     let url =
         'https://ised-isde.canada.ca/cbr/srch/api/v1/search' +

@@ -119,6 +119,24 @@ export interface ICompany extends Document {
         provinceKey: string;   // "ab", "bc", "federal", …
         registryId: string;    // MRAS_ID / BC OrgBook source_id
     };
+    // Notification dedupe. Reminders track the calendar year they last
+    // fired for, so a single 30-day-before window only sends once per
+    // cycle (a daily cron would otherwise spam). Reset naturally each
+    // year as the year rolls over.
+    notifications?: {
+        fyeRemindedForYear?: number;             // FY reminders per year
+        annualReturnRemindedForYear?: number;    // AR reminders per year
+    };
+    // Registry-drift check state. Set by the weekly poller when the
+    // government registry snapshot no longer matches what MinuteBook
+    // holds. Dashboard surfaces this as a banner so the user knows
+    // their internal record has diverged from the public record.
+    drift?: {
+        checkedAt?: Date;                        // last time we polled
+        detectedAt?: Date | null;                // most recent drift moment (null when clean)
+        fields?: string[];                       // which fields differ (e.g. ["name", "status"])
+        resolvedAt?: Date | null;                // when user marked drift as resolved
+    };
     deletedAt?: Date | null;
     createdAt: Date;
     updatedAt: Date;
@@ -248,6 +266,16 @@ const companySchema: Schema = new Schema(
         registrySignature: {
             provinceKey: String,
             registryId:  String,
+        },
+        notifications: {
+            fyeRemindedForYear:          { type: Number, default: null },
+            annualReturnRemindedForYear: { type: Number, default: null },
+        },
+        drift: {
+            checkedAt:  { type: Date, default: null },
+            detectedAt: { type: Date, default: null },
+            fields:     { type: [String], default: [] },
+            resolvedAt: { type: Date, default: null },
         },
         deletedAt: { type: Date, default: null },
     },

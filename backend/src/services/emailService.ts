@@ -36,6 +36,112 @@ export const sendOtpEmail = async (opts: { to: string; code: string }) => {
     });
 };
 
+const APP_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+/**
+ * Fiscal-year-end reminder — fires 30 days before FYE. Framed for the
+ * business owner + their accountant: this is the moment annual director
+ * and shareholder resolutions get dated, and the T2 corporate tax return
+ * cycle begins.
+ */
+export const sendFyeReminderEmail = async (opts: {
+    to: string;
+    companyName: string;
+    fyeDate: Date;
+    companyId: string;
+    daysUntil: number;
+}) => {
+    const { to, companyName, fyeDate, companyId, daysUntil } = opts;
+    const fyeLabel = fyeDate.toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' });
+    const url = `${APP_URL}/records/${companyId}?openEvent=1`;
+
+    await sendMail({
+        from: FROM,
+        to,
+        subject: `${companyName}: fiscal year-end in ${daysUntil} days`,
+        html: `
+            <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#222;line-height:1.6">
+                <h2 style="color:#1a237e;margin-bottom:8px">Your fiscal year end is approaching</h2>
+                <p style="color:#666;margin:0 0 24px 0">A short heads-up for <strong>${companyName}</strong> — ${daysUntil} days to go.</p>
+
+                <div style="background:#f0f4ff;border-left:4px solid #1a237e;padding:16px 20px;margin:0 0 24px 0">
+                    <div style="font-size:13px;color:#666;letter-spacing:0.05em;text-transform:uppercase;font-weight:600">Fiscal year end</div>
+                    <div style="font-size:20px;font-weight:700;color:#1a237e;margin-top:4px">${fyeLabel}</div>
+                </div>
+
+                <p><strong>What typically needs to happen around FYE:</strong></p>
+                <ul>
+                    <li>Annual director resolution (adopts financial statements, waives audit if applicable)</li>
+                    <li>Annual shareholder resolution (elects directors, appoints or waives auditor)</li>
+                    <li>Any dividend declarations for the fiscal year</li>
+                </ul>
+
+                <p>You can record all of these directly in MinuteBook — signed copies will slot into your compiled book.</p>
+
+                <div style="margin:28px 0">
+                    <a href="${url}" style="display:inline-block;background:#1a237e;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:600">Record an event →</a>
+                </div>
+
+                <p style="color:#888;font-size:12px;margin-top:32px">You're receiving this because ${companyName} has this fiscal year end on file with MinuteBook. To adjust or turn off reminders, edit the company in the app.</p>
+            </div>`,
+    });
+};
+
+/**
+ * Annual-return reminder — fires 30 days before the AR due date. Wording
+ * intentionally direct: missing the AR triggers a notice-of-intent-to-
+ * dissolve in most Canadian jurisdictions, and that costs money to
+ * reverse. Owners routinely forget.
+ */
+export const sendAnnualReturnReminderEmail = async (opts: {
+    to: string;
+    companyName: string;
+    dueDate: Date;
+    companyId: string;
+    daysUntil: number;
+}) => {
+    const { to, companyName, dueDate, companyId, daysUntil } = opts;
+    const dueLabel = dueDate.toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' });
+    const url = `${APP_URL}/records/${companyId}`;
+
+    await sendMail({
+        from: FROM,
+        to,
+        subject: `${companyName}: annual return due in ${daysUntil} days`,
+        html: `
+            <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#222;line-height:1.6">
+                <h2 style="color:#b71c1c;margin-bottom:8px">Annual return due in ${daysUntil} days</h2>
+                <p style="color:#666;margin:0 0 24px 0">${companyName} — file this before the deadline to keep the corporation in good standing.</p>
+
+                <div style="background:#fff8e1;border-left:4px solid #f9a825;padding:16px 20px;margin:0 0 24px 0">
+                    <div style="font-size:13px;color:#8a6d1f;letter-spacing:0.05em;text-transform:uppercase;font-weight:600">Deadline</div>
+                    <div style="font-size:20px;font-weight:700;color:#8a6d1f;margin-top:4px">${dueLabel}</div>
+                </div>
+
+                <p><strong>What happens if you miss it:</strong></p>
+                <ul>
+                    <li>Registry issues a notice of intent to dissolve</li>
+                    <li>Corporation loses good standing (blocks bank loans, extra-provincial registrations, grants)</li>
+                    <li>Eventually, the corporation is struck from the registry — revival costs several hundred to several thousand dollars</li>
+                </ul>
+
+                <p><strong>Two ways to file:</strong></p>
+                <ul>
+                    <li>File it yourself directly through your provincial or federal registry portal</li>
+                    <li>Have CRS file it for you — $99 all-in, filed within 24 hours (<a href="https://www.corporateregistryservices.ca/annual-return" style="color:#1a237e">order here</a>)</li>
+                </ul>
+
+                <p>Once it's filed, log the confirmation in MinuteBook as an "Annual Return Filed" event so your minute book stays current.</p>
+
+                <div style="margin:28px 0">
+                    <a href="${url}" style="display:inline-block;background:#1a237e;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:600">Open ${companyName} →</a>
+                </div>
+
+                <p style="color:#888;font-size:12px;margin-top:32px">You're receiving this because ${companyName}'s annual return date is on file with MinuteBook.</p>
+            </div>`,
+    });
+};
+
 export const sendResolutionEmail = async (opts: {
     to: string;
     recipientName: string;
