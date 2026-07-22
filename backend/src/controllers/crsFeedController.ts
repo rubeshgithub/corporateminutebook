@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import crypto from 'crypto';
+import mongoose from 'mongoose';
 import { User } from '../models/User';
 import { Company } from '../models/Company';
 import { CorporateEvent, CorporateEventType } from '../models/CorporateEvent';
@@ -129,100 +130,131 @@ export const orderCompleted = async (req: Request, res: Response) => {
 
     const email = body.customerEmail.toLowerCase().trim();
 
-    // Upsert user — either they already have a MinuteBook account (self_signup)
-    // or we materialize a crs_seeded shell that OTP login can later "claim".
-    let user = await User.findOne({ email });
-    if (!user) {
-        user = await User.create({
-            email,
-            name:             (body.customerName ?? '').trim(),
-            role:             'business_owner',
-            subscriptionTier: 'free',
-            origin:           'crs_seeded',
-            firstLoggedInAt:  null,
+    /**
+     * Wrap the four correlated writes — User, Company, CorporateEvents,
+     * CrsProcessedOrder — in a single Mongo transaction. Without it, a
+     * mid-sequence failure (e.g. events save fails after Company save
+     * succeeds) leaves orphaned records + doesn't record CrsProcessedOrder,
+     * so the next webhook retry re-inserts the Company + creates duplicate
+     * User records. With the transaction, either all four land or none do
+     * — and Stripe's retry safely re-runs the same idempotent flow.
+     *
+     * `session.withTransaction` handles the commit/abort/retry lifecycle;
+     * we just throw on any error and Mongo unwinds cleanly.
+     */
+    const session = await mongoose.startSession();
+    let result: { userId: any; companyId: any; eventsCreated: number };
+    try {
+        result = await session.withTransaction(async () => {
+            // Upsert user — either they already have a MinuteBook account
+            // (self_signup) or we materialize a crs_seeded shell that OTP
+            // login can later "claim".
+            let user = await User.findOne({ email }).session(session);
+            if (!user) {
+                const [created] = await User.create([{
+                    email,
+                    name:             (body.customerName ?? '').trim(),
+                    role:             'business_owner',
+                    subscriptionTier: 'free',
+                    origin:           'crs_seeded',
+                    firstLoggedInAt:  null,
+                }], { session });
+                user = created;
+            }
+
+            // Upsert company by registrySignature. Scoped to this user so two
+            // different MinuteBook accounts can each hold their own record
+            // for the same real-world corporation without collisions.
+            const registrySignature = {
+                provinceKey: body.company.provinceKey,
+                registryId:  body.company.registryId,
+            };
+            let company = await Company.findOne({
+                userId:                          user._id,
+                'registrySignature.provinceKey': registrySignature.provinceKey,
+                'registrySignature.registryId':  registrySignature.registryId,
+            }).session(session);
+
+            if (!company) {
+                const parsed = parseLocation(body.company.location);
+                const [created] = await Company.create([{
+                    userId:                user._id,
+                    name:                  body.company.name,
+                    corporateAccessNumber: body.company.registryId,
+                    businessNumber:        body.company.businessNumber,
+                    incorporationDate:     body.company.incorpDate ? new Date(body.company.incorpDate) : undefined,
+                    registeredOfficeAddress: {
+                        street:     '',
+                        city:       parsed.city,
+                        province:   parsed.province,
+                        postalCode: '',
+                        country:    'Canada',
+                    },
+                    recordsAddress:    { sameAsRegistered: true },
+                    addressForService: { sameAsRegistered: true },
+                    restrictions:      {},
+                    authorizedBy: {
+                        name:  (body.customerName ?? '').trim() || 'CRS Customer',
+                        email,
+                        phone: '',
+                    },
+                    schedules:         [],
+                    shareClasses:      [],
+                    directors:         [],
+                    shareholders:      [],
+                    officers:          [],
+                    origin:            'crs_seeded',
+                    crsCustomerEmail:  email,
+                    claimedAt:         null,
+                    registrySignature,
+                }], { session });
+                company = created;
+            }
+
+            // Create events. Empty payloads are legitimate (e.g. Good Standing
+            // orders seed the company but have nothing to record). We still
+            // write a CrsProcessedOrder so idempotency works for reorders.
+            const eventsToCreate = (body.events ?? []).map((e) => ({
+                companyId:     company!._id,
+                userId:        user!._id,
+                eventType:     e.type,
+                effectiveDate: new Date(e.effectiveDate),
+                recordedAt:    body.occurredAt ? new Date(body.occurredAt) : new Date(),
+                data:          e.data ?? {},
+                notes:         `From CRS order ${body.orderId} (${body.service}).`,
+                attachments:   [],
+                eSign:         { status: 'none' },
+            }));
+            const eventDocs = eventsToCreate.length
+                ? await CorporateEvent.create(eventsToCreate, { session })
+                : [];
+
+            await CrsProcessedOrder.create([{
+                sessionId:     body.orderId,
+                service:       body.service,
+                companyId:     company._id,
+                userId:        user._id,
+                eventsCreated: eventDocs.length,
+                receivedAt:    new Date(),
+            }], { session });
+
+            return {
+                userId:        user._id,
+                companyId:     company._id,
+                eventsCreated: eventDocs.length,
+            };
         });
+    } catch (e: any) {
+        console.error('[crs-feed] transaction failed, rolling back:', e?.message ?? e);
+        await session.endSession();
+        return res.status(500).json({ error: 'Failed to process CRS order.' });
     }
-
-    // Upsert company by registrySignature. We scope the dedupe to this user
-    // so two different MinuteBook accounts can each hold their own record
-    // for the same real-world corporation without collisions.
-    const registrySignature = {
-        provinceKey: body.company.provinceKey,
-        registryId:  body.company.registryId,
-    };
-    let company = await Company.findOne({
-        userId:                            user._id,
-        'registrySignature.provinceKey':  registrySignature.provinceKey,
-        'registrySignature.registryId':   registrySignature.registryId,
-    });
-
-    if (!company) {
-        const parsed = parseLocation(body.company.location);
-        company = await Company.create({
-            userId:                user._id,
-            name:                  body.company.name,
-            corporateAccessNumber: body.company.registryId,
-            businessNumber:        body.company.businessNumber,
-            incorporationDate:     body.company.incorpDate ? new Date(body.company.incorpDate) : undefined,
-            registeredOfficeAddress: {
-                street:     '',
-                city:       parsed.city,
-                province:   parsed.province,
-                postalCode: '',
-                country:    'Canada',
-            },
-            recordsAddress:    { sameAsRegistered: true },
-            addressForService: { sameAsRegistered: true },
-            restrictions:      {},
-            authorizedBy: {
-                name:  (body.customerName ?? '').trim() || 'CRS Customer',
-                email,
-                phone: '',
-            },
-            schedules:         [],
-            shareClasses:      [],
-            directors:         [],
-            shareholders:      [],
-            officers:          [],
-            origin:            'crs_seeded',
-            crsCustomerEmail:  email,
-            claimedAt:         null,
-            registrySignature,
-        });
-    }
-
-    // Create events. Empty payloads are legitimate (e.g. Good Standing orders
-    // seed the company but have nothing to record). We still write a
-    // CrsProcessedOrder so the idempotency check works for reorders.
-    const eventDocs = [];
-    for (const e of body.events ?? []) {
-        const doc = await CorporateEvent.create({
-            companyId:     company._id,
-            userId:        user._id,
-            eventType:     e.type,
-            effectiveDate: new Date(e.effectiveDate),
-            recordedAt:    body.occurredAt ? new Date(body.occurredAt) : new Date(),
-            data:          e.data ?? {},
-            notes:         `From CRS order ${body.orderId} (${body.service}).`,
-            attachments:   [],
-            eSign:         { status: 'none' },
-        });
-        eventDocs.push(doc);
-    }
-
-    await CrsProcessedOrder.create({
-        sessionId:     body.orderId,
-        service:       body.service,
-        companyId:     company._id,
-        userId:        user._id,
-        eventsCreated: eventDocs.length,
-        receivedAt:    new Date(),
-    });
+    await session.endSession();
 
     return res.status(200).json({
         received:      true,
-        userId:        user._id,
-        companyId:     company._id,
-        eventsCreated: eventDocs.length,
+        userId:        result.userId,
+        companyId:     result.companyId,
+        eventsCreated: result.eventsCreated,
     });
 };
