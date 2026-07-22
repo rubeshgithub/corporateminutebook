@@ -21,6 +21,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import api from '../utils/api';
 import { useSnackbar } from '../context/SnackbarContext';
 import RecordEventDialog from './RecordEventDialog';
+import ChangeWizard, { WizardEventType } from './ChangeWizard';
 import AddIcon from '@mui/icons-material/Add';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -300,14 +301,25 @@ const RecordsVault: React.FC = () => {
     const [sendingESign, setSendingESign] = useState(false);
 
     const [recordEventOpen, setRecordEventOpen] = useState(false);
+    // Plain-English change wizard — a tile picker that scopes the dialog to
+    // the right event type before opening. Owners don't need to know what
+    // `share_class_added` means; they pick "Add a new share class".
+    const [wizardOpen, setWizardOpen] = useState(false);
+    const [wizardPreset, setWizardPreset] = useState<WizardEventType | undefined>(undefined);
+    const openWizardThenDialog = () => setWizardOpen(true);
+    const handleWizardPick = (t: WizardEventType) => {
+        setWizardPreset(t);
+        setWizardOpen(false);
+        setRecordEventOpen(true);
+    };
 
     // Dashboard "+ Record event" fast-path passes ?openEvent=1 to bypass the
-    // vault landing and open the dialog straight away. Consume + strip the
+    // vault landing and open the wizard straight away. Consume + strip the
     // param so a page refresh doesn't reopen the dialog.
     const [searchParams, setSearchParams] = useSearchParams();
     useEffect(() => {
         if (searchParams.get('openEvent') === '1') {
-            setRecordEventOpen(true);
+            setWizardOpen(true);
             const next = new URLSearchParams(searchParams);
             next.delete('openEvent');
             setSearchParams(next, { replace: true });
@@ -715,7 +727,7 @@ const RecordsVault: React.FC = () => {
                     <Typography variant="h5" color="primary" fontWeight={700} flex={1}>
                         Records Vault
                     </Typography>
-                    <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => setRecordEventOpen(true)}>
+                    <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={openWizardThenDialog}>
                         Record Event
                     </Button>
                 </Box>
@@ -1195,6 +1207,45 @@ const RecordsVault: React.FC = () => {
                                                 )}
                                             </Box>
                                         )}
+
+                                        {/* Specimen-signature nudge for signing-authority grants — banks
+                                            typically want the resolution paired with a specimen signature
+                                            card. The template already has the placeholder box; this
+                                            surfaces the "attach the signed card" affordance so the owner
+                                            doesn't have to hunt for the generic supporting-file upload. */}
+                                        {ev.eventType === 'signing_authority_granted' && (() => {
+                                            const supAtt = ev.attachments?.find((a) => a.role === 'supporting');
+                                            return (
+                                                <Box display="flex" alignItems="center" gap={1} flexWrap="wrap" mb={0.5}
+                                                    sx={{ pl: 0.5, borderLeft: '3px solid #00695c' }}>
+                                                    <Typography variant="caption" sx={{ color: '#00695c', fontWeight: 700, minWidth: 80 }}>
+                                                        Specimen sig.
+                                                    </Typography>
+                                                    {supAtt ? (
+                                                        <Chip
+                                                            icon={<DownloadIcon sx={{ fontSize: 13 }} />}
+                                                            label={supAtt.originalName}
+                                                            size="small"
+                                                            onClick={() => handleDownloadAttachment(ev._id, supAtt.fileId, supAtt.originalName)}
+                                                            sx={{ bgcolor: ATTACH_ROLE_COLORS.supporting, color: '#fff', cursor: 'pointer', fontSize: 10, maxWidth: 260, '& .MuiChip-icon': { color: '#fff' } }}
+                                                        />
+                                                    ) : (
+                                                        <Button
+                                                            size="small"
+                                                            variant="outlined"
+                                                            startIcon={<AttachFileIcon sx={{ fontSize: 13 }} />}
+                                                            onClick={() => { setAttachDialog({ eventId: ev._id, role: 'supporting', label: 'Specimen Signature Card' }); setAttachFile(null); }}
+                                                            sx={{ fontSize: 10, py: 0.2, px: 1, color: '#00695c', borderColor: '#00695c' }}
+                                                        >
+                                                            Attach Card
+                                                        </Button>
+                                                    )}
+                                                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: 9.5 }}>
+                                                        Banks require a signature card for signing officers.
+                                                    </Typography>
+                                                </Box>
+                                            );
+                                        })()}
                                     </Box>
                                 );
                             })}
@@ -1472,12 +1523,19 @@ const RecordsVault: React.FC = () => {
                 </DialogActions>
             </Dialog>
 
+            <ChangeWizard
+                open={wizardOpen}
+                onClose={() => setWizardOpen(false)}
+                onPick={handleWizardPick}
+            />
+
             <RecordEventDialog
                 open={recordEventOpen}
-                onClose={() => setRecordEventOpen(false)}
+                onClose={() => { setRecordEventOpen(false); setWizardPreset(undefined); }}
                 companyId={companyId!}
                 company={company}
                 onSuccess={handleEventRecorded}
+                initialEventType={wizardPreset}
             />
 
             {/* Delete-event confirmation. The snapshot caveat is up-front:

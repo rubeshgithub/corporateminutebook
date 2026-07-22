@@ -118,7 +118,32 @@ function computeReadiness(c: ComplianceEntry | undefined) {
     return { bank, audit, sale };
 }
 
-const ReadinessRow: React.FC<{ c: ComplianceEntry | undefined }> = ({ c }) => {
+/**
+ * Map internal province short code to the CRS good-standing URL segment.
+ * When we don't know the province (rare — most companies have a registered
+ * office on file), fall back to the generic landing page.
+ */
+const PROVINCE_URL_SLUG: Record<string, string> = {
+    ab: 'alberta', bc: 'british-columbia', mb: 'manitoba', nb: 'new-brunswick',
+    nl: 'newfoundland-and-labrador', ns: 'nova-scotia', nt: 'northwest-territories',
+    nu: 'nunavut', on: 'ontario', pe: 'prince-edward-island', qc: 'quebec',
+    sk: 'saskatchewan', yt: 'yukon', federal: 'canada-federal',
+};
+
+function crsGoodStandingUrl(company: any): string {
+    const province = (company?.registeredOfficeAddress?.province || '').toLowerCase();
+    // Accept both short codes ("ab") and long names ("Alberta") — normalise.
+    const shortCode = province.length === 2
+        ? province
+        : Object.entries(PROVINCE_URL_SLUG).find(([, slug]) => slug.replace(/-/g, ' ') === province)?.[0];
+    const slug = shortCode ? PROVINCE_URL_SLUG[shortCode] : null;
+    const base = slug
+        ? `https://www.corporateregistryservices.ca/good-standing/${slug}-certificate-of-good-standing`
+        : `https://www.corporateregistryservices.ca/good-standing`;
+    return `${base}?src=minutebook`;
+}
+
+const ReadinessRow: React.FC<{ c: ComplianceEntry | undefined; company: any }> = ({ c, company }) => {
     const r = computeReadiness(c);
     const items: Array<{ label: string; ok: boolean; tip: string }> = [
         { label: 'Bank',  ok: r.bank,  tip: 'Ready to hand to a lender — no overdue annual return, incorporation doc on file.' },
@@ -126,7 +151,7 @@ const ReadinessRow: React.FC<{ c: ComplianceEntry | undefined }> = ({ c }) => {
         { label: 'Sale',  ok: r.sale,  tip: 'Ready for buyer due diligence — all resolutions signed + registry filings attached.' },
     ];
     return (
-        <Box sx={{ display: 'flex', gap: 0.3, mt: 0.4, flexWrap: 'wrap' }}>
+        <Box sx={{ display: 'flex', gap: 0.3, mt: 0.4, flexWrap: 'wrap', alignItems: 'center' }}>
             {items.map((it) => (
                 <Tooltip key={it.label} title={it.tip} arrow>
                     <Chip
@@ -150,6 +175,31 @@ const ReadinessRow: React.FC<{ c: ComplianceEntry | undefined }> = ({ c }) => {
                     />
                 </Tooltip>
             ))}
+            {/* Deep-link to CRS's Certificate of Good Standing order page — the
+                one document banks routinely ask for that MinuteBook can't
+                generate itself (it's a live-registry document). Bank-Ready
+                companies are the ones whose lender is about to ask. */}
+            {r.bank && (
+                <Tooltip title="Order a Certificate of Good Standing from CRS — the government-issued document banks ask for at loan advance" arrow>
+                    <Box
+                        component="a"
+                        href={crsGoodStandingUrl(company)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        sx={{
+                            height: 16, fontSize: 9.5, fontWeight: 600,
+                            display: 'inline-flex', alignItems: 'center', gap: 0.35,
+                            px: 0.65, borderRadius: '999px',
+                            bgcolor: 'rgba(21,101,192,0.08)', color: '#1565c0',
+                            border: '1px solid rgba(21,101,192,0.35)',
+                            textDecoration: 'none',
+                            '&:hover': { bgcolor: 'rgba(21,101,192,0.15)' },
+                        }}
+                    >
+                        Order Certificate →
+                    </Box>
+                </Tooltip>
+            )}
         </Box>
     );
 };
@@ -741,7 +791,7 @@ const Dashboard: React.FC = () => {
                                                     c={comp}
                                                     onClick={() => navigate(`/records/${company._id}`)}
                                                 />
-                                                <ReadinessRow c={comp} />
+                                                <ReadinessRow c={comp} company={company} />
                                             </TableCell>
 
                                             <TableCell align="right" sx={{ py: 0.75, pr: 1 }}>

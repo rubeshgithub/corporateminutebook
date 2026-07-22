@@ -68,13 +68,28 @@ interface Props {
     companyId: string;
     company: any;
     onSuccess: (event: any) => void;
+    /** Preset the event-type dropdown — used by the plain-English change
+     *  wizard so a click on "Add a shareholder" opens the dialog already
+     *  scoped to `shares_issued` instead of the generic default. */
+    initialEventType?: EventType;
 }
 
-const RecordEventDialog: React.FC<Props> = ({ open, onClose, companyId, company, onSuccess }) => {
+const RecordEventDialog: React.FC<Props> = ({ open, onClose, companyId, company, onSuccess, initialEventType }) => {
     const { showSnackbar } = useSnackbar();
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
-    const [eventType, setEventType] = useState<EventType>('director_appointed');
+    const [eventType, setEventType] = useState<EventType>(initialEventType ?? 'director_appointed');
+
+    // Re-sync when the launcher opens the dialog with a new preset so
+    // sequentially opening different wizard tiles doesn't stick on the
+    // first one selected.
+    React.useEffect(() => {
+        if (open && initialEventType) {
+            setEventType(initialEventType);
+            setFormData({});
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open, initialEventType]);
     const [effectiveDate, setEffectiveDate] = useState('');
     const [notes, setNotes] = useState('');
     const [formData, setFormData] = useState<Record<string, any>>({});
@@ -316,7 +331,8 @@ const RecordEventDialog: React.FC<Props> = ({ open, onClose, companyId, company,
             case 'annual_return_filed':
                 return <>
                     <TextField label="Year" type="number" fullWidth size="small" sx={{ mb: 2 }} value={formData.year || new Date().getFullYear()} onChange={(e) => set('year', Number(e.target.value))} />
-                    <TextField label="Confirmation Number" fullWidth size="small" sx={{ mb: 2 }} placeholder="Optional" value={formData.confirmationNumber || ''} onChange={(e) => set('confirmationNumber', e.target.value)} />
+                    <TextField label="Registry Confirmation Number" fullWidth size="small" sx={{ mb: 2 }} placeholder="From your registry (e.g. Corporations Canada, OBR, BC Registries)" value={formData.confirmationNumber || ''} onChange={(e) => set('confirmationNumber', e.target.value)} />
+                    <TextField label="T2 Reference (optional)" fullWidth size="small" sx={{ mb: 2 }} placeholder="Link to the CRA T2 corporate tax return for the same fiscal year — for CPA audit trails" value={formData.t2Reference || ''} onChange={(e) => set('t2Reference', e.target.value)} />
                 </>;
 
             case 'fiscal_year_end_changed':
