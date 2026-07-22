@@ -16,7 +16,10 @@ type EventType =
     | 'share_class_added'
     | 'annual_return_filed'
     | 'fiscal_year_end_changed'
-    | 'name_changed';
+    | 'name_changed'
+    // Wave 2 additions:
+    | 'signing_authority_granted' | 'signing_authority_revoked'
+    | 'dividend_declared';
 
 type AttachRole = 'resolution' | 'registry_filing' | 'supporting';
 
@@ -25,8 +28,12 @@ const RESOLUTION_EVENT_TYPES = new Set<EventType>([
     'officer_appointed', 'officer_resigned',
     'shares_issued', 'shares_transferred', 'shares_cancelled', 'share_class_added',
     'address_changed', 'name_changed', 'fiscal_year_end_changed',
+    'signing_authority_granted', 'signing_authority_revoked', 'dividend_declared',
 ]);
 
+// Signing-authority + dividend events are internal governance actions —
+// no filing with the corporate registry is expected, so the "attach
+// registry filing" prompt stays off for them.
 const REGISTRY_ATTACH_EVENT_TYPES = new Set<EventType>([
     'director_appointed', 'director_resigned', 'director_address_changed',
     'address_changed', 'name_changed', 'shares_transferred', 'shares_issued',
@@ -34,19 +41,22 @@ const REGISTRY_ATTACH_EVENT_TYPES = new Set<EventType>([
 ]);
 
 const EVENT_LABELS: Record<EventType, string> = {
-    director_appointed:       'Director Appointed',
-    director_resigned:        'Director Resigned',
-    director_address_changed: "Director's Address Changed",
-    address_changed:          'Registered Address Changed',
-    shares_issued:            'Shares Issued',
-    shares_transferred:       'Shares Transferred',
-    shares_cancelled:         'Shares Cancelled',
-    officer_appointed:        'Officer Appointed',
-    officer_resigned:         'Officer Resigned',
-    share_class_added:        'Share Class Added',
-    annual_return_filed:      'Annual Return Filed',
-    fiscal_year_end_changed:  'Fiscal Year End Changed',
-    name_changed:             'Company Name Changed',
+    director_appointed:         'Director Appointed',
+    director_resigned:          'Director Resigned',
+    director_address_changed:   "Director's Address Changed",
+    address_changed:            'Registered Address Changed',
+    shares_issued:              'Shares Issued',
+    shares_transferred:         'Shares Transferred',
+    shares_cancelled:           'Shares Cancelled',
+    officer_appointed:          'Officer Appointed',
+    officer_resigned:           'Officer Resigned',
+    share_class_added:          'Share Class Added',
+    annual_return_filed:        'Annual Return Filed',
+    fiscal_year_end_changed:    'Fiscal Year End Changed',
+    name_changed:               'Company Name Changed',
+    signing_authority_granted:  'Signing Authority Granted',
+    signing_authority_revoked:  'Signing Authority Revoked',
+    dividend_declared:          'Dividend Declared',
 };
 
 const PROVINCE_CODES = ['AB', 'BC', 'MB', 'NB', 'NL', 'NS', 'NT', 'NU', 'ON', 'PE', 'QC', 'SK', 'YT'];
@@ -317,6 +327,44 @@ const RecordEventDialog: React.FC<Props> = ({ open, onClose, companyId, company,
             case 'name_changed':
                 return <>
                     <TextField label="New Legal Name" fullWidth size="small" sx={{ mb: 2 }} value={formData.newName || ''} onChange={(e) => set('newName', e.target.value)} />
+                </>;
+
+            case 'signing_authority_granted':
+                return <>
+                    <TextField label="Signing Officer Name" fullWidth size="small" sx={{ mb: 2 }} value={formData.signingOfficerName || ''} onChange={(e) => set('signingOfficerName', e.target.value)} />
+                    <TextField label="Title / Role" fullWidth size="small" sx={{ mb: 2 }} placeholder="e.g. President, CFO, Attorney-in-Fact" value={formData.title || ''} onChange={(e) => set('title', e.target.value)} />
+                    <TextField label="Scope of Authority" fullWidth size="small" sx={{ mb: 2 }} placeholder="e.g. general banking, contracts up to $100k, single-signature payroll" value={formData.scope || ''} onChange={(e) => set('scope', e.target.value)} />
+                    <TextField label="Limits (optional)" fullWidth size="small" sx={{ mb: 2 }} placeholder="e.g. Two signatures required over $50,000" value={formData.limits || ''} onChange={(e) => set('limits', e.target.value)} />
+                </>;
+
+            case 'signing_authority_revoked':
+                return <>
+                    <TextField label="Signing Officer Name" fullWidth size="small" sx={{ mb: 2 }} value={formData.signingOfficerName || ''} onChange={(e) => set('signingOfficerName', e.target.value)} />
+                    <TextField label="Reason (optional)" fullWidth size="small" sx={{ mb: 2 }} placeholder="e.g. Resigned, retired, replaced" value={formData.reason || ''} onChange={(e) => set('reason', e.target.value)} />
+                </>;
+
+            case 'dividend_declared':
+                return <>
+                    <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+                        <InputLabel>Share Class</InputLabel>
+                        <Select value={formData.shareClass || ''} label="Share Class" onChange={(e) => set('shareClass', e.target.value)}>
+                            {shareClassOptions.map((n: string) => <MenuItem key={n} value={n}>{n}</MenuItem>)}
+                        </Select>
+                    </FormControl>
+                    <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+                        <InputLabel>Dividend Type</InputLabel>
+                        <Select value={formData.dividendType || 'Eligible'} label="Dividend Type" onChange={(e) => set('dividendType', e.target.value)}>
+                            <MenuItem value="Eligible">Eligible</MenuItem>
+                            <MenuItem value="Non-Eligible">Non-Eligible</MenuItem>
+                            <MenuItem value="Capital">Capital Dividend</MenuItem>
+                        </Select>
+                    </FormControl>
+                    <TextField label="Per-Share Amount ($ CAD)" type="number" inputProps={{ step: '0.01' }} fullWidth size="small" sx={{ mb: 2 }} value={formData.perShareAmount ?? ''} onChange={(e) => set('perShareAmount', e.target.value === '' ? null : Number(e.target.value))} />
+                    <TextField label="Total Dividend ($ CAD)" type="number" inputProps={{ step: '0.01' }} fullWidth size="small" sx={{ mb: 2 }} placeholder="Optional — computed if per-share and holdings known" value={formData.totalAmount ?? ''} onChange={(e) => set('totalAmount', e.target.value === '' ? null : Number(e.target.value))} />
+                    <TextField label="Record Date" type="date" fullWidth size="small" sx={{ mb: 2 }} InputLabelProps={{ shrink: true }} value={formData.recordDate || ''} onChange={(e) => set('recordDate', e.target.value)} />
+                    <TextField label="Payment Date" type="date" fullWidth size="small" sx={{ mb: 2 }} InputLabelProps={{ shrink: true }} value={formData.paymentDate || ''} onChange={(e) => set('paymentDate', e.target.value)} />
+                    <TextField label="Fiscal Year" type="number" fullWidth size="small" sx={{ mb: 2 }} value={formData.fiscalYear || new Date().getFullYear()} onChange={(e) => set('fiscalYear', Number(e.target.value))} />
+                    <TextField label="T5 Reference (optional)" fullWidth size="small" sx={{ mb: 2 }} placeholder="Add later once T5 slips are filed with CRA" value={formData.t5Reference || ''} onChange={(e) => set('t5Reference', e.target.value)} />
                 </>;
 
             default:

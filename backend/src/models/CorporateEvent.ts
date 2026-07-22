@@ -15,7 +15,11 @@ export type CorporateEventType =
     | 'fiscal_year_end_changed'
     | 'name_changed'
     | 'voluntary_dissolution_filed'
-    | 'revival_filed';
+    | 'revival_filed'
+    // Wave 2 additions:
+    | 'signing_authority_granted'    // bank-critical: identifies who can bind the corp
+    | 'signing_authority_revoked'
+    | 'dividend_declared';           // T5-critical: pairs the declaration with a resolution
 
 export type AttachmentRole = 'resolution' | 'registry_filing' | 'supporting';
 
@@ -86,6 +90,7 @@ const corporateEventSchema = new Schema<ICorporateEvent>(
                 'officer_appointed', 'officer_resigned', 'share_class_added',
                 'annual_return_filed', 'fiscal_year_end_changed', 'name_changed',
                 'voluntary_dissolution_filed', 'revival_filed',
+                'signing_authority_granted', 'signing_authority_revoked', 'dividend_declared',
             ],
         },
         effectiveDate: { type: Date, required: true },

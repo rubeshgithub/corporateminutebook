@@ -685,8 +685,31 @@
             share_class_added: 'Share Class Added',
             fiscal_year_end_changed: 'Fiscal Year End Changed',
             name_changed: 'Company Name Changed',
+            signing_authority_granted: 'Signing Authority Granted',
+            signing_authority_revoked: 'Signing Authority Revoked',
+            dividend_declared: 'Dividend Declared',
         };
-        var changeEventsForSection = (events || []).filter(function(e){ return e.eventType !== 'annual_return_filed'; });
+        // Classification: which resolutions are signed by the board vs. the
+        // shareholders. Under most Canadian corporate statutes, fundamental
+        // changes (name change) + share transactions (transfer, cancel,
+        // new class) are shareholder-class; day-to-day governance (director
+        // + officer moves, addresses, dividends, signing authority) is
+        // board-class. Buyers' counsel and auditors read the two sections
+        // separately, so we render them separately.
+        var BOARD_EVENT_TYPES = {
+            director_appointed: 1, director_resigned: 1, director_address_changed: 1,
+            officer_appointed: 1, officer_resigned: 1,
+            address_changed: 1, fiscal_year_end_changed: 1,
+            shares_issued: 1, dividend_declared: 1,
+            signing_authority_granted: 1, signing_authority_revoked: 1,
+        };
+        var SHAREHOLDER_EVENT_TYPES = {
+            name_changed: 1, share_class_added: 1,
+            shares_transferred: 1, shares_cancelled: 1,
+        };
+        var allChangeEvents = (events || []).filter(function(e){ return e.eventType !== 'annual_return_filed'; });
+        var boardResolutions       = allChangeEvents.filter(function(e){ return BOARD_EVENT_TYPES[e.eventType]; });
+        var shareholderResolutions = allChangeEvents.filter(function(e){ return SHAREHOLDER_EVENT_TYPES[e.eventType]; });
         var annualReturnEventsForSection = (events || []).filter(function(e){ return e.eventType === 'annual_return_filed'; });
         function evtSummary(type, data) {
             var d = data || {};
@@ -702,7 +725,50 @@
             if (type === 'share_class_added') return d.name || '';
             if (type === 'fiscal_year_end_changed') return 'New year-end: ' + (d.newFiscalYearEnd || '');
             if (type === 'name_changed') return 'New name: ' + (d.newName || '');
+            if (type === 'signing_authority_granted') {
+                var so = d.signingOfficerName || '';
+                var t  = d.title ? ' (' + d.title + ')' : '';
+                var s  = d.scope ? ' — ' + d.scope : '';
+                return so + t + s;
+            }
+            if (type === 'signing_authority_revoked') {
+                var so2 = d.signingOfficerName || '';
+                var r   = d.reason ? ' — ' + d.reason : '';
+                return so2 + r;
+            }
+            if (type === 'dividend_declared') {
+                var cls = d.shareClass || '';
+                var ps  = (d.perShareAmount != null) ? ('$' + Number(d.perShareAmount).toFixed(2) + '/share') : '';
+                var tot = (d.totalAmount != null) ? ('$' + Number(d.totalAmount).toFixed(2) + ' total') : '';
+                return [cls, ps, tot].filter(Boolean).join(' · ');
+            }
             return '';
+        }
+        function renderResolutionsTable(list) {
+            var registryTypes = ['director_appointed','director_resigned','director_address_changed','address_changed','name_changed','shares_transferred','shares_issued','shares_cancelled','share_class_added'];
+            var out = '<table><thead><tr>' +
+                '<th style="width: 100px;">Date</th>' +
+                '<th style="width: 160px;">Event Type</th>' +
+                '<th>Details</th>' +
+                '<th style="width: 90px; text-align:center;">Resolution</th>' +
+                '<th style="width: 90px; text-align:center;">Registry<br>Filing</th>' +
+                '</tr></thead><tbody>';
+            list.forEach(function(ev) {
+                var hasRes = (ev.attachments || []).some(function(a){ return a.role === 'resolution'; });
+                var hasReg = (ev.attachments || []).some(function(a){ return a.role === 'registry_filing'; });
+                var needsReg = registryTypes.indexOf(ev.eventType) !== -1;
+                out += '<tr>';
+                out += '<td>' + new Date(ev.effectiveDate).toLocaleDateString() + '</td>';
+                out += '<td>' + (CHANGE_EVENT_LABELS[ev.eventType] || ev.eventType) + '</td>';
+                out += '<td style="font-size: 10pt;">' + evtSummary(ev.eventType, ev.data);
+                if (ev.notes) out += '<div style="color:#888; font-size:9.5pt;">' + ev.notes + '</div>';
+                out += '</td>';
+                out += '<td style="text-align:center; font-size: 10pt;">' + (hasRes ? '✓ Attached' : '—') + '</td>';
+                out += '<td style="text-align:center; font-size: 10pt;">' + (needsReg ? (hasReg ? '✓ Attached' : '—') : '<span style="color:#aaa;">N/A</span>') + '</td>';
+                out += '</tr>';
+            });
+            out += '</tbody></table>';
+            return out;
         }
     %>
     <div class="page">
@@ -720,48 +786,32 @@
             This section records all corporate changes made after incorporation. Signed resolutions and official registry filing confirmations are attached as individual documents following this section.
         </p>
 
-        <% if (changeEventsForSection.length === 0) { %>
+        <% if (boardResolutions.length === 0 && shareholderResolutions.length === 0) { %>
             <p style="font-style: italic; color: #888;">No corporate change events have been recorded.</p>
         <% } else { %>
-            <table>
-                <thead>
-                    <tr>
-                        <th style="width: 100px;">Date</th>
-                        <th style="width: 160px;">Event Type</th>
-                        <th>Details</th>
-                        <th style="width: 90px; text-align:center;">Resolution</th>
-                        <th style="width: 90px; text-align:center;">Registry<br>Filing</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <% changeEventsForSection.forEach(function(ev) { %>
-                        <%
-                            var hasRes = (ev.attachments || []).some(function(a){ return a.role === 'resolution'; });
-                            var hasReg = (ev.attachments || []).some(function(a){ return a.role === 'registry_filing'; });
-                            var registryTypes = ['director_appointed','director_resigned','director_address_changed','address_changed','name_changed','shares_transferred','shares_issued','shares_cancelled','share_class_added'];
-                            var needsReg = registryTypes.indexOf(ev.eventType) !== -1;
-                        %>
-                        <tr>
-                            <td><%= new Date(ev.effectiveDate).toLocaleDateString() %></td>
-                            <td><%= CHANGE_EVENT_LABELS[ev.eventType] || ev.eventType %></td>
-                            <td style="font-size: 10pt;">
-                                <%= evtSummary(ev.eventType, ev.data) %>
-                                <% if (ev.notes) { %><div style="color:#888; font-size:9.5pt;"><%= ev.notes %></div><% } %>
-                            </td>
-                            <td style="text-align:center; font-size: 10pt;">
-                                <%= hasRes ? '✓ Attached' : '—' %>
-                            </td>
-                            <td style="text-align:center; font-size: 10pt;">
-                                <% if (!needsReg) { %>
-                                    <span style="color:#aaa;">N/A</span>
-                                <% } else { %>
-                                    <%= hasReg ? '✓ Attached' : '—' %>
-                                <% } %>
-                            </td>
-                        </tr>
-                    <% }); %>
-                </tbody>
-            </table>
+            <div class="section-block">
+                <div class="section-block-title">Board (Director) Resolutions</div>
+                <p style="font-size: 10pt; color: #666; margin-bottom: 8px;">
+                    Day-to-day governance decisions signed by the directors — director / officer appointments and resignations, address changes, share issuances under existing authority, dividend declarations, and signing-authority grants.
+                </p>
+                <% if (boardResolutions.length === 0) { %>
+                    <p style="font-style: italic; color: #888;">None on record.</p>
+                <% } else { %>
+                    <%- renderResolutionsTable(boardResolutions) %>
+                <% } %>
+            </div>
+
+            <div class="section-block" style="margin-top: 28px;">
+                <div class="section-block-title">Shareholders' Resolutions</div>
+                <p style="font-size: 10pt; color: #666; margin-bottom: 8px;">
+                    Fundamental changes and share-transaction decisions requiring shareholder approval — name change, new share classes, share transfers and cancellations.
+                </p>
+                <% if (shareholderResolutions.length === 0) { %>
+                    <p style="font-style: italic; color: #888;">None on record.</p>
+                <% } else { %>
+                    <%- renderResolutionsTable(shareholderResolutions) %>
+                <% } %>
+            </div>
         <% } %>
 
         <% if (annualReturnEventsForSection.length > 0) { %>

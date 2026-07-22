@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Board Resolution — Dividend Declaration — <%= company.name %></title>
+    <style>
+        body { font-family: 'Helvetica', 'Arial', sans-serif; padding: 44px; line-height: 1.65; font-size: 11pt; color: #1a1a1a; }
+        .company-name { text-align: center; font-size: 21px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
+        .res-type { text-align: center; font-size: 15px; font-weight: bold; margin: 3px 0; }
+        .res-sub { text-align: center; font-size: 13px; color: #444; margin: 2px 0 6px 0; }
+        .eff-date { text-align: center; font-size: 12px; color: #555; margin-bottom: 20px; }
+        hr { border: none; border-top: 1.5px solid #333; margin: 18px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 14px 0 20px 0; font-size: 10.5pt; }
+        th { background: #2c3e50; color: #fff; padding: 8px 10px; text-align: left; font-size: 10pt; font-weight: 600; }
+        td { padding: 7px 10px; border: 1px solid #ccc; vertical-align: top; }
+        tr:nth-child(even) td { background: #f7f7f7; }
+        .section { margin: 18px 0; }
+        .resolved { font-weight: bold; text-transform: uppercase; font-size: 10.5pt; margin-bottom: 6px; }
+        .date-line { margin-top: 44px; font-size: 11pt; }
+        .sig-section { margin-top: 36px; }
+        .sig-grid { display: flex; gap: 28px; flex-wrap: wrap; margin-top: 10px; }
+        .sig-block { flex: 1; min-width: 160px; }
+        .sig-line { border-top: 1px solid #000; margin-top: 52px; padding-top: 5px; font-size: 10pt; line-height: 1.5; }
+        .cra-note { background: #fffde7; border-left: 4px solid #f9a825; padding: 10px 14px; font-size: 9.5pt; color: #5f4a00; margin-top: 24px; }
+    </style>
+</head>
+<body>
+<%
+    var ev = (typeof event !== 'undefined' && event) ? event : {};
+    var d = ev.data || {};
+    var effDate = ev.effectiveDate ? new Date(ev.effectiveDate) : new Date();
+    var effDateStr = effDate.toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' });
+
+    var activeDirectors = (company.directors || []).filter(function(dir) { return !dir.resignedDate; });
+    var dirName = function(dir) {
+        return dir.name || ([dir.firstName, dir.middleName, dir.lastName].filter(Boolean).join(' ').trim()) || '';
+    };
+
+    var shareClass = d.shareClass || '(unspecified class)';
+    var perShare = (d.perShareAmount != null) ? Number(d.perShareAmount).toFixed(2) : '';
+    var totalAmount = (d.totalAmount != null) ? Number(d.totalAmount).toFixed(2) : '';
+    var recordDate = d.recordDate ? new Date(d.recordDate).toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' }) : effDateStr;
+    var paymentDate = d.paymentDate ? new Date(d.paymentDate).toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' }) : '';
+    var fiscalYear = d.fiscalYear || (effDate.getFullYear());
+    var dividendType = d.dividendType || 'Eligible';   // Eligible / Non-Eligible / Capital
+    var t5Ref = d.t5Reference || '';
+
+    // Holders of the class as of the record date (best-effort from current snapshot)
+    var holdersOfClass = (company.shareholders || []).filter(function(sh) {
+        return sh.sharesClass === shareClass && (sh.numberOfShares || 0) > 0;
+    });
+%>
+
+<div class="company-name"><%= company.name %></div>
+<div class="res-type">Board Resolution</div>
+<div class="res-sub">Declaration of Dividend — <%= shareClass %></div>
+<div class="eff-date">Declared <%= effDateStr %></div>
+<hr>
+
+<div class="section">
+    <p><strong>WHEREAS</strong> the Directors of the Corporation have reviewed the financial position of the Corporation and are satisfied that the payment of a dividend on the <em><%= shareClass %></em> would not render the Corporation unable to pay its liabilities as they become due, nor cause the realisable value of the Corporation&rsquo;s assets to be less than the aggregate of its liabilities and stated capital of all classes;</p>
+
+    <p><strong>AND WHEREAS</strong> the Directors have determined that the payment of such dividend is in the best interests of the Corporation;</p>
+</div>
+
+<table>
+    <thead>
+        <tr><th style="width: 35%;">Field</th><th>Detail</th></tr>
+    </thead>
+    <tbody>
+        <tr><td><strong>Share Class</strong></td><td><%= shareClass %></td></tr>
+        <tr><td><strong>Dividend Type</strong></td><td><%= dividendType %></td></tr>
+        <% if (perShare) { %>
+            <tr><td><strong>Per-Share Amount</strong></td><td>$<%= perShare %> CAD</td></tr>
+        <% } %>
+        <% if (totalAmount) { %>
+            <tr><td><strong>Total Dividend</strong></td><td>$<%= totalAmount %> CAD</td></tr>
+        <% } %>
+        <tr><td><strong>Record Date</strong></td><td><%= recordDate %></td></tr>
+        <% if (paymentDate) { %>
+            <tr><td><strong>Payment Date</strong></td><td><%= paymentDate %></td></tr>
+        <% } %>
+        <tr><td><strong>Fiscal Year</strong></td><td><%= fiscalYear %></td></tr>
+        <% if (t5Ref) { %>
+            <tr><td><strong>T5 Reference</strong></td><td><%= t5Ref %></td></tr>
+        <% } %>
+    </tbody>
+</table>
+
+<% if (holdersOfClass.length > 0) { %>
+    <div class="section">
+        <p class="resolved">Holders of record — <%= shareClass %>:</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Shareholder</th>
+                    <th>Shares Held</th>
+                    <% if (perShare) { %><th>Dividend Amount</th><% } %>
+                </tr>
+            </thead>
+            <tbody>
+                <% holdersOfClass.forEach(function(sh) { %>
+                    <tr>
+                        <td><%= sh.name %></td>
+                        <td><%= (sh.numberOfShares || 0).toLocaleString() %></td>
+                        <% if (perShare) { %>
+                            <td>$<%= ((sh.numberOfShares || 0) * Number(perShare)).toFixed(2) %></td>
+                        <% } %>
+                    </tr>
+                <% }) %>
+            </tbody>
+        </table>
+    </div>
+<% } %>
+
+<div class="section">
+    <p class="resolved">Be it resolved that:</p>
+    <p>1. A dividend of <strong>$<%= perShare || '____' %> per share</strong> on the <em><%= shareClass %></em> is hereby <strong>DECLARED</strong>, payable to the shareholders of record as at <strong><%= recordDate %></strong><% if (paymentDate) { %> and payable on or before <strong><%= paymentDate %></strong><% } %>.</p>
+    <p>2. The Officers of the Corporation are authorised to take all steps necessary to pay the dividend, issue T5 information slips to the recipients within the timelines prescribed by the <em>Income Tax Act</em> (Canada), and record the dividend in the Corporation&rsquo;s books.</p>
+</div>
+
+<div class="cra-note">
+    <strong>T5 issuance reminder:</strong> A T5 information slip must be issued to each recipient shareholder and filed with CRA on or before the last day of February of the year following the calendar year in which the dividend was paid. Record the T5 reference number on this event once filed.
+</div>
+
+<div class="sig-section">
+    <p class="resolved">Signed by the Directors:</p>
+    <div class="sig-grid">
+        <% (activeDirectors.length > 0 ? activeDirectors : [{ firstName: '', lastName: '(Director signature required)' }]).forEach(function(dir) { %>
+            <div class="sig-block">
+                <div class="sig-line">
+                    <strong>Name:</strong> <%= dirName(dir) %><br>
+                    <strong>Title:</strong> Director<br>
+                    <strong>Date:</strong> ______________
+                </div>
+            </div>
+        <% }) %>
+    </div>
+</div>
+
+</body>
+</html>

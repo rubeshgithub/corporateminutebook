@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Board Resolution — Signing Authority — <%= company.name %></title>
+    <style>
+        body { font-family: 'Helvetica', 'Arial', sans-serif; padding: 44px; line-height: 1.65; font-size: 11pt; color: #1a1a1a; }
+        .company-name { text-align: center; font-size: 21px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
+        .res-type { text-align: center; font-size: 15px; font-weight: bold; margin: 3px 0; }
+        .res-sub { text-align: center; font-size: 13px; color: #444; margin: 2px 0 6px 0; }
+        .eff-date { text-align: center; font-size: 12px; color: #555; margin-bottom: 20px; }
+        hr { border: none; border-top: 1.5px solid #333; margin: 18px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 14px 0 20px 0; font-size: 10.5pt; }
+        th { background: #2c3e50; color: #fff; padding: 8px 10px; text-align: left; font-size: 10pt; font-weight: 600; }
+        td { padding: 7px 10px; border: 1px solid #ccc; vertical-align: top; }
+        tr:nth-child(even) td { background: #f7f7f7; }
+        .section { margin: 18px 0; }
+        .resolved { font-weight: bold; text-transform: uppercase; font-size: 10.5pt; margin-bottom: 6px; }
+        .date-line { margin-top: 44px; font-size: 11pt; }
+        .sig-section { margin-top: 36px; }
+        .sig-grid { display: flex; gap: 28px; flex-wrap: wrap; margin-top: 10px; }
+        .sig-block { flex: 1; min-width: 160px; }
+        .sig-line { border-top: 1px solid #000; margin-top: 52px; padding-top: 5px; font-size: 10pt; line-height: 1.5; }
+        .specimen-box { border: 1px dashed #666; height: 60px; margin-top: 8px; background: #fafafa; }
+        .specimen-label { font-size: 9pt; color: #666; text-align: center; margin-top: 3px; }
+    </style>
+</head>
+<body>
+<%
+    var ev = (typeof event !== 'undefined' && event) ? event : {};
+    var d = ev.data || {};
+    var effDate = ev.effectiveDate ? new Date(ev.effectiveDate) : new Date();
+    var effDateStr = effDate.toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' });
+
+    var activeDirectors = (company.directors || []).filter(function(dir) { return !dir.resignedDate; });
+    var dirName = function(dir) {
+        return dir.name || ([dir.firstName, dir.middleName, dir.lastName].filter(Boolean).join(' ').trim()) || '';
+    };
+
+    var isRevoke = ev.eventType === 'signing_authority_revoked';
+    var resolvedTitle = isRevoke ? 'Revocation of Signing Authority' : 'Grant of Signing Authority';
+
+    var officerName = d.signingOfficerName || d.name || '';
+    var officerTitle = d.title || 'Signing Officer';
+    var scope = d.scope || 'general banking, contracts, and corporate filings';
+    var limits = d.limits || '';
+%>
+
+<div class="company-name"><%= company.name %></div>
+<div class="res-type">Board Resolution</div>
+<div class="res-sub"><%= resolvedTitle %></div>
+<div class="eff-date">Effective <%= effDateStr %></div>
+<hr>
+
+<div class="section">
+    <p><strong>WHEREAS</strong> the Directors of the Corporation have determined that it is in the best interests of the Corporation to
+    <% if (isRevoke) { %>
+        revoke the signing authority previously granted to <strong><%= officerName %></strong>;
+    <% } else { %>
+        appoint <strong><%= officerName %></strong> as a signing officer of the Corporation, with authority to bind the Corporation for the purposes of <em><%= scope %></em>;
+    <% } %></p>
+
+    <% if (!isRevoke && limits) { %>
+        <p><strong>AND WHEREAS</strong> the following limits apply to this authority: <em><%= limits %></em>;</p>
+    <% } %>
+</div>
+
+<table>
+    <thead>
+        <tr><th style="width: 35%;">Field</th><th>Detail</th></tr>
+    </thead>
+    <tbody>
+        <tr><td><strong>Signing Officer</strong></td><td><%= officerName %></td></tr>
+        <tr><td><strong>Title / Role</strong></td><td><%= officerTitle %></td></tr>
+        <% if (!isRevoke) { %>
+            <tr><td><strong>Scope of Authority</strong></td><td><%= scope %></td></tr>
+            <% if (limits) { %>
+                <tr><td><strong>Limits</strong></td><td><%= limits %></td></tr>
+            <% } %>
+        <% } %>
+        <tr><td><strong>Effective Date</strong></td><td><%= effDateStr %></td></tr>
+        <tr><td><strong>Action</strong></td><td><%= isRevoke ? 'Revoked' : 'Granted' %></td></tr>
+    </tbody>
+</table>
+
+<div class="section">
+    <p class="resolved">Be it resolved that:</p>
+    <% if (isRevoke) { %>
+        <p>1. The signing authority previously granted to <strong><%= officerName %></strong> is hereby <strong>REVOKED</strong> effective <%= effDateStr %>.</p>
+        <p>2. The Corporation shall notify any bank, counterparty, or public body that relies on the prior authority.</p>
+    <% } else { %>
+        <p>1. <strong><%= officerName %></strong> is hereby appointed a signing officer of the Corporation with authority to bind the Corporation for <em><%= scope %></em> effective <%= effDateStr %>.</p>
+        <p>2. The Officers of the Corporation are authorised to execute and deliver such certificates, notices, and documents as may be required to give effect to this resolution — including any bank signing card or banking mandate.</p>
+    <% } %>
+</div>
+
+<%
+    var signers = activeDirectors.length > 0
+        ? activeDirectors
+        : [{ firstName: '', lastName: '(Director signature required)', name: '(Director signature required)' }];
+%>
+
+<div class="sig-section">
+    <p class="resolved">Signed by the Directors:</p>
+    <div class="sig-grid">
+        <% signers.forEach(function(dir) { %>
+            <div class="sig-block">
+                <div class="sig-line">
+                    <strong>Name:</strong> <%= dirName(dir) %><br>
+                    <strong>Title:</strong> Director<br>
+                    <strong>Date:</strong> ______________
+                </div>
+            </div>
+        <% }) %>
+    </div>
+</div>
+
+<% if (!isRevoke) { %>
+    <div class="sig-section">
+        <p class="resolved">Specimen signature of <%= officerName %>:</p>
+        <div class="specimen-box"></div>
+        <div class="specimen-label">Attach a specimen signature card here if required by the Corporation's bank.</div>
+    </div>
+<% } %>
+
+</body>
+</html>

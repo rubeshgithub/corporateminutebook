@@ -33,7 +33,9 @@ type EventType =
     | 'share_class_added'
     | 'annual_return_filed'
     | 'fiscal_year_end_changed'
-    | 'name_changed';
+    | 'name_changed'
+    | 'signing_authority_granted' | 'signing_authority_revoked'
+    | 'dividend_declared';
 
 type AttachRole = 'resolution' | 'registry_filing' | 'supporting';
 
@@ -67,8 +69,12 @@ const RESOLUTION_EVENT_TYPES = new Set<EventType>([
     'officer_appointed', 'officer_resigned',
     'shares_issued', 'shares_transferred', 'shares_cancelled', 'share_class_added',
     'address_changed', 'name_changed', 'fiscal_year_end_changed',
+    'signing_authority_granted', 'signing_authority_revoked', 'dividend_declared',
 ]);
 
+// Signing-authority and dividend events are internal governance actions —
+// no separate registry filing is expected, so no "attach registry filing"
+// prompt appears for them.
 const REGISTRY_EVENT_TYPES = new Set<EventType>([
     'director_appointed', 'director_resigned', 'director_address_changed',
     'address_changed', 'name_changed', 'shares_transferred', 'shares_issued',
@@ -89,6 +95,9 @@ const EVENT_LABELS: Record<EventType, string> = {
     annual_return_filed: 'Annual Return Filed',
     fiscal_year_end_changed: 'Fiscal Year End Changed',
     name_changed: 'Company Name Changed',
+    signing_authority_granted: 'Signing Authority Granted',
+    signing_authority_revoked: 'Signing Authority Revoked',
+    dividend_declared: 'Dividend Declared',
 };
 
 const EVENT_COLORS: Record<EventType, string> = {
@@ -105,12 +114,68 @@ const EVENT_COLORS: Record<EventType, string> = {
     annual_return_filed: '#37474f',
     fiscal_year_end_changed: '#4e342e',
     name_changed: '#6a1b9a',
+    signing_authority_granted: '#00695c',
+    signing_authority_revoked: '#795548',
+    dividend_declared: '#f9a825',
 };
 
 const ATTACH_ROLE_COLORS: Record<AttachRole, string> = {
     resolution: '#1565c0',
     registry_filing: '#2e7d32',
     supporting: '#6d4c41',
+};
+
+/**
+ * Filing-status tri-state per event. Every corporate change moves through
+ * three states — drafted (event logged), signed (resolution signed / e-signed),
+ * filed (registry filing attached where required). Surfacing them as three
+ * pills makes a lawyer or a bank compliance officer able to see, at a
+ * glance, which of the three is still outstanding — instead of having to
+ * cross-reference the attachment list against a mental checklist.
+ */
+type EventStatus = { drafted: boolean; signed: boolean; needsRegistry: boolean; filed: boolean };
+
+const eventFilingStatus = (ev: CorporateEvent): EventStatus => {
+    const resAtt = ev.attachments?.find((a) => a.role === 'resolution');
+    const regAtt = ev.attachments?.find((a) => a.role === 'registry_filing');
+    const eSignDone = ev.eSign?.status === 'completed';
+    return {
+        drafted:       true,   // the event itself is the "drafted" state
+        signed:        !!resAtt || eSignDone,
+        needsRegistry: REGISTRY_EVENT_TYPES.has(ev.eventType),
+        filed:         !!regAtt,
+    };
+};
+
+const FilingStatusPills: React.FC<{ ev: CorporateEvent }> = ({ ev }) => {
+    const s = eventFilingStatus(ev);
+    const pill = (label: string, ok: boolean, tip: string) => (
+        <Tooltip title={tip} arrow key={label}>
+            <Chip
+                label={label}
+                size="small"
+                sx={{
+                    height: 16,
+                    fontSize: 9.5,
+                    fontWeight: 700,
+                    letterSpacing: 0.4,
+                    bgcolor: ok ? 'rgba(46,125,50,0.10)' : 'rgba(158,158,158,0.15)',
+                    color:   ok ? '#2e7d32' : '#616161',
+                    border:  '1px solid',
+                    borderColor: ok ? 'rgba(46,125,50,0.35)' : 'rgba(158,158,158,0.4)',
+                    '& .MuiChip-label': { px: 0.6 },
+                    cursor: 'default',
+                }}
+            />
+        </Tooltip>
+    );
+    return (
+        <Box sx={{ display: 'inline-flex', gap: 0.3, ml: 0.5 }}>
+            {pill('D', s.drafted, 'Drafted — the event is recorded internally.')}
+            {pill('S', s.signed,  s.signed ? 'Signed — resolution is signed and attached.' : 'Not yet signed — upload the signed resolution or send for e-signature.')}
+            {s.needsRegistry && pill('F', s.filed, s.filed ? 'Filed — registry filing attached.' : 'Not yet filed — attach the registry acknowledgment PDF.')}
+        </Box>
+    );
 };
 
 const eventSummary = (type: EventType, data: Record<string, any>): string => {
@@ -129,6 +194,16 @@ const eventSummary = (type: EventType, data: Record<string, any>): string => {
         case 'annual_return_filed': return `Year ${d.year || ''}${d.confirmationNumber ? ` — ${d.confirmationNumber}` : ''}`;
         case 'fiscal_year_end_changed': return `New year-end: ${d.newFiscalYearEnd || ''}`;
         case 'name_changed': return `New name: ${d.newName || ''}`;
+        case 'signing_authority_granted':
+            return `${d.signingOfficerName || ''}${d.title ? ` (${d.title})` : ''}${d.scope ? ` — ${d.scope}` : ''}`;
+        case 'signing_authority_revoked':
+            return `${d.signingOfficerName || ''}${d.reason ? ` — ${d.reason}` : ''}`;
+        case 'dividend_declared': {
+            const perShare = d.perShareAmount != null ? `$${Number(d.perShareAmount).toFixed(2)}/share` : '';
+            const total = d.totalAmount != null ? `$${Number(d.totalAmount).toFixed(2)} total` : '';
+            const cls = d.shareClass ? `${d.shareClass}` : '';
+            return [cls, perShare, total].filter(Boolean).join(' · ');
+        }
         default: return '';
     }
 };
@@ -941,6 +1016,7 @@ const RecordsVault: React.FC = () => {
                                             {ev.notes === 'Founding' && (
                                                 <Chip label="Founding" size="small" sx={{ bgcolor: '#e8eaf6', color: '#3949ab', fontSize: 10, height: 18 }} />
                                             )}
+                                            <FilingStatusPills ev={ev} />
                                             <Box sx={{ ml: 'auto' }}>
                                                 <Tooltip title="Delete event">
                                                     <IconButton

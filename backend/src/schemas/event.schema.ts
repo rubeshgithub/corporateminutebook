@@ -22,6 +22,9 @@ export const eventTypeEnum = z.enum([
     'name_changed',
     'voluntary_dissolution_filed',
     'revival_filed',
+    'signing_authority_granted',
+    'signing_authority_revoked',
+    'dividend_declared',
 ]);
 
 /**

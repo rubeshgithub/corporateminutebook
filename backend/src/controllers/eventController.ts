@@ -30,18 +30,22 @@ function makeAttachmentFileId(originalName: string): string {
 // ─── Resolution template mapping ─────────────────────────────────────────────
 
 const RESOLUTION_TEMPLATES: Partial<Record<CorporateEventType, string>> = {
-    director_appointed:       'resolution_director_change',
-    director_resigned:        'resolution_director_change',
-    director_address_changed: 'resolution_director_change',
-    officer_appointed:        'resolution_director_change',
-    officer_resigned:         'resolution_director_change',
-    shares_issued:            'resolution_share_issuance',
-    shares_transferred:       'resolution_share_transfer',
-    shares_cancelled:         'resolution_share_issuance',
-    share_class_added:        'resolution_share_issuance',
-    address_changed:          'resolution_address_change',
-    name_changed:             'resolution_name_change',
-    fiscal_year_end_changed:  'resolution_name_change',
+    director_appointed:         'resolution_director_change',
+    director_resigned:          'resolution_director_change',
+    director_address_changed:   'resolution_director_change',
+    officer_appointed:          'resolution_director_change',
+    officer_resigned:           'resolution_director_change',
+    shares_issued:              'resolution_share_issuance',
+    shares_transferred:         'resolution_share_transfer',
+    shares_cancelled:           'resolution_share_issuance',
+    share_class_added:          'resolution_share_issuance',
+    address_changed:            'resolution_address_change',
+    name_changed:               'resolution_name_change',
+    fiscal_year_end_changed:    'resolution_name_change',
+    // Wave 2:
+    signing_authority_granted:  'resolution_signing_authority',
+    signing_authority_revoked:  'resolution_signing_authority',
+    dividend_declared:          'resolution_dividend_declaration',
 };
 
 // ─── Create event ─────────────────────────────────────────────────────────────

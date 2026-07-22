@@ -36,8 +36,14 @@ const COMPILE_RESOLUTION_ELIGIBLE = new Set([
     'officer_appointed', 'officer_resigned',
     'shares_issued', 'shares_transferred', 'shares_cancelled', 'share_class_added',
     'address_changed', 'name_changed', 'fiscal_year_end_changed',
+    // Wave 2 — these events also produce signable resolutions
+    'signing_authority_granted', 'signing_authority_revoked', 'dividend_declared',
 ]);
 
+// Registry-filing requirement is unchanged by Wave 2: signing-authority and
+// dividend events are internal governance actions — they don't get filed
+// with the corporate registry, so we don't nag the user about missing
+// registry filings on them.
 const COMPILE_REGISTRY_REQUIRED = new Set([
     'director_appointed', 'director_resigned', 'director_address_changed',
     'address_changed', 'name_changed', 'shares_transferred', 'shares_issued',
