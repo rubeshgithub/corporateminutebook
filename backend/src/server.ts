@@ -69,6 +69,7 @@ import statsRoutes from './routes/statsRoutes';
 import incorporationRoutes from './routes/incorporationRoutes';
 import eventRoutes from './routes/eventRoutes';
 import crsFeedRoutes from './routes/crsFeedRoutes';
+import shareRoutes from './routes/shareRoutes';
 
 // Basic Route
 app.use('/api/auth', authRoutes);
@@ -80,6 +81,9 @@ app.use('/api/stats', statsRoutes);
 app.use('/api/incorporation', incorporationRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/crs-feed', crsFeedRoutes);
+// Sharing routes contribute BOTH /api/share/:token (public) AND owner-scoped
+// /api/companies/:id/shares + /api/shares/:shareId (auth-guarded inside).
+app.use('/api', shareRoutes);
 
 app.get('/api/health', (req: Request, res: Response) => {
     res.status(200).json({ status: 'ok', message: 'Corporate Minute Book API is running' });

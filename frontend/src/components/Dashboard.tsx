@@ -10,6 +10,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import SearchIcon from '@mui/icons-material/Search';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import AddIcon from '@mui/icons-material/Add';
+import ShareIcon from '@mui/icons-material/Share';
 import BusinessIcon from '@mui/icons-material/Business';
 import DescriptionIcon from '@mui/icons-material/Description';
 import GroupIcon from '@mui/icons-material/Group';
@@ -22,6 +23,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import api from '../utils/api';
 import { useNavigate } from 'react-router-dom';
 import { useSnackbar } from '../context/SnackbarContext';
+import ShareDialog from './ShareDialog';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -234,6 +236,7 @@ const Dashboard: React.FC = () => {
     const [order, setOrder] = React.useState<Order>('asc');
     const [orderBy, setOrderBy] = React.useState<OrderBy>('name');
     const [deleteDialog, setDeleteDialog] = React.useState<{ open: boolean; companyId: string; companyName: string }>({ open: false, companyId: '', companyName: '' });
+    const [shareDialog, setShareDialog] = React.useState<{ open: boolean; companyId: string; companyName: string }>({ open: false, companyId: '', companyName: '' });
 
     const fetchAll = async () => {
         try {
@@ -770,6 +773,11 @@ const Dashboard: React.FC = () => {
                                                         <EditIcon sx={{ fontSize: 17 }} />
                                                     </IconButton>
                                                 </Tooltip>
+                                                <Tooltip title="Share (read-only link)" placement="top">
+                                                    <IconButton size="small" onClick={() => setShareDialog({ open: true, companyId: company._id, companyName: company.name })} sx={{ color: 'text.secondary', '&:hover': { color: '#1565c0' } }}>
+                                                        <ShareIcon sx={{ fontSize: 16 }} />
+                                                    </IconButton>
+                                                </Tooltip>
                                                 <Tooltip title="Delete corporation" placement="top">
                                                     <IconButton size="small" onClick={() => handleDelete(company._id, company.name)} sx={{ color: 'text.secondary', '&:hover': { color: 'error.main' } }}>
                                                         <DeleteIcon sx={{ fontSize: 17 }} />
@@ -837,6 +845,14 @@ const Dashboard: React.FC = () => {
                     )}
                 </Box>
             </Paper>
+
+            {/* Share dialog */}
+            <ShareDialog
+                open={shareDialog.open}
+                onClose={() => setShareDialog({ open: false, companyId: '', companyName: '' })}
+                companyId={shareDialog.companyId}
+                companyName={shareDialog.companyName}
+            />
 
             {/* Delete confirm dialog */}
             <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false, companyId: '', companyName: '' })}>

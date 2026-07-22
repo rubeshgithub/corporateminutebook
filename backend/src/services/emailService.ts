@@ -142,6 +142,45 @@ export const sendAnnualReturnReminderEmail = async (opts: {
     });
 };
 
+/**
+ * Sharing invitation — a CPA / lawyer / partner has been given read-only
+ * access to a company's minute book. The share link IS the credential;
+ * no MinuteBook account required. Deliberately understated: this is a
+ * professional service exchange, not a marketing email.
+ */
+export const sendShareInviteEmail = async (opts: {
+    to:            string;
+    inviterName:   string;
+    companyName:   string;
+    shareUrl:      string;
+    label?:        string;
+    expiresAt:     Date;
+}) => {
+    const { to, inviterName, companyName, shareUrl, label, expiresAt } = opts;
+    const expiresLabel = expiresAt.toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' });
+
+    await sendMail({
+        from: FROM,
+        to,
+        subject: `${inviterName} shared ${companyName} minute book with you`,
+        html: `
+            <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#222;line-height:1.6">
+                <h2 style="color:#1a237e;margin-bottom:8px">You have read-only access to a minute book</h2>
+                <p style="color:#666;margin:0 0 24px 0"><strong>${inviterName}</strong> has shared the corporate minute book for <strong>${companyName}</strong> with you.${label ? ` <em>(${label})</em>` : ''}</p>
+
+                <p>The link below is read-only. You can review the corporation's current directors, share structure, recorded events, and download the compiled minute book — but you can't edit anything.</p>
+
+                <div style="margin:28px 0">
+                    <a href="${shareUrl}" style="display:inline-block;background:#1a237e;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:600">Open ${companyName}</a>
+                </div>
+
+                <p style="color:#666;font-size:13px"><strong>Access expires ${expiresLabel}.</strong> The link is the credential — no sign-in required. Don't forward it if you don't want others viewing this record.</p>
+
+                <p style="color:#888;font-size:12px;margin-top:32px">Sent via MinuteBook — Corporate Records Management. If you weren't expecting this, you can safely ignore the email.</p>
+            </div>`,
+    });
+};
+
 export const sendResolutionEmail = async (opts: {
     to: string;
     recipientName: string;

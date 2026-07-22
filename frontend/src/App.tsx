@@ -6,6 +6,7 @@ import Dashboard from './components/Dashboard';
 import MinuteBookBuilder from './components/MinuteBookBuilder';
 import DocumentManagement from './components/DocumentManagement';
 import RecordsVault from './components/RecordsVault';
+import SharedCompanyView from './components/SharedCompanyView';
 import Layout from './components/Layout';
 import { useSelector } from 'react-redux';
 import { SnackbarProvider } from './context/SnackbarContext';
@@ -53,6 +54,9 @@ function App() {
                     <Route path="/documents" element={<PrivateRoute><DocumentManagement /></PrivateRoute>} />
                     <Route path="/events/:companyId" element={<EventsRedirect />} />
                     <Route path="/records/:companyId" element={<PrivateRoute><RecordsVault /></PrivateRoute>} />
+                    {/* Public read-only share view — no auth. The token IS
+                        the credential; backend enforces expiry + revoke. */}
+                    <Route path="/share/:token" element={<SharedCompanyView />} />
                 </Routes>
             </BrowserRouter>
             </SnackbarProvider>
