@@ -1,0 +1,56 @@
+import { APIRequestContext, BrowserContext, request } from '@playwright/test';
+import { API_URL, TEST_TOKEN } from './config';
+
+/**
+ * Mints an authenticated session for the given test email using the
+ * env-guarded /api/auth/test-mint-session endpoint, then attaches the
+ * resulting httpOnly cookie to the given browser context so subsequent
+ * page loads are authenticated.
+ *
+ * The paired APIRequestContext returned here re-uses the same cookie —
+ * hand it to any helper that needs to call the API on behalf of the
+ * persona (create company, record event, download bundle).
+ */
+export async function loginAs(context: BrowserContext, email: string): Promise<APIRequestContext> {
+    if (!TEST_TOKEN) {
+        throw new Error(
+            'TEST_MODE_TOKEN env var is not set. Set it in your shell + on the backend (TEST_MODE_ENABLED=true) before running persona tests.',
+        );
+    }
+
+    // A dedicated request context lets Playwright manage its own cookie jar.
+    // We call test-mint-session through it — the Set-Cookie header lands in
+    // that jar — and then port those cookies into the browser context.
+    const apiContext = await request.newContext({ baseURL: API_URL });
+    const res = await apiContext.post('/api/auth/test-mint-session', {
+        data:    { email },
+        headers: { 'x-test-token': TEST_TOKEN, 'Content-Type': 'application/json' },
+    });
+    if (!res.ok()) {
+        const body = await res.text();
+        throw new Error(`test-mint-session failed: ${res.status()} — ${body}`);
+    }
+
+    // Copy every cookie the server set into the browser context so page
+    // navigations arrive authenticated. Cookie domain must match the
+    // browser's origin — for cross-origin dev (5173 + 5000) each cookie
+    // is scoped to its origin server, which Playwright honours.
+    const { cookies } = await apiContext.storageState();
+    if (cookies.length > 0) await context.addCookies(cookies);
+
+    return apiContext;
+}
+
+/**
+ * Convenience wrapper: hand back a fresh test email tied to this run so
+ * personas don't collide when tests run concurrently. Reruns of the same
+ * suite land the same email (deterministic on the run identifier)
+ * unless FRESH_EMAIL is set — useful when you want to test the
+ * first-run empty state.
+ */
+export function testEmailFor(persona: 'owner' | 'cpa' | 'lawyer'): string {
+    if (process.env.FRESH_EMAIL === 'true') {
+        return `${persona}+${Date.now()}@personatest.minutebook.local`;
+    }
+    return `${persona}@personatest.minutebook.local`;
+}

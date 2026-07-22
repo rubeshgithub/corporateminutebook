@@ -1,6 +1,6 @@
 import express from 'express';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
-import { requestOtp, verifyOtp, logout, me } from '../controllers/authController';
+import { requestOtp, verifyOtp, logout, me, testMintSession } from '../controllers/authController';
 import { protect } from '../middleware/authMiddleware';
 
 const router = express.Router();
@@ -50,5 +50,8 @@ router.post('/request-otp', otpRequestIpLimiter, otpRequestEmailLimiter, request
 router.post('/verify-otp', otpVerifyLimiter, verifyOtp);
 router.post('/logout', logout);
 router.get('/me', protect, me);
+// Test-mode session mint — env + shared-secret guarded inside the handler.
+// Only reachable when TEST_MODE_ENABLED=true AND x-test-token matches.
+router.post('/test-mint-session', testMintSession);
 
 export default router;

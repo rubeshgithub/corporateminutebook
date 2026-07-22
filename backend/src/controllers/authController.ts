@@ -127,6 +127,57 @@ export const logout = (_req: Request, res: Response) => {
 };
 
 /**
+ * POST /api/auth/test-mint-session — CI/persona-test session bypass.
+ *
+ * Guarded by BOTH:
+ *   - TEST_MODE_ENABLED=true (env)
+ *   - x-test-token header matching TEST_MODE_TOKEN (env)
+ *
+ * When either check fails we 404 (env off) or 401 (bad token), so a
+ * production instance without the env vars is completely opaque to any
+ * request that hits this endpoint. Existing users are reused when
+ * present; otherwise a bare user is materialized so persona tests can
+ * hit any email without pre-seeding.
+ *
+ * This is the only way the automated persona test suite can log in
+ * without going through the OTP + SES round-trip.
+ */
+export const testMintSession = async (req: Request, res: Response) => {
+    if (process.env.TEST_MODE_ENABLED !== 'true') {
+        return res.status(404).json({ error: 'Not found.' });
+    }
+    const expectedToken = process.env.TEST_MODE_TOKEN;
+    const providedToken = req.header('x-test-token');
+    if (!expectedToken || providedToken !== expectedToken) {
+        return res.status(401).json({ error: 'Invalid test token.' });
+    }
+
+    const email = String(req.body?.email ?? '').toLowerCase().trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ error: 'A valid email is required.' });
+    }
+
+    let user = await User.findOne({ email });
+    if (!user) {
+        user = await User.create({
+            email,
+            name:             email.split('@')[0],
+            role:             'business_owner',
+            subscriptionTier: 'free',
+        });
+    }
+
+    setAuthCookie(res, generateToken(user._id.toString(), user.role));
+    return res.json({
+        _id:   user._id,
+        name:  user.name,
+        email: user.email,
+        role:  user.role,
+        testSession: true,
+    });
+};
+
+/**
  * Returns the current user's public profile — used by the SPA on boot to
  * decide whether the cached user in localStorage is still logged in
  * server-side. If the cookie is missing/expired, `protect` returns 401

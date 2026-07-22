@@ -1,0 +1,21 @@
+{
+  "name": "minutebook-persona-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "End-to-end persona tests for MinuteBook — Business Owner / CPA / Lawyer walkthroughs + PDF quality checks.",
+  "scripts": {
+    "test": "playwright test",
+    "test:owner": "playwright test business-owner",
+    "test:cpa": "playwright test cpa",
+    "test:lawyer": "playwright test lawyer",
+    "test:ui": "playwright test --ui",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0",
+    "@types/node": "^22.0.0",
+    "@types/pdf-parse": "^1.1.4",
+    "pdf-parse": "^1.1.1",
+    "typescript": "^5.6.0"
+  }
+}
