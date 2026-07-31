@@ -44,8 +44,14 @@ test.describe('Business Owner persona', () => {
         expect(created._id).toBeTruthy();
 
         /* ─── Verify the dashboard now shows it ──────────────── */
+        // Scope to the Companies table specifically so we don't match the
+        // compliance chip that ALSO contains the corp name ("<name> — Overdue").
+        // `.first()` handles the case where a prior test run left another
+        // corp with the same name in the DB.
         await page.reload();
-        await expect(page.getByText(corp.name)).toBeVisible();
+        await expect(
+            page.getByRole('table').getByText(corp.name, { exact: true }).first(),
+        ).toBeVisible();
 
         /* ─── Record two events an owner would routinely add ── */
         await recordEvent(api, {

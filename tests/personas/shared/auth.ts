@@ -30,6 +30,7 @@ export async function loginAs(context: BrowserContext, email: string): Promise<A
         const body = await res.text();
         throw new Error(`test-mint-session failed: ${res.status()} — ${body}`);
     }
+    const userData = await res.json();
 
     // Copy every cookie the server set into the browser context so page
     // navigations arrive authenticated. Cookie domain must match the
@@ -37,6 +38,22 @@ export async function loginAs(context: BrowserContext, email: string): Promise<A
     // is scoped to its origin server, which Playwright honours.
     const { cookies } = await apiContext.storageState();
     if (cookies.length > 0) await context.addCookies(cookies);
+
+    // The SPA's PrivateRoute guard reads user metadata from localStorage
+    // (the httpOnly auth cookie is server-side only, so the client can't
+    // introspect it directly). Without this, the browser hits /dashboard,
+    // the guard sees isAuthenticated=false, and bounces to the Landing
+    // page — the test would then fail against copy that has nothing to do
+    // with the persona flow. addInitScript runs before every page load in
+    // this context, so the SPA sees the user on its very first render.
+    await context.addInitScript((user: any) => {
+        try { window.localStorage.setItem('user', JSON.stringify(user)); } catch { /* ignore */ }
+    }, {
+        _id:   userData._id,
+        name:  userData.name,
+        email: userData.email,
+        role:  userData.role,
+    });
 
     return apiContext;
 }

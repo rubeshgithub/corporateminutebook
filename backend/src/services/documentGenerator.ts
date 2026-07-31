@@ -10,24 +10,42 @@ import { tryGetFile } from './uploadStorage';
 const TEMPLATES_DIR = path.join(__dirname, '..', 'templates');
 
 // ─── Singleton browser — avoids Windows lockfile conflicts ────────────────────
+//
+// Concurrent requests must NOT both launch. Two callers each seeing
+// `_browser === null` and racing to puppeteer.launch() with the same
+// userDataDir crashes the second one — Chrome takes an exclusive lock
+// on the profile directory. The persona test suite caught this: two
+// personas hitting /api/documents/bundle in parallel = one 500.
+//
+// Fix: share a launch promise across concurrent callers. First arrival
+// starts the launch; every subsequent arrival awaits the same promise.
 let _browser: Browser | null = null;
+let _browserLaunching: Promise<Browser> | null = null;
 
 const getBrowser = async (): Promise<Browser> => {
     if (_browser) {
         try {
-            // Quick liveness check
             await _browser.version();
             return _browser;
         } catch {
             _browser = null;
         }
     }
-    _browser = await puppeteer.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
-        userDataDir: path.join(os.tmpdir(), 'minutebook_chrome_profile'),
-    });
-    return _browser;
+    if (!_browserLaunching) {
+        _browserLaunching = puppeteer.launch({
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+            userDataDir: path.join(os.tmpdir(), 'minutebook_chrome_profile'),
+        }).then((b) => {
+            _browser = b;
+            _browserLaunching = null;
+            return b;
+        }).catch((err) => {
+            _browserLaunching = null;
+            throw err;
+        });
+    }
+    return _browserLaunching;
 };
 
 const renderTemplate = (templateName: string, data: Record<string, unknown>): string => {

@@ -35,12 +35,26 @@ export interface PdfCheckResult {
     tooFewPages:     boolean;
 }
 
+/**
+ * Normalize PDF text before matching: pdf-parse preserves CSS-driven
+ * case (e.g. text-transform: uppercase renders as "BOARD (DIRECTOR)
+ * RESOLUTIONS" in the extracted text) and inserts newlines wherever a
+ * table column wraps a phrase mid-word ("Registered Address\nChanged").
+ * A caller writes tests against the human-readable phrase — we lowercase
+ * and collapse whitespace on both sides so those styling / layout
+ * artifacts don't invalidate correct content.
+ */
+function normalizeForMatch(s: string): string {
+    return s.toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
 export async function validatePdf(buffer: Buffer, check: PdfCheck): Promise<PdfCheckResult> {
     const data = await pdf(buffer);
     const text = data.text;
+    const normText = normalizeForMatch(text);
 
-    const missingSections = check.expectedSections.filter((s) => !text.includes(s));
-    const foundForbidden  = (check.forbiddenContent ?? []).filter((s) => text.includes(s));
+    const missingSections = check.expectedSections.filter((s) => !normText.includes(normalizeForMatch(s)));
+    const foundForbidden  = (check.forbiddenContent ?? []).filter((s) => normText.includes(normalizeForMatch(s)));
     const tooFewPages     = check.minPages !== undefined && data.numpages < check.minPages;
 
     return {
