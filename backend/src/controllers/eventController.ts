@@ -140,7 +140,7 @@ export const updateEvent = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user?.id;
         const id = String(req.params.id);
-        const { notes, effectiveDate, data } = req.body ?? {};
+        const { notes, effectiveDate, data, registryFilingNotApplicable } = req.body ?? {};
 
         const event = await CorporateEvent.findById(id);
         if (!event || event.deletedAt) return res.status(404).json({ error: 'Event not found.' });
@@ -160,6 +160,9 @@ export const updateEvent = async (req: AuthRequest, res: Response) => {
         if (data && typeof data === 'object') {
             event.data = data;
             snapshotWarning = true;
+        }
+        if (typeof registryFilingNotApplicable === 'boolean') {
+            event.registryFilingNotApplicable = registryFilingNotApplicable;
         }
 
         await event.save();

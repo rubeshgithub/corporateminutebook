@@ -92,7 +92,8 @@ const buildComplianceGaps = (company: any, events: any[]): string[] => {
 
     const missingReg = events.filter((e) =>
         COMPILE_REGISTRY_REQUIRED.has(e.eventType) &&
-        !(e.attachments || []).some((a: any) => a.role === 'registry_filing'),
+        !(e.attachments || []).some((a: any) => a.role === 'registry_filing') &&
+        !e.registryFilingNotApplicable,
     ).length;
 
     if (!company.incorporationDocumentFile) {

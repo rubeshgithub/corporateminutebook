@@ -757,6 +757,7 @@
                 var hasRes = (ev.attachments || []).some(function(a){ return a.role === 'resolution'; });
                 var hasReg = (ev.attachments || []).some(function(a){ return a.role === 'registry_filing'; });
                 var needsReg = registryTypes.indexOf(ev.eventType) !== -1;
+                var regNA = !!ev.registryFilingNotApplicable;
                 out += '<tr>';
                 out += '<td>' + new Date(ev.effectiveDate).toLocaleDateString() + '</td>';
                 out += '<td>' + (CHANGE_EVENT_LABELS[ev.eventType] || ev.eventType) + '</td>';
@@ -764,7 +765,20 @@
                 if (ev.notes) out += '<div style="color:#888; font-size:9.5pt;">' + ev.notes + '</div>';
                 out += '</td>';
                 out += '<td style="text-align:center; font-size: 10pt;">' + (hasRes ? '✓ Attached' : '—') + '</td>';
-                out += '<td style="text-align:center; font-size: 10pt;">' + (needsReg ? (hasReg ? '✓ Attached' : '—') : '<span style="color:#aaa;">N/A</span>') + '</td>';
+                // Registry-filing column: N/A when the event type never
+                // needs one, OR when the user explicitly marked this
+                // event as "not applicable" (founding events, provinces
+                // that don't track shareholders, etc.). Otherwise show
+                // attached / missing as before.
+                var regCell;
+                if (!needsReg || regNA) {
+                    regCell = '<span style="color:#aaa;">N/A</span>';
+                } else if (hasReg) {
+                    regCell = '✓ Attached';
+                } else {
+                    regCell = '—';
+                }
+                out += '<td style="text-align:center; font-size: 10pt;">' + regCell + '</td>';
                 out += '</tr>';
             });
             out += '</tbody></table>';

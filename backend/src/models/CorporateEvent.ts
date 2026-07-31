@@ -55,6 +55,13 @@ export interface ICorporateEvent extends Document {
      *  the deletion is a bookkeeping action, not a state rewind. The UI
      *  warns the user to correct the company directly if needed. */
     deletedAt?: Date | null;
+    /** True when the user has confirmed no separate registry filing is
+     *  expected for this event — e.g. share issuances recorded at
+     *  incorporation (already in the Articles), or shareholders in
+     *  provinces that don't record them at the registry level.
+     *  Compliance gap detection + minute-book "Registry Filing" column
+     *  treat this as satisfied rather than pending. */
+    registryFilingNotApplicable?: boolean;
 }
 
 const attachmentSchema = new Schema<IEventAttachment>(
@@ -100,6 +107,7 @@ const corporateEventSchema = new Schema<ICorporateEvent>(
         attachments: { type: [attachmentSchema], default: [] },
         eSign: { type: eSignSchema, default: () => ({ status: 'none' }) },
         deletedAt: { type: Date, default: null, index: true },
+        registryFilingNotApplicable: { type: Boolean, default: false },
     },
     { timestamps: false },
 );

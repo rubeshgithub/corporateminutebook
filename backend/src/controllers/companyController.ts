@@ -18,6 +18,11 @@ const createFoundingEvents = async (company: any, userId: string) => {
     const effectiveDate = company.incorporationDate ? new Date(company.incorporationDate) : new Date();
     const events: any[] = [];
 
+    // Founding events all get registryFilingNotApplicable=true — they were
+    // recorded as part of the incorporation filing itself, so there's no
+    // separate registry filing to attach. Otherwise the compliance chip
+    // shows N gaps for every founding director/officer/shareholder from
+    // day one, which is nonsense.
     for (const d of company.directors || []) {
         events.push({
             companyId: company._id,
@@ -32,6 +37,7 @@ const createFoundingEvents = async (company: any, userId: string) => {
                 residentCanadian: d.residentCanadian ?? true,
             },
             notes: 'Founding',
+            registryFilingNotApplicable: true,
         });
     }
 
@@ -43,6 +49,7 @@ const createFoundingEvents = async (company: any, userId: string) => {
             effectiveDate,
             data: { name: o.name || '', title: o.title || '' },
             notes: 'Founding',
+            registryFilingNotApplicable: true,
         });
     }
 
@@ -60,6 +67,7 @@ const createFoundingEvents = async (company: any, userId: string) => {
                 certificateNumber: s.certificateNumber,
             },
             notes: 'Founding',
+            registryFilingNotApplicable: true,
         });
     }
 
@@ -263,7 +271,8 @@ export const getComplianceSummary = async (req: AuthRequest, res: Response) => {
             const missingRegistryFilings = compEvents.filter(
                 (e) =>
                     REGISTRY_REQUIRED.has(e.eventType) &&
-                    !(e.attachments || []).some((a: any) => a.role === 'registry_filing'),
+                    !(e.attachments || []).some((a: any) => a.role === 'registry_filing') &&
+                    !(e as any).registryFilingNotApplicable,
             ).length;
 
             let annualReturnStatus: 'not_set' | 'ok' | 'due_soon' | 'overdue' = 'not_set';

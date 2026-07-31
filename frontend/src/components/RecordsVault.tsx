@@ -62,6 +62,12 @@ interface CorporateEvent {
     notes?: string;
     attachments: EventAttachment[];
     eSign?: ESign;
+    /** User's decision: no separate registry filing is expected for this
+     *  event (e.g. founding events, provinces that don't record
+     *  shareholders, or a filing rolled into another one). Compliance
+     *  logic treats true as satisfied. Auto-set on founding events by
+     *  the backend; togglable per-event via the UI. */
+    registryFilingNotApplicable?: boolean;
 }
 
 
@@ -134,47 +140,68 @@ const ATTACH_ROLE_COLORS: Record<AttachRole, string> = {
  * glance, which of the three is still outstanding — instead of having to
  * cross-reference the attachment list against a mental checklist.
  */
-type EventStatus = { drafted: boolean; signed: boolean; needsRegistry: boolean; filed: boolean };
+type EventStatus = { drafted: boolean; signed: boolean; needsRegistry: boolean; filed: boolean; regNotApplicable: boolean };
 
 const eventFilingStatus = (ev: CorporateEvent): EventStatus => {
     const resAtt = ev.attachments?.find((a) => a.role === 'resolution');
     const regAtt = ev.attachments?.find((a) => a.role === 'registry_filing');
     const eSignDone = ev.eSign?.status === 'completed';
     return {
-        drafted:       true,   // the event itself is the "drafted" state
-        signed:        !!resAtt || eSignDone,
-        needsRegistry: REGISTRY_EVENT_TYPES.has(ev.eventType),
-        filed:         !!regAtt,
+        drafted:          true,   // the event itself is the "drafted" state
+        signed:           !!resAtt || eSignDone,
+        needsRegistry:    REGISTRY_EVENT_TYPES.has(ev.eventType),
+        filed:            !!regAtt,
+        regNotApplicable: !!ev.registryFilingNotApplicable,
     };
 };
 
 const FilingStatusPills: React.FC<{ ev: CorporateEvent }> = ({ ev }) => {
     const s = eventFilingStatus(ev);
-    const pill = (label: string, ok: boolean, tip: string) => (
-        <Tooltip title={tip} arrow key={label}>
-            <Chip
-                label={label}
-                size="small"
-                sx={{
-                    height: 16,
-                    fontSize: 9.5,
-                    fontWeight: 700,
-                    letterSpacing: 0.4,
-                    bgcolor: ok ? 'rgba(46,125,50,0.10)' : 'rgba(158,158,158,0.15)',
-                    color:   ok ? '#2e7d32' : '#616161',
-                    border:  '1px solid',
-                    borderColor: ok ? 'rgba(46,125,50,0.35)' : 'rgba(158,158,158,0.4)',
-                    '& .MuiChip-label': { px: 0.6 },
-                    cursor: 'default',
-                }}
-            />
-        </Tooltip>
-    );
+    // Three-way pill colouring: green (satisfied), grey (pending),
+    // neutral-green (N/A — satisfied but stylistically distinct so a
+    // reader can see the user's choice at a glance).
+    const pill = (label: string, tone: 'ok' | 'pending' | 'na', tip: string) => {
+        const styles = tone === 'ok'
+            ? { bg: 'rgba(46,125,50,0.10)', fg: '#2e7d32', border: 'rgba(46,125,50,0.35)' }
+            : tone === 'na'
+            ? { bg: 'rgba(96,125,139,0.12)', fg: '#546e7a', border: 'rgba(96,125,139,0.4)' }
+            : { bg: 'rgba(158,158,158,0.15)', fg: '#616161', border: 'rgba(158,158,158,0.4)' };
+        return (
+            <Tooltip title={tip} arrow key={label}>
+                <Chip
+                    label={label}
+                    size="small"
+                    sx={{
+                        height: 16,
+                        fontSize: 9.5,
+                        fontWeight: 700,
+                        letterSpacing: 0.4,
+                        bgcolor: styles.bg,
+                        color:   styles.fg,
+                        border:  '1px solid',
+                        borderColor: styles.border,
+                        '& .MuiChip-label': { px: 0.6 },
+                        cursor: 'default',
+                    }}
+                />
+            </Tooltip>
+        );
+    };
     return (
         <Box sx={{ display: 'inline-flex', gap: 0.3, ml: 0.5 }}>
-            {pill('D', s.drafted, 'Drafted — the event is recorded internally.')}
-            {pill('S', s.signed,  s.signed ? 'Signed — resolution is signed and attached.' : 'Not yet signed — upload the signed resolution or send for e-signature.')}
-            {s.needsRegistry && pill('F', s.filed, s.filed ? 'Filed — registry filing attached.' : 'Not yet filed — attach the registry acknowledgment PDF.')}
+            {pill('D', 'ok', 'Drafted — the event is recorded internally.')}
+            {pill('S',
+                s.signed ? 'ok' : 'pending',
+                s.signed ? 'Signed — resolution is signed and attached.' : 'Not yet signed — upload the signed resolution or send for e-signature.',
+            )}
+            {s.needsRegistry && pill('F',
+                s.regNotApplicable ? 'na' : s.filed ? 'ok' : 'pending',
+                s.regNotApplicable
+                    ? 'Registry filing marked not applicable for this event.'
+                    : s.filed
+                        ? 'Filed — registry filing attached.'
+                        : 'Not yet filed — attach the registry acknowledgment PDF, or mark not applicable if none is expected.',
+            )}
         </Box>
     );
 };
@@ -359,6 +386,30 @@ const RecordsVault: React.FC = () => {
         };
         load();
     }, [companyId]);
+
+    /**
+     * Toggle the "no registry filing needed for this event" flag. Used for
+     * events where the user knows a separate filing isn't expected (founding
+     * events, provinces that don't record shareholders, filings rolled into
+     * the incorporation itself). Backend rewrites the compliance gap count
+     * as soon as this is persisted.
+     */
+    const handleToggleRegistryNA = async (eventId: string, next: boolean) => {
+        try {
+            await api.put(`/events/${eventId}`, { registryFilingNotApplicable: next });
+            setEvents((prev) => prev.map((e) => e._id === eventId
+                ? { ...e, registryFilingNotApplicable: next }
+                : e,
+            ));
+            showSnackbar(next
+                ? 'Marked as no registry filing needed.'
+                : 'Cleared — registry filing expected.',
+                'success',
+            );
+        } catch {
+            showSnackbar('Failed to update event.', 'error');
+        }
+    };
 
     const handleConfirmDeleteEvent = async () => {
         if (!deleteEventDialog) return;
@@ -661,7 +712,9 @@ const RecordsVault: React.FC = () => {
         (e) => !e.attachments?.some((a) => a.role === 'resolution'),
     );
     const missingRegistry = changeEvents.filter(
-        (e) => REGISTRY_EVENT_TYPES.has(e.eventType) && !e.attachments?.some((a) => a.role === 'registry_filing'),
+        (e) => REGISTRY_EVENT_TYPES.has(e.eventType)
+            && !e.attachments?.some((a) => a.role === 'registry_filing')
+            && !e.registryFilingNotApplicable,
     );
 
     const expectedFiscalYears = useMemo(() =>
@@ -1178,7 +1231,15 @@ const RecordsVault: React.FC = () => {
                                             </Box>
                                         )}
 
-                                        {/* Registry filing row */}
+                                        {/* Registry filing row.
+                                            Three states:
+                                              1. Filed — chip with download link.
+                                              2. Not applicable — user marked this event as needing
+                                                 no separate filing (founding / no-record province /
+                                                 rolled into another filing). Chip + "Undo" affordance.
+                                              3. Pending — Upload button + "Mark N/A" affordance.
+                                            The N/A path is the fix for the case where the compliance
+                                            chip shows a gap that isn't actually a gap. */}
                                         {needsRegistry && (
                                             <Box display="flex" alignItems="center" gap={1} flexWrap="wrap"
                                                 sx={{ pl: 0.5, borderLeft: '3px solid #2e7d32' }}>
@@ -1193,17 +1254,45 @@ const RecordsVault: React.FC = () => {
                                                         onClick={() => handleDownloadAttachment(ev._id, regAtt.fileId, regAtt.originalName)}
                                                         sx={{ bgcolor: ATTACH_ROLE_COLORS.registry_filing, color: '#fff', cursor: 'pointer', fontSize: 10, maxWidth: 260, '& .MuiChip-icon': { color: '#fff' } }}
                                                     />
+                                                ) : ev.registryFilingNotApplicable ? (
+                                                    <>
+                                                        <Chip
+                                                            label="Not applicable"
+                                                            size="small"
+                                                            sx={{ bgcolor: '#eceff1', color: '#546e7a', fontSize: 10, height: 20, fontWeight: 600 }}
+                                                        />
+                                                        <Button
+                                                            size="small"
+                                                            variant="text"
+                                                            onClick={() => handleToggleRegistryNA(ev._id, false)}
+                                                            sx={{ fontSize: 10, py: 0.2, px: 0.6, color: 'text.secondary', minWidth: 0 }}
+                                                        >
+                                                            Undo
+                                                        </Button>
+                                                    </>
                                                 ) : (
-                                                    <Button
-                                                        size="small"
-                                                        variant="outlined"
-                                                        color="warning"
-                                                        startIcon={<AttachFileIcon sx={{ fontSize: 13 }} />}
-                                                        onClick={() => { setAttachDialog({ eventId: ev._id, role: 'registry_filing', label: 'Registry Filing Confirmation' }); setAttachFile(null); }}
-                                                        sx={{ fontSize: 10, py: 0.2, px: 1 }}
-                                                    >
-                                                        Upload Filing
-                                                    </Button>
+                                                    <>
+                                                        <Button
+                                                            size="small"
+                                                            variant="outlined"
+                                                            color="warning"
+                                                            startIcon={<AttachFileIcon sx={{ fontSize: 13 }} />}
+                                                            onClick={() => { setAttachDialog({ eventId: ev._id, role: 'registry_filing', label: 'Registry Filing Confirmation' }); setAttachFile(null); }}
+                                                            sx={{ fontSize: 10, py: 0.2, px: 1 }}
+                                                        >
+                                                            Upload Filing
+                                                        </Button>
+                                                        <Tooltip title="No separate registry filing is expected for this event (e.g. founding events, or provinces that don't record it).">
+                                                            <Button
+                                                                size="small"
+                                                                variant="text"
+                                                                onClick={() => handleToggleRegistryNA(ev._id, true)}
+                                                                sx={{ fontSize: 10, py: 0.2, px: 0.6, color: 'text.secondary', minWidth: 0 }}
+                                                            >
+                                                                Mark N/A
+                                                            </Button>
+                                                        </Tooltip>
+                                                    </>
                                                 )}
                                             </Box>
                                         )}

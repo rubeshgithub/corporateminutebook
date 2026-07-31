@@ -50,9 +50,14 @@ export const createEventSchema = z.object({
 export type CreateEventInput = z.infer<typeof createEventSchema>;
 
 export const updateEventSchema = z.object({
-    effectiveDate: isoDate.optional(),
-    data:          eventDataObject.optional(),
-    notes:         mediumString.optional(),
+    effectiveDate:               isoDate.optional(),
+    data:                        eventDataObject.optional(),
+    notes:                       mediumString.optional(),
+    // "This event doesn't require a separate registry filing" —
+    // e.g. founding events, or shareholders in provinces where the
+    // registry doesn't track them. Toggled from the UI. When true,
+    // compliance summary + gap detection treat the event as satisfied.
+    registryFilingNotApplicable: z.boolean().optional(),
 });
 
 export type UpdateEventInput = z.infer<typeof updateEventSchema>;
