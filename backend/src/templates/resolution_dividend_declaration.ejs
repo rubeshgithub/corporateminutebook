@@ -29,7 +29,11 @@
     var ev = (typeof event !== 'undefined' && event) ? event : {};
     var d = ev.data || {};
     var effDate = ev.effectiveDate ? new Date(ev.effectiveDate) : new Date();
-    var effDateStr = effDate.toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' });
+    // Stored dates are UTC midnight (date-only) — format in UTC or servers west
+    // of UTC print the previous day; the "now" fallback stays local.
+    var effDateOpts = { month: 'long', day: 'numeric', year: 'numeric' };
+    if (ev.effectiveDate) effDateOpts.timeZone = 'UTC';
+    var effDateStr = effDate.toLocaleDateString('en-CA', effDateOpts);
 
     var activeDirectors = (company.directors || []).filter(function(dir) { return !dir.resignedDate; });
     var dirName = function(dir) {
@@ -39,9 +43,9 @@
     var shareClass = d.shareClass || '(unspecified class)';
     var perShare = (d.perShareAmount != null) ? Number(d.perShareAmount).toFixed(2) : '';
     var totalAmount = (d.totalAmount != null) ? Number(d.totalAmount).toFixed(2) : '';
-    var recordDate = d.recordDate ? new Date(d.recordDate).toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' }) : effDateStr;
-    var paymentDate = d.paymentDate ? new Date(d.paymentDate).toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' }) : '';
-    var fiscalYear = d.fiscalYear || (effDate.getFullYear());
+    var recordDate = d.recordDate ? new Date(d.recordDate).toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : effDateStr;
+    var paymentDate = d.paymentDate ? new Date(d.paymentDate).toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : '';
+    var fiscalYear = d.fiscalYear || (ev.effectiveDate ? effDate.getUTCFullYear() : effDate.getFullYear());
     var dividendType = d.dividendType || 'Eligible';   // Eligible / Non-Eligible / Capital
     var t5Ref = d.t5Reference || '';
 

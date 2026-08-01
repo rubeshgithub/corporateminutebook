@@ -26,7 +26,7 @@
             return sc && sc.parValue != null ? sc.parValue : null;
         };
         var fmtDate = function(d) {
-            return d ? new Date(d).toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' }) : '_________________';
+            return d ? new Date(d).toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) : '_________________';
         };
     %>
     <% (company.shareholders || []).forEach(function(s) { %>

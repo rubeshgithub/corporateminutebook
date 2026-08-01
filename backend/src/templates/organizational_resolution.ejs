@@ -29,7 +29,7 @@
 
     <div class="section">
         <div class="section-title">1. Confirmation of Incorporation</div>
-        <div class="clause">RESOLVED THAT the Articles of Incorporation of the Corporation, dated <%= company.incorporationDate ? new Date(company.incorporationDate).toLocaleDateString() : '__________' %>, are hereby received and acknowledged.</div>
+        <div class="clause">RESOLVED THAT the Articles of Incorporation of the Corporation, dated <%= company.incorporationDate ? new Date(company.incorporationDate).toLocaleDateString(undefined, { timeZone: 'UTC' }) : '__________' %>, are hereby received and acknowledged.</div>
     </div>
 
     <div class="section">
@@ -54,7 +54,7 @@
                     <tr>
                         <td><%= o.name %></td>
                         <td><%= o.title %></td>
-                        <td><%= o.appointedDate ? new Date(o.appointedDate).toLocaleDateString() : '' %></td>
+                        <td><%= o.appointedDate ? new Date(o.appointedDate).toLocaleDateString(undefined, { timeZone: 'UTC' }) : '' %></td>
                     </tr>
                 <% }); %>
                 <% if (!company.officers || company.officers.length === 0) { %>

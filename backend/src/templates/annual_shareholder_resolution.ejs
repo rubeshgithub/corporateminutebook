@@ -20,6 +20,10 @@
     <%
         var res = (typeof resolution !== 'undefined' && resolution) ? resolution : {};
         var resDate = res.resolutionDate ? new Date(res.resolutionDate) : new Date();
+        // Stored dates are UTC midnight (date-only) — format in UTC or servers west
+        // of UTC print the previous day; "now" fallbacks stay local.
+        var resDateOpts = { month: 'long', day: 'numeric', year: 'numeric' };
+        if (res.resolutionDate) resDateOpts.timeZone = 'UTC';
         var fiscalYear = res.fiscalYear || new Date().getFullYear();
 
         // Format fiscal year end: "12-31" → "December 31, 2024"
@@ -100,7 +104,7 @@
     <% }); %>
 
     <div class="signature">
-        <p>DATED this <%= resDate.toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' }) %>.</p>
+        <p>DATED this <%= resDate.toLocaleDateString('en-CA', resDateOpts) %>.</p>
         <% activeShareholders.forEach(function(s) { %>
             <div class="sig-line"><%= s.name %>, Shareholder</div>
         <% }); %>

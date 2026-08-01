@@ -39,8 +39,8 @@
                     <tr>
                         <td><%= d.name %></td>
                         <td><%= [d.address, d.city, d.province, d.postalCode, d.country].filter(Boolean).join(', ') %></td>
-                        <td><%= d.appointedDate ? new Date(d.appointedDate).toLocaleDateString() : '' %></td>
-                        <td><%= d.resignedDate ? new Date(d.resignedDate).toLocaleDateString() : '—' %></td>
+                        <td><%= d.appointedDate ? new Date(d.appointedDate).toLocaleDateString(undefined, { timeZone: 'UTC' }) : '' %></td>
+                        <td><%= d.resignedDate ? new Date(d.resignedDate).toLocaleDateString(undefined, { timeZone: 'UTC' }) : '—' %></td>
                     </tr>
                 <% }); %>
             </tbody>
@@ -66,8 +66,8 @@
                     <tr>
                         <td><%= o.name %></td>
                         <td><%= o.title %></td>
-                        <td><%= o.appointedDate ? new Date(o.appointedDate).toLocaleDateString() : '' %></td>
-                        <td><%= o.resignedDate ? new Date(o.resignedDate).toLocaleDateString() : '—' %></td>
+                        <td><%= o.appointedDate ? new Date(o.appointedDate).toLocaleDateString(undefined, { timeZone: 'UTC' }) : '' %></td>
+                        <td><%= o.resignedDate ? new Date(o.resignedDate).toLocaleDateString(undefined, { timeZone: 'UTC' }) : '—' %></td>
                     </tr>
                 <% }); %>
             </tbody>
@@ -95,8 +95,8 @@
                         <td><%= s.name %></td>
                         <td><%= s.sharesClass %></td>
                         <td><%= s.numberOfShares %></td>
-                        <td><%= idx + 1 %></td>
-                        <td><%= company.incorporationDate ? new Date(company.incorporationDate).toLocaleDateString() : '' %></td>
+                        <td><%= s.certificateNumber ? 'A' + s.certificateNumber : 'A' + (idx + 1) %></td>
+                        <td><%= company.incorporationDate ? new Date(company.incorporationDate).toLocaleDateString(undefined, { timeZone: 'UTC' }) : '' %></td>
                     </tr>
                 <% }); %>
             </tbody>

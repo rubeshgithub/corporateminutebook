@@ -33,7 +33,9 @@
             var sc = classByName[className];
             return sc && sc.parValue != null ? sc.parValue : 1;
         };
-        var fmtDate = function(d) { return d ? new Date(d).toLocaleDateString() : ''; };
+        // Stored dates are UTC midnight (date-only) — format in UTC or servers
+        // west of UTC print the previous day.
+        var fmtDate = function(d) { return d ? new Date(d).toLocaleDateString(undefined, { timeZone: 'UTC' }) : ''; };
         var fmtMoney = function(n) { return n != null ? '$' + Number(n).toFixed(2) : '—'; };
     %>
 
