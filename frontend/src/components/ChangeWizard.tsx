@@ -11,7 +11,6 @@ import BadgeOutlinedIcon from '@mui/icons-material/BadgeOutlined';
 import DriveFileRenameOutlineIcon from '@mui/icons-material/DriveFileRenameOutline';
 import CategoryIcon from '@mui/icons-material/Category';
 import EventBusyIcon from '@mui/icons-material/EventBusy';
-import GavelIcon from '@mui/icons-material/Gavel';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
 import LockIcon from '@mui/icons-material/Lock';
 import DescriptionIcon from '@mui/icons-material/Description';

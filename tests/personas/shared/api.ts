@@ -27,9 +27,20 @@ export async function recordEvent(api: APIRequestContext, args: {
     return res.json();
 }
 
+/**
+ * PDF endpoints render a full minute book through Puppeteer — measured at
+ * 3–10s warm, longer on the first call of a run while Chrome cold-starts.
+ * The global 12s actionTimeout is a good tight bound for UI interactions
+ * but sits right on top of that range, so these calls flapped at random.
+ * Give the document routes their own realistic ceiling instead of loosening
+ * the timeout every other assertion relies on.
+ */
+const PDF_TIMEOUT_MS = 60_000;
+
 export async function compileMinuteBook(api: APIRequestContext, companyId: string): Promise<Buffer> {
     const res = await api.post('/api/documents/compile', {
         data: { companyId, force: true },   // force skips the compliance gate
+        timeout: PDF_TIMEOUT_MS,
     });
     if (!res.ok()) throw new Error(`compileMinuteBook failed: ${res.status()} — ${await res.text()}`);
     return Buffer.from(await res.body());
@@ -41,6 +52,7 @@ export async function downloadBundle(api: APIRequestContext, args: {
 }): Promise<Buffer> {
     const res = await api.post(`/api/documents/bundle/${args.bundleType}`, {
         data: { companyId: args.companyId },
+        timeout: PDF_TIMEOUT_MS,
     });
     if (!res.ok()) throw new Error(`downloadBundle(${args.bundleType}) failed: ${res.status()} — ${await res.text()}`);
     return Buffer.from(await res.body());

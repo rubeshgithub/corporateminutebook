@@ -53,8 +53,14 @@ export async function validatePdf(buffer: Buffer, check: PdfCheck): Promise<PdfC
     const text = data.text;
     const normText = normalizeForMatch(text);
 
+    // Forbidden markers are error tokens with exact casing ("NaN",
+    // "undefined", "[object Object]") — matching them lowercased turns
+    // "fiNANcial" and "uNANimous" in the bylaws into false positives.
+    // Only collapse whitespace; keep case.
+    const rawCollapsed = text.replace(/\s+/g, ' ');
+
     const missingSections = check.expectedSections.filter((s) => !normText.includes(normalizeForMatch(s)));
-    const foundForbidden  = (check.forbiddenContent ?? []).filter((s) => normText.includes(normalizeForMatch(s)));
+    const foundForbidden  = (check.forbiddenContent ?? []).filter((s) => rawCollapsed.includes(s));
     const tooFewPages     = check.minPages !== undefined && data.numpages < check.minPages;
 
     return {

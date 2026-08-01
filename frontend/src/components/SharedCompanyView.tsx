@@ -8,7 +8,6 @@ import BusinessIcon from '@mui/icons-material/Business';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
 import LandingHeader from './LandingHeader';
 import LandingFooter from './LandingFooter';
-import api from '../utils/api';
 
 /**
  * Public read-only view served at /share/:token. No sign-in required —

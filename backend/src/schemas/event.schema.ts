@@ -67,8 +67,14 @@ export function isShareChangeEventType(type: string): type is ShareChangeEventTy
  * every share change must have and pass everything else through untouched.
  */
 export const shareChangeDataSchema = z.looseObject({
-    numberOfShares: z.number().int().positive(),
-    sharesClass:    shortString.min(1),
+    // Messages are written for the person filling in the form, and match the
+    // client-side wording in RecordEventDialog so the same mistake reads the
+    // same whether it is caught before or after the round-trip.
+    numberOfShares: z
+        .number({ error: 'Number of shares must be a whole number of at least 1.' })
+        .int('Number of shares must be a whole number of at least 1.')
+        .positive('Number of shares must be a whole number of at least 1.'),
+    sharesClass: shortString.min(1, 'Share class is required.'),
 });
 
 /** Flatten a share-data ZodError into one line suitable for an API message. */

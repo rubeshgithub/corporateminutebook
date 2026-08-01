@@ -31,6 +31,13 @@ const RESOLUTION_EVENT_TYPES = new Set<EventType>([
     'signing_authority_granted', 'signing_authority_revoked', 'dividend_declared',
 ]);
 
+// Share-change events write into company.shareholders and print on share
+// certificates — the backend rejects fractional/zero counts and unknown
+// share classes, so catch both here before the round-trip.
+const SHARE_CHANGE_EVENT_TYPES = new Set<EventType>([
+    'shares_issued', 'shares_transferred', 'shares_cancelled',
+]);
+
 // Signing-authority + dividend events are internal governance actions —
 // no filing with the corporate registry is expected, so the "attach
 // registry filing" prompt stays off for them.
@@ -123,6 +130,16 @@ const RecordEventDialog: React.FC<Props> = ({ open, onClose, companyId, company,
 
     const handleSubmit = async () => {
         if (!effectiveDate) { setError('Effective date is required.'); return; }
+        if (SHARE_CHANGE_EVENT_TYPES.has(eventType)) {
+            if (!formData.sharesClass) {
+                setError('Select a share class. If none are listed, record a "Share Class Added" event first.');
+                return;
+            }
+            if (!Number.isInteger(formData.numberOfShares) || formData.numberOfShares < 1) {
+                setError('Number of shares must be a whole number of at least 1.');
+                return;
+            }
+        }
         setSaving(true);
         setError('');
         try {
@@ -244,7 +261,7 @@ const RecordEventDialog: React.FC<Props> = ({ open, onClose, companyId, company,
                             {shareClassOptions.map((n: string) => <MenuItem key={n} value={n}>{n}</MenuItem>)}
                         </Select>
                     </FormControl>
-                    <TextField label="Number of Shares" type="number" fullWidth size="small" sx={{ mb: 2 }} value={formData.numberOfShares || ''} onChange={(e) => set('numberOfShares', Number(e.target.value))} />
+                    <TextField label="Number of Shares" type="number" inputProps={{ min: 1, step: 1 }} fullWidth size="small" sx={{ mb: 2 }} value={formData.numberOfShares || ''} onChange={(e) => set('numberOfShares', Number(e.target.value))} />
                     <TextField label="Consideration Paid ($)" type="number" fullWidth size="small" sx={{ mb: 2 }} value={formData.considerationPaid || ''} onChange={(e) => set('considerationPaid', Number(e.target.value))} />
                     <TextField label="Address" fullWidth size="small" sx={{ mb: 2 }} value={formData.address || ''} onChange={(e) => set('address', e.target.value)} />
                     <TextField label="Voting %" type="number" fullWidth size="small" sx={{ mb: 2 }} value={formData.votingPercent || ''} onChange={(e) => set('votingPercent', Number(e.target.value))} />
@@ -267,7 +284,7 @@ const RecordEventDialog: React.FC<Props> = ({ open, onClose, companyId, company,
                             {shareClassOptions.map((n: string) => <MenuItem key={n} value={n}>{n}</MenuItem>)}
                         </Select>
                     </FormControl>
-                    <TextField label="Number of Shares" type="number" fullWidth size="small" sx={{ mb: 2 }} value={formData.numberOfShares || ''} onChange={(e) => set('numberOfShares', Number(e.target.value))} />
+                    <TextField label="Number of Shares" type="number" inputProps={{ min: 1, step: 1 }} fullWidth size="small" sx={{ mb: 2 }} value={formData.numberOfShares || ''} onChange={(e) => set('numberOfShares', Number(e.target.value))} />
                     <TextField label="Consideration ($)" type="number" fullWidth size="small" sx={{ mb: 2 }} value={formData.consideration || ''} onChange={(e) => set('consideration', Number(e.target.value))} />
                     <TextField label="Certificate No. Surrendered" type="number" fullWidth size="small" sx={{ mb: 2 }} placeholder="Optional" value={formData.certificateNumberSurrendered || ''} onChange={(e) => set('certificateNumberSurrendered', Number(e.target.value))} />
                     <TextField label="Certificate No. Issued" type="number" fullWidth size="small" sx={{ mb: 2 }} placeholder="Optional — leave blank to auto-assign" value={formData.certificateNumberIssued || ''} onChange={(e) => set('certificateNumberIssued', Number(e.target.value))} />
@@ -287,7 +304,7 @@ const RecordEventDialog: React.FC<Props> = ({ open, onClose, companyId, company,
                             {shareClassOptions.map((n: string) => <MenuItem key={n} value={n}>{n}</MenuItem>)}
                         </Select>
                     </FormControl>
-                    <TextField label="Number of Shares to Cancel" type="number" fullWidth size="small" sx={{ mb: 2 }} value={formData.numberOfShares || ''} onChange={(e) => set('numberOfShares', Number(e.target.value))} />
+                    <TextField label="Number of Shares to Cancel" type="number" inputProps={{ min: 1, step: 1 }} fullWidth size="small" sx={{ mb: 2 }} value={formData.numberOfShares || ''} onChange={(e) => set('numberOfShares', Number(e.target.value))} />
                     <TextField label="Certificate Number" type="number" fullWidth size="small" sx={{ mb: 2 }} placeholder="Optional" value={formData.certificateNumber || ''} onChange={(e) => set('certificateNumber', Number(e.target.value))} />
                 </>;
 

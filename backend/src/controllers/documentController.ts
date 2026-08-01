@@ -261,6 +261,7 @@ type BundleType = 'bank' | 'dd' | 'cra';
 const CRA_EVENT_TYPES = new Set([
     'annual_return_filed',
     'shares_issued', 'shares_transferred', 'shares_cancelled', 'share_class_added',
+    'dividend_declared',
     'director_appointed', 'director_resigned', 'name_changed', 'fiscal_year_end_changed',
 ]);
 
