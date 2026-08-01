@@ -50,16 +50,10 @@
             position: relative;
             text-align: center;
         }
-        .cover-mid .label {
-            font-size: 14pt;
-            letter-spacing: 8px;
-            opacity: 0.85;
-        }
         .cover-mid .corp {
             font-size: 36pt;
             font-weight: 700;
             letter-spacing: 1px;
-            margin-top: 14px;
             line-height: 1.15;
         }
         .cover-mid .rule {
@@ -214,10 +208,9 @@
             <span><%= today %></span>
         </div>
         <div class="cover-mid">
-            <div class="label">Corporate</div>
             <div class="corp"><%= company.name %></div>
             <div class="rule"></div>
-            <div class="subtitle">Minute Book</div>
+            <div class="subtitle">Corporate Minute Book</div>
         </div>
         <div class="cover-bottom">
             <div class="left">
@@ -365,7 +358,7 @@
                     <% company.directors.forEach(function(d) { %>
                         <tr>
                             <td><%= d.name || ((d.firstName || '') + ' ' + (d.middleName || '') + ' ' + (d.lastName || '')).replace(/\s+/g,' ').trim() %></td>
-                            <td><%= d.address %></td>
+                            <td><%= [d.address, d.city, d.province, d.postalCode, d.country].filter(Boolean).join(', ') %></td>
                             <td><%= d.residentCanadian === false ? 'No' : 'Yes' %></td>
                             <td><%= d.appointedDate ? new Date(d.appointedDate).toLocaleDateString() : '' %></td>
                         </tr>
@@ -529,7 +522,7 @@
             <h1>CONSENT TO ACT AS DIRECTOR</h1>
             <h2><%= company.name %></h2>
             <p class="preamble">(the "Corporation")</p>
-            <p style="margin-top: 28px; text-align: justify;">I, <strong><%= director.name %></strong>, of <%= director.address %>, hereby consent to act as a director of the Corporation, effective <%= director.appointedDate ? new Date(director.appointedDate).toLocaleDateString() : '_________________' %>.</p>
+            <p style="margin-top: 28px; text-align: justify;">I, <strong><%= director.name %></strong>, of <%= [director.address, director.city, director.province, director.postalCode, director.country].filter(Boolean).join(', ') %>, hereby consent to act as a director of the Corporation, effective <%= director.appointedDate ? new Date(director.appointedDate).toLocaleDateString() : '_________________' %>.</p>
             <p style="text-align: justify;">I acknowledge that I am not disqualified under the applicable corporate legislation from acting as a director of the Corporation, and I undertake to notify the Corporation forthwith if I become so disqualified.</p>
             <div class="signature">
                 <p>Date: <%= today %></p>
@@ -889,7 +882,7 @@
                     <% if (s.corporateAccessNumber) { %><div style="font-size: 10pt; color: #555;">Corporate Access Number: <%= s.corporateAccessNumber %></div><% } %>
                     <% if (s.businessNumber) { %><div style="font-size: 10pt; color: #555;">Business Number: <%= s.businessNumber %></div><% } %>
                 <% } %>
-                <% if (s.address) { %><div style="font-size: 10pt; color: #555;"><%= s.address %></div><% } %>
+                <% var sFullAddr = [s.address, s.city, s.province, s.postalCode, s.country].filter(Boolean).join(', '); %><% if (sFullAddr) { %><div style="font-size: 10pt; color: #555;"><%= sFullAddr %></div><% } %>
             </div>
         </div>
     <% }); %>
@@ -914,7 +907,7 @@
                     <% if (s.holderType === 'Legal Entity' && s.corporateAccessNumber) { %> &mdash; CAN <%= s.corporateAccessNumber %><% } %>
                     <% if (s.holderType === 'Legal Entity' && s.businessNumber) { %> &mdash; BN <%= s.businessNumber %><% } %>
                 </div>
-                <% if (s.address) { %><div style="font-size: 10pt; color: #555;"><%= s.address %></div><% } %>
+                <% var sFullAddr = [s.address, s.city, s.province, s.postalCode, s.country].filter(Boolean).join(', '); %><% if (sFullAddr) { %><div style="font-size: 10pt; color: #555;"><%= sFullAddr %></div><% } %>
                 <div style="font-size: 10pt; color: #555;">Class of Shares: <strong><%= s.sharesClass %></strong></div>
             </div>
             <table style="margin-top: 12px;">
@@ -966,7 +959,7 @@
                         <td>—</td>
                         <td>From Treasury</td>
                         <td><%= s.name %></td>
-                        <td><%= s.address || '' %></td>
+                        <td><%= [s.address, s.city, s.province, s.postalCode, s.country].filter(Boolean).join(', ') %></td>
                         <td>A<%= idx + 1 %> / <%= s.numberOfShares %></td>
                     </tr>
                 <% }); %>

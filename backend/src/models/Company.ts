@@ -69,6 +69,7 @@ export interface ICompany extends Document {
         city?: string;
         province?: string;
         postalCode?: string;
+        country?: string;         // directors may reside outside Canada
         residentCanadian?: boolean;
         appointedDate: Date;
         resignedDate?: Date;
@@ -86,6 +87,7 @@ export interface ICompany extends Document {
         city?: string;
         province?: string;
         postalCode?: string;
+        country?: string;         // holders may reside outside Canada
         votingPercent?: number;
         certificateNumber?: number;
         considerationPaid?: number;
@@ -220,6 +222,7 @@ const companySchema: Schema = new Schema(
                 city: String,
                 province: String,
                 postalCode: String,
+                country: String,
                 residentCanadian: { type: Boolean, default: true },
                 appointedDate: Date,
                 resignedDate: Date,
@@ -239,6 +242,7 @@ const companySchema: Schema = new Schema(
                 city: String,
                 province: String,
                 postalCode: String,
+                country: String,
                 votingPercent: Number,
                 certificateNumber: Number,
                 considerationPaid: Number,

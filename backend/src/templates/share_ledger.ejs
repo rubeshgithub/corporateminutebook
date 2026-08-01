@@ -123,7 +123,8 @@
                     <% if (s.holderType === 'Legal Entity' && s.corporateAccessNumber) { %> &mdash; CAN <%= s.corporateAccessNumber %><% } %>
                     <% if (s.holderType === 'Legal Entity' && s.businessNumber) { %> &mdash; BN <%= s.businessNumber %><% } %>
                 </div>
-                <% if (s.address) { %><div class="holder-meta"><%= s.address %></div><% } %>
+                <% var sFullAddr = [s.address, s.city, s.province, s.postalCode, s.country].filter(Boolean).join(', '); %>
+                <% if (sFullAddr) { %><div class="holder-meta"><%= sFullAddr %></div><% } %>
                 <div class="holder-meta">Class of Shares: <strong><%= s.sharesClass %></strong></div>
             </div>
 

@@ -27,7 +27,7 @@
             <p class="preamble">(the "Corporation")</p>
 
             <div class="body">
-                <p>I, <strong><%= director.name %></strong>, of <%= [director.address, director.city, director.province, director.postalCode].filter(Boolean).join(', ') %>, hereby consent to act as a director of the Corporation, effective <%= director.appointedDate ? new Date(director.appointedDate).toLocaleDateString() : '_________________' %>.</p>
+                <p>I, <strong><%= director.name %></strong>, of <%= [director.address, director.city, director.province, director.postalCode, director.country].filter(Boolean).join(', ') %>, hereby consent to act as a director of the Corporation, effective <%= director.appointedDate ? new Date(director.appointedDate).toLocaleDateString() : '_________________' %>.</p>
 
                 <p>I acknowledge that I am not disqualified under the applicable corporate legislation from acting as a director of the Corporation, and I undertake to notify the Corporation forthwith if I become so disqualified.</p>
             </div>

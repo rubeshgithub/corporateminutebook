@@ -262,6 +262,16 @@ const DocumentManagement = () => {
         }
     };
 
+    // <Company_Name_Inc>-MinuteBook-<YYYYMMDD>-<HHMMSS>.pdf
+    const minuteBookFilename = () => {
+        const company = companies.find((c) => c._id === selectedCompanyId);
+        const base = String(company?.name || 'Company').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+        const now = new Date();
+        const pad = (n: number) => String(n).padStart(2, '0');
+        const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+        return `${base}-MinuteBook-${stamp}.pdf`;
+    };
+
     const handleCompileMinuteBook = async (force = false) => {
         if (!selectedCompanyId) return;
         setBusy({ type: 'minute_book', mode: 'download' });
@@ -275,7 +285,7 @@ const DocumentManagement = () => {
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', `minute_book.pdf`);
+            link.setAttribute('download', minuteBookFilename());
             document.body.appendChild(link);
             link.click();
             link.remove();
@@ -308,7 +318,7 @@ const DocumentManagement = () => {
                 url,
                 title: 'Compiled Minute Book',
                 type: 'minute_book',
-                filename: 'minute_book.pdf',
+                filename: minuteBookFilename(),
             });
             await refreshHistory();
         } catch (error: any) {

@@ -6,99 +6,403 @@
     <title>Share Certificate - <%= company.name %></title>
     <style>
         html, body { margin: 0; padding: 0; }
-        body { font-family: 'Helvetica', 'Arial', sans-serif; }
+        * { box-sizing: border-box; }
+        body { font-family: Georgia, 'Times New Roman', serif; color: #1c1c1c; }
 
         .certificate {
-            box-sizing: border-box;
             width: 9in;
             height: 6.5in;
             page-break-after: always;
             page-break-inside: avoid;
             position: relative;
-            display: flex;
-            flex-direction: column;
+            background: #fdfefc;
         }
         .certificate:last-child { page-break-after: auto; }
 
-        .frame {
-            box-sizing: border-box;
-            flex: 1;
-            border: 8px double #1a237e;
-            padding: 28px 60px;
-            position: relative;
+        /* Traditional engraved-certificate colorways, assigned by share class type */
+        .theme-green  { --ink: #1f5c38; --tint: #f2f7f2; --wm: rgba(31, 92, 56, 0.09); }
+        .theme-blue   { --ink: #27418c; --tint: #f1f4fa; --wm: rgba(39, 65, 140, 0.09); }
+        .theme-maroon { --ink: #8a2f2b; --tint: #faf2f0; --wm: rgba(138, 47, 43, 0.09); }
+
+        .frame-art { position: absolute; inset: 0; width: 100%; height: 100%; color: var(--ink); }
+
+        .inner {
+            position: absolute;
+            inset: 50px 58px;
             display: flex;
             flex-direction: column;
+            text-align: center;
+            z-index: 1;
         }
 
-        .cert-no { text-align: right; font-size: 11px; color: #555; }
-        .header { text-align: center; margin-top: 4px; }
-        .corp-name { font-size: 28px; font-weight: bold; letter-spacing: 3px; color: #1a237e; }
-        .cert-title { font-size: 18px; margin-top: 4px; letter-spacing: 6px; }
-        .jurisdiction { font-size: 11px; margin-top: 4px; color: #555; }
+        .toprow {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .numbox {
+            border: 1.2px solid var(--ink);
+            padding: 3px 12px;
+            min-width: 90px;
+            font-size: 11px;
+            letter-spacing: 1px;
+            color: var(--ink);
+            background: #fff;
+        }
+        .numbox .fill { font-size: 14px; font-weight: bold; color: #111; }
+        .act-top { font-size: 9.5px; letter-spacing: 2.5px; color: var(--ink); }
 
-        .body { margin-top: 16px; font-size: 14px; line-height: 1.5; text-align: center; flex: 1; }
-        .holder { font-size: 22px; font-weight: bold; margin: 10px 0; text-decoration: underline; }
-        .shares-amount { font-size: 30px; font-weight: bold; color: #1a237e; display: block; margin-top: 10px; }
-        .shares-class { font-size: 15px; margin-top: 2px; }
-        .legalese { margin-top: 14px; font-size: 12px; color: #333; max-width: 75%; margin-left: auto; margin-right: auto; }
+        .plate {
+            margin: 12px auto 0;
+            width: 72%;
+            border: 2px solid var(--ink);
+            outline: 1px solid var(--ink);
+            outline-offset: 3px;
+            background: #fff;
+            padding: 10px 18px 8px;
+        }
+        .plate-name { font-weight: bold; letter-spacing: 3px; color: var(--ink); }
+        .corp-sub { font-size: 10.5px; margin-top: 7px; }
+        .act-sub { font-size: 10.5px; font-style: italic; margin-top: 2px; color: #333; }
 
-        .footer {
+        .certify { margin-top: 14px; font-size: 13px; text-align: left; line-height: 2.05; }
+        .bl {
+            font-family: 'Old English Text MT', Georgia, serif;
+            font-size: 21px;
+            color: var(--ink);
+        }
+        .lead {
+            display: inline-block;
+            border-bottom: 1px dotted #444;
+            text-align: center;
+            font-weight: bold;
+            position: relative;
+            padding: 0 10px;
+        }
+        .lead .sub {
+            position: absolute;
+            left: 0; right: 0; top: 100%;
+            font-weight: normal;
+            font-size: 7.5px;
+            letter-spacing: 1.5px;
+            color: #666;
+            line-height: 1;
+            margin-top: 1px;
+        }
+        .holder-line { display: flex; align-items: baseline; }
+        .holder-line .lead { flex: 1; font-size: 16px; }
+
+        /* Compact mode: long names / large spelled-out counts shrink type instead of overflowing the frame */
+        .compact .certify { font-size: 11.5px; line-height: 1.9; margin-top: 10px; }
+        .compact .bl { font-size: 19px; }
+        .compact .holder-line .lead { font-size: 13px; }
+        .compact .legend { font-size: 8px; margin-top: 8px; }
+        .compact .plate { padding: 7px 14px 5px; }
+        .compact .corp-sub { margin-top: 5px; }
+        .compact .sig .line { margin-top: 20px; }
+        .compact .seal-wrap svg { width: 82px; height: 82px; }
+
+        .legend {
+            margin-top: 10px;
+            font-size: 8.6px;
+            line-height: 1.45;
+            text-align: justify;
+            color: #2a2a2a;
+        }
+        .legend .n { font-weight: bold; }
+
+        .witness { margin-top: auto; font-size: 10.5px; text-align: left; }
+        .witness .sc { font-variant: small-caps; letter-spacing: 1px; font-weight: bold; }
+        .sigrow {
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
-            margin-top: 16px;
+            margin-top: 4px;
         }
-        .sig-block { width: 35%; text-align: center; }
-        .sig-line { border-top: 1px solid #000; padding-top: 4px; margin-top: 30px; font-size: 12px; }
+        .seal-wrap { width: 108px; }
+        .sig { width: 30%; text-align: center; font-size: 10.5px; }
+        .sig .line { border-top: 1px solid #000; padding-top: 3px; margin-top: 26px; letter-spacing: 0.5px; }
+
+        .parvalue {
+            position: absolute;
+            bottom: 7px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #fff;
+            border: 1.5px solid var(--ink);
+            color: var(--ink);
+            font-size: 11px;
+            font-weight: bold;
+            letter-spacing: 4px;
+            padding: 3px 22px;
+            white-space: nowrap;
+            z-index: 3;
+        }
+
+        .watermark {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 0;
+        }
+        .watermark span { font-weight: bold; color: var(--wm); white-space: nowrap; }
     </style>
 </head>
 
 <body>
+    <%
+        // ---- helpers ----------------------------------------------------
+        var ONES = ['', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE', 'TEN',
+            'ELEVEN', 'TWELVE', 'THIRTEEN', 'FOURTEEN', 'FIFTEEN', 'SIXTEEN', 'SEVENTEEN', 'EIGHTEEN', 'NINETEEN'];
+        var TENS = ['', '', 'TWENTY', 'THIRTY', 'FORTY', 'FIFTY', 'SIXTY', 'SEVENTY', 'EIGHTY', 'NINETY'];
+        function threeDigits(n) {
+            var parts = [];
+            if (n >= 100) { parts.push(ONES[Math.floor(n / 100)] + ' HUNDRED'); n = n % 100; }
+            if (n >= 20) {
+                parts.push(TENS[Math.floor(n / 10)] + (n % 10 ? '-' + ONES[n % 10] : ''));
+            } else if (n > 0) {
+                parts.push(ONES[n]);
+            }
+            return parts.join(' ');
+        }
+        function numberToWords(n) {
+            if (!isFinite(n) || n < 0) return '';
+            n = Math.floor(n);
+            if (n === 0) return 'ZERO';
+            var scales = [[1e9, 'BILLION'], [1e6, 'MILLION'], [1e3, 'THOUSAND'], [1, '']];
+            var parts = [];
+            for (var s = 0; s < scales.length; s++) {
+                var chunk = Math.floor(n / scales[s][0]);
+                if (chunk > 0) {
+                    parts.push(threeDigits(chunk) + (scales[s][1] ? ' ' + scales[s][1] : ''));
+                    n = n % scales[s][0];
+                }
+            }
+            return parts.join(' ');
+        }
+        function ordinal(d) {
+            var rem10 = d % 10, rem100 = d % 100;
+            if (rem10 === 1 && rem100 !== 11) return d + 'st';
+            if (rem10 === 2 && rem100 !== 12) return d + 'nd';
+            if (rem10 === 3 && rem100 !== 13) return d + 'rd';
+            return d + 'th';
+        }
+
+        // Dates are stored as UTC midnight (date-only input) — always read them
+        // back with UTC getters or servers west of UTC print the previous day.
+        var incorpYear = company.incorporationDate ? new Date(company.incorporationDate).getUTCFullYear() : null;
+        var countryLine = 'INCORPORATED UNDER THE LAWS OF '
+            + String((company.registeredOfficeAddress && company.registeredOfficeAddress.country) || 'Canada').toUpperCase();
+    %>
     <% company.shareholders.forEach(function(shareholder, idx) { %>
         <%
             var certNo = shareholder.certificateNumber || (idx + 1);
-            var issueDate = (shareholder.issuanceDate || company.incorporationDate)
-                ? new Date(shareholder.issuanceDate || company.incorporationDate).toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })
-                : null;
+
+            // Match this holding to a defined share class (exact name first, then containment either way)
+            var clsName = String(shareholder.sharesClass || '');
+            var classes = company.shareClasses || [];
+            var cls = classes.find(function(c) { return c.name === clsName; });
+            if (!cls && clsName) {
+                var lower = clsName.toLowerCase();
+                cls = classes.find(function(c) {
+                    var cn = String(c.name || '').toLowerCase();
+                    return cn.indexOf(lower) !== -1 || lower.indexOf(cn) !== -1;
+                });
+            }
+
+            // Colorway: Common = green, Preferred = blue, anything else = maroon
+            var type = cls ? cls.type : (/common/i.test(clsName) ? 'Common' : (/pref/i.test(clsName) ? 'Preferred' : null));
+            var theme = type === 'Common' ? 'theme-green' : (type === 'Preferred' ? 'theme-blue' : 'theme-maroon');
+
+            // Watermark word: class type, or the distinguishing word of the class name
+            var wmText;
+            if (type === 'Common' || type === 'Preferred') {
+                wmText = type.toUpperCase();
+            } else {
+                var tokens = clsName.replace(/shares?/ig, '').trim().split(/\s+/).filter(Boolean);
+                var last = tokens.length ? tokens[tokens.length - 1] : '';
+                wmText = (last.length > 2 ? last : tokens.join(' ')).toUpperCase() || 'SHARES';
+            }
+            if (wmText.length > 14) wmText = wmText.slice(0, 14);
+            var wmSize = wmText.length <= 6 ? 92 : (wmText.length <= 9 ? 66 : (wmText.length <= 12 ? 54 : 44));
+            var wmSpace = wmText.length <= 6 ? 26 : (wmText.length <= 9 ? 15 : (wmText.length <= 12 ? 10 : 6));
+
+            // Par value: banner + wording follow the matched class definition.
+            // A sub-cent par like $0.001 must never round to "$0.00", and par 0
+            // means no par. If the class can't be matched at all, par status is
+            // unknown — stay neutral rather than asserting "NO PAR VALUE".
+            function formatPar(v) {
+                var n = Number(v);
+                var s = String(parseFloat(n.toPrecision(12)));
+                var dec = s.indexOf('.') === -1 ? 0 : s.split('.')[1].length;
+                return dec < 2 ? n.toFixed(2) : s;
+            }
+            var parKnown = !!cls;
+            var parValue = (cls && cls.parValue != null && Number(cls.parValue) > 0) ? Number(cls.parValue) : null;
+            var parBanner = !parKnown ? null
+                : (parValue != null ? 'PAR VALUE $' + formatPar(parValue) : 'NO PAR VALUE');
+            var parWording = !parKnown ? ''
+                : (parValue != null
+                    ? ' of the par value of $' + formatPar(parValue) + ' each'
+                    : ' without nominal or par value');
+
+            var shareCount = Number(shareholder.numberOfShares);
+            var countFigure = isFinite(shareCount) ? shareCount.toLocaleString('en-CA') : '';
+            // Spell out whole numbers only — a floored spelling would contradict a fractional figure
+            var countWords = isFinite(shareCount)
+                ? (Number.isInteger(shareCount)
+                    ? numberToWords(shareCount) + ' (' + countFigure + ')'
+                    : countFigure)
+                : '';
+
+            var issueDate = shareholder.issuanceDate || company.incorporationDate;
+            var dayText = '____', monthText = '____________', yearText = incorpYear ? String(incorpYear) : '20____';
+            if (issueDate) {
+                var d = new Date(issueDate);
+                dayText = ordinal(d.getUTCDate());
+                monthText = d.toLocaleDateString('en-CA', { month: 'long', timeZone: 'UTC' });
+                yearText = String(d.getUTCFullYear());
+            }
+
+            var nameLen = String(company.name || '').length;
+            var plateSize = nameLen <= 28 ? 26 : (nameLen <= 40 ? 22 : (nameLen <= 60 ? 18 : 15));
+
+            var compact = String(shareholder.name || '').length > 45
+                || countWords.length > 45
+                || nameLen > 60;
         %>
-        <div class="certificate">
-            <div class="frame">
-                <div class="cert-no">Certificate No. <%= certNo %></div>
-                <div class="header">
-                    <div class="corp-name"><%= company.name.toUpperCase() %></div>
-                    <div class="cert-title">SHARE CERTIFICATE</div>
-                    <div class="jurisdiction">
-                        Incorporated under the laws of <%= company.registeredOfficeAddress.country || 'Canada' %>
+        <div class="certificate <%= theme %><%= compact ? ' compact' : '' %>">
+            <svg class="frame-art" viewBox="0 0 864 624" preserveAspectRatio="none">
+                <defs>
+                    <pattern id="laceH-<%= idx %>" width="14" height="22" patternUnits="userSpaceOnUse">
+                        <circle cx="7" cy="5" r="5.2" fill="none" stroke="currentColor" stroke-width="1.3"/>
+                        <circle cx="0" cy="15" r="5.2" fill="none" stroke="currentColor" stroke-width="1.3"/>
+                        <circle cx="14" cy="15" r="5.2" fill="none" stroke="currentColor" stroke-width="1.3"/>
+                    </pattern>
+                    <pattern id="laceV-<%= idx %>" width="14" height="22" patternUnits="userSpaceOnUse" patternTransform="rotate(90)">
+                        <circle cx="7" cy="5" r="5.2" fill="none" stroke="currentColor" stroke-width="1.3"/>
+                        <circle cx="0" cy="15" r="5.2" fill="none" stroke="currentColor" stroke-width="1.3"/>
+                        <circle cx="14" cy="15" r="5.2" fill="none" stroke="currentColor" stroke-width="1.3"/>
+                    </pattern>
+                </defs>
+                <rect x="4" y="4" width="856" height="616" fill="none" stroke="currentColor" stroke-width="1"/>
+                <rect x="34" y="9" width="796" height="23" fill="url(#laceH-<%= idx %>)"/>
+                <rect x="34" y="592" width="796" height="23" fill="url(#laceH-<%= idx %>)"/>
+                <rect x="9" y="34" width="23" height="556" fill="url(#laceV-<%= idx %>)"/>
+                <rect x="832" y="34" width="23" height="556" fill="url(#laceV-<%= idx %>)"/>
+                <g transform="translate(21 21)">
+                    <rect x="-13" y="-13" width="27" height="27" fill="#fff" stroke="currentColor" stroke-width="1.1"/>
+                    <circle r="9" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                    <circle r="5" fill="none" stroke="currentColor" stroke-width="1"/>
+                    <circle r="1.9" fill="currentColor"/>
+                </g>
+                <g transform="translate(843 21)">
+                    <rect x="-14" y="-13" width="27" height="27" fill="#fff" stroke="currentColor" stroke-width="1.1"/>
+                    <circle r="9" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                    <circle r="5" fill="none" stroke="currentColor" stroke-width="1"/>
+                    <circle r="1.9" fill="currentColor"/>
+                </g>
+                <g transform="translate(21 603)">
+                    <rect x="-13" y="-14" width="27" height="27" fill="#fff" stroke="currentColor" stroke-width="1.1"/>
+                    <circle r="9" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                    <circle r="5" fill="none" stroke="currentColor" stroke-width="1"/>
+                    <circle r="1.9" fill="currentColor"/>
+                </g>
+                <g transform="translate(843 603)">
+                    <rect x="-14" y="-14" width="27" height="27" fill="#fff" stroke="currentColor" stroke-width="1.1"/>
+                    <circle r="9" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                    <circle r="5" fill="none" stroke="currentColor" stroke-width="1"/>
+                    <circle r="1.9" fill="currentColor"/>
+                </g>
+                <rect x="38" y="38" width="788" height="548" fill="var(--tint)" stroke="currentColor" stroke-width="2.4"/>
+                <rect x="43" y="43" width="778" height="538" fill="none" stroke="currentColor" stroke-width="0.8"/>
+            </svg>
+
+            <div class="watermark"><span style="font-size: <%= wmSize %>px; letter-spacing: <%= wmSpace %>px; padding-left: <%= wmSpace %>px;"><%= wmText %></span></div>
+
+            <div class="inner">
+                <div class="toprow">
+                    <%# Display as "A<n>" — identical to how the ledger and registers cite it %>
+                    <div class="numbox">N&ordm;&nbsp; <span class="fill">A<%= certNo %></span></div>
+                    <div class="act-top"><%= countryLine %></div>
+                    <div class="numbox"><span class="fill"><%= countFigure || '—' %></span> &nbsp;SHARES</div>
+                </div>
+
+                <div class="plate">
+                    <div class="plate-name" style="font-size: <%= plateSize %>px;"><%= company.name.toUpperCase() %></div>
+                </div>
+                <div class="corp-sub">(the &ldquo;Corporation&rdquo;)</div>
+                <div class="act-sub">Subject to the Business Corporations Act (the &ldquo;Act&rdquo;)</div>
+
+                <div class="certify">
+                    <div class="holder-line">
+                        <span><span class="bl">This is to Certify</span>&nbsp; that</span>
+                        <span class="lead"><%= shareholder.name %><span class="sub">(NAME OF HOLDER)</span></span>
+                    </div>
+                    <div>
+                        is the registered holder of
+                        <span class="lead" style="min-width: 190px;"><%= countWords %><span class="sub">(NUMBER)</span></span>
+                        fully paid and non-assessable
+                        <span class="lead" style="min-width: 150px;"><%= shareholder.sharesClass %><span class="sub">(DESIGNATION)</span></span>
+                        shares<%= parWording %> in the capital of the Corporation, transferable only on the books of
+                        the Corporation by the holder hereof in person or by duly authorized attorney upon surrender of
+                        this certificate properly endorsed.
                     </div>
                 </div>
 
-                <div class="body">
-                    <div>This is to certify that</div>
-                    <div class="holder"><%= shareholder.name %></div>
-                    <div>is the registered holder of</div>
-                    <span class="shares-amount"><%= shareholder.numberOfShares %></span>
-                    <div class="shares-class"><%= shareholder.sharesClass %> Shares</div>
-                    <div class="legalese">
-                        in the capital of the above-named Corporation, fully paid and non-assessable,
-                        transferable only on the books of the Corporation upon surrender of this
-                        certificate properly endorsed.
-                    </div>
-                    <% if (issueDate) { %>
-                    <div style="margin-top: 12px; font-size: 12px; color: #555;">Issued: <%= issueDate %></div>
-                    <% } %>
+                <div class="legend">
+                    <span class="n">NOTICE:</span> The class or series of shares represented by this certificate has rights, privileges,
+                    restrictions or conditions attached thereto and the Corporation will furnish to the holder, on demand and
+                    without charge, a full copy of the text of&nbsp;(i)&nbsp;the rights, privileges, restrictions and conditions attached
+                    to the said shares and to each class authorized to be issued and to each series insofar as the same have been
+                    fixed by the directors; and&nbsp;(ii)&nbsp;the authority of the directors to fix the rights, privileges, restrictions
+                    and conditions of subsequent series, if applicable.
                 </div>
 
-                <div class="footer">
-                    <div class="sig-block">
-                        <div class="sig-line">President / Director</div>
+                <div class="witness">
+                    <span class="sc">In Witness Whereof</span> the Corporation has caused this Certificate to be signed by its duly
+                    authorized officers this <b><%= dayText %></b> day of <b><%= monthText %></b>, <b><%= yearText %></b>.
+                </div>
+                <div class="sigrow">
+                    <div class="seal-wrap">
+                        <svg width="96" height="96" viewBox="0 0 100 100">
+                            <circle cx="50" cy="50" r="43" fill="var(--ink)" opacity="0.92"/>
+                            <circle cx="50" cy="50" r="46.5" fill="none" stroke="var(--ink)" stroke-width="4.5" stroke-dasharray="2.4 3.1" opacity="0.92"/>
+                            <circle cx="50" cy="50" r="36" fill="none" stroke="#fff" stroke-width="1" opacity="0.75"/>
+                            <defs>
+                                <path id="sealArc-<%= idx %>" d="M 18,50 A 32,32 0 1 1 82,50"/>
+                            </defs>
+                            <text font-size="7.5" letter-spacing="1.6" fill="#fff" opacity="0.9" font-family="Georgia, serif">
+                                <textPath href="#sealArc-<%= idx %>" startOffset="50%" text-anchor="middle">CORPORATE SEAL</textPath>
+                            </text>
+                            <% if (incorpYear) { %>
+                            <text x="50" y="55" font-size="9" letter-spacing="1" fill="#fff" text-anchor="middle" opacity="0.8" font-family="Georgia, serif"><%= incorpYear %></text>
+                            <% } %>
+                        </svg>
                     </div>
-                    <div class="sig-block">
-                        <div class="sig-line">Secretary</div>
-                    </div>
+                    <div class="sig"><div class="line">President / Director</div></div>
+                    <div class="sig"><div class="line">Secretary</div></div>
                 </div>
             </div>
+
+            <% if (parBanner) { %>
+            <div class="parvalue"><%= parBanner %></div>
+            <% } %>
         </div>
     <% }); %>
+    <% if (!company.shareholders || !company.shareholders.length) { %>
+        <!-- Direct single-document requests for a company with no shareholders get an
+             explanatory page instead of a silently blank one. Book compilers skip the
+             certificate section entirely in this case. -->
+        <div class="certificate" style="display: flex; align-items: center; justify-content: center;">
+            <div style="text-align: center; color: #555; font-size: 13px; max-width: 60%;">
+                No share certificates have been issued &mdash; no shareholders are recorded
+                for <%= company.name %>.
+            </div>
+        </div>
+    <% } %>
 </body>
 
 </html>

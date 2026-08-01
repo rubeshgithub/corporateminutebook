@@ -38,7 +38,7 @@
                 <% company.directors.forEach(function(d) { %>
                     <tr>
                         <td><%= d.name %></td>
-                        <td><%= d.address %></td>
+                        <td><%= [d.address, d.city, d.province, d.postalCode, d.country].filter(Boolean).join(', ') %></td>
                         <td><%= d.appointedDate ? new Date(d.appointedDate).toLocaleDateString() : '' %></td>
                         <td><%= d.resignedDate ? new Date(d.resignedDate).toLocaleDateString() : '—' %></td>
                     </tr>

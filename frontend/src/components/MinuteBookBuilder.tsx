@@ -155,8 +155,9 @@ const companySchema = z.object({
         lastName: z.string().min(1, 'Last name is required'),
         address: z.string().min(1, 'Street address is required'),
         city: z.string().min(1, 'City is required'),
-        province: z.string().min(1, 'Province is required'),
-        postalCode: z.string().min(1, 'Postal code is required'),
+        province: z.string().min(1, 'Province/State is required'),
+        postalCode: z.string().min(1, 'Postal/ZIP code is required'),
+        country: z.string().default('Canada'),
         residentCanadian: z.boolean().default(true),
         appointedDate: z.string().min(1, 'Appointed Date is required'),
         email: z.string().email('Invalid email').optional().or(z.literal('')),
@@ -171,6 +172,7 @@ const companySchema = z.object({
         city: z.string().optional(),
         province: z.string().optional(),
         postalCode: z.string().optional(),
+        country: z.string().default('Canada'),
         sharesClass: z.string().min(1, 'Share Class is required'),
         numberOfShares: z.coerce.number().min(1, 'Must have at least 1 share'),
         votingPercent: z.coerce.number().min(0).max(100).optional(),
@@ -490,6 +492,7 @@ const MinuteBookBuilder: React.FC = () => {
                             city: d.city || '',
                             province: d.province || '',
                             postalCode: d.postalCode || '',
+                            country: d.country || 'Canada',
                             residentCanadian: d.residentCanadian ?? true,
                             appointedDate: toDateInput(d.appointedDate),
                             email: d.email || '',
@@ -505,6 +508,7 @@ const MinuteBookBuilder: React.FC = () => {
                         city: s.city || '',
                         province: s.province || '',
                         postalCode: s.postalCode || '',
+                        country: s.country || 'Canada',
                         sharesClass: s.sharesClass || DEFAULT_SHARE_CLASS.name,
                         numberOfShares: s.numberOfShares ?? 100,
                         votingPercent: s.votingPercent ?? undefined,
@@ -1283,7 +1287,7 @@ const MinuteBookBuilder: React.FC = () => {
                         <Box>
                             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                                 <Typography variant="h6">Directors</Typography>
-                                <Button type="button" startIcon={<AddIcon />} variant="outlined" size="small" onClick={() => appendDirector({ name: '', firstName: '', middleName: '', lastName: '', address: '', city: '', province: '', postalCode: '', residentCanadian: true, appointedDate: '', email: '', phone: '' })}>
+                                <Button type="button" startIcon={<AddIcon />} variant="outlined" size="small" onClick={() => appendDirector({ name: '', firstName: '', middleName: '', lastName: '', address: '', city: '', province: '', postalCode: '', country: 'Canada', residentCanadian: true, appointedDate: '', email: '', phone: '' })}>
                                     Add Director
                                 </Button>
                             </Box>
@@ -1307,30 +1311,36 @@ const MinuteBookBuilder: React.FC = () => {
                                         </Grid>
                                         <Grid item xs={12}>
                                             <Controller name={`directors.${index}.address`} control={control} render={({ field: f }) => (
-                                                <PlacesTextField {...f} fullWidth label="Street Address"
+                                                <PlacesTextField {...f} fullWidth label="Street Address" worldwide
                                                     error={!!errors.directors?.[index]?.address}
                                                     helperText={errors.directors?.[index]?.address?.message}
                                                     onPlaceSelected={(addr) => {
                                                         setValue(`directors.${index}.city`, addr.city, { shouldValidate: true });
                                                         setValue(`directors.${index}.province`, addr.province, { shouldValidate: true });
                                                         setValue(`directors.${index}.postalCode`, addr.postalCode, { shouldValidate: true });
+                                                        setValue(`directors.${index}.country`, addr.country || 'Canada', { shouldValidate: true });
                                                     }}
                                                 />
                                             )} />
                                         </Grid>
-                                        <Grid item xs={12} sm={5}>
+                                        <Grid item xs={12} sm={4}>
                                             <Controller name={`directors.${index}.city`} control={control} render={({ field: f }) => (
                                                 <TextField {...f} fullWidth label="City" error={!!errors.directors?.[index]?.city} helperText={errors.directors?.[index]?.city?.message} />
                                             )} />
                                         </Grid>
-                                        <Grid item xs={12} sm={4}>
+                                        <Grid item xs={12} sm={3}>
                                             <Controller name={`directors.${index}.province`} control={control} render={({ field: f }) => (
-                                                <TextField {...f} fullWidth label="Province" error={!!errors.directors?.[index]?.province} helperText={errors.directors?.[index]?.province?.message} />
+                                                <TextField {...f} fullWidth label="Province / State" error={!!errors.directors?.[index]?.province} helperText={errors.directors?.[index]?.province?.message} />
+                                            )} />
+                                        </Grid>
+                                        <Grid item xs={12} sm={2}>
+                                            <Controller name={`directors.${index}.postalCode`} control={control} render={({ field: f }) => (
+                                                <TextField {...f} fullWidth label="Postal / ZIP" error={!!errors.directors?.[index]?.postalCode} helperText={errors.directors?.[index]?.postalCode?.message} />
                                             )} />
                                         </Grid>
                                         <Grid item xs={12} sm={3}>
-                                            <Controller name={`directors.${index}.postalCode`} control={control} render={({ field: f }) => (
-                                                <TextField {...f} fullWidth label="Postal Code" error={!!errors.directors?.[index]?.postalCode} helperText={errors.directors?.[index]?.postalCode?.message} />
+                                            <Controller name={`directors.${index}.country`} control={control} render={({ field: f }) => (
+                                                <TextField {...f} fullWidth label="Country" error={!!errors.directors?.[index]?.country} helperText={errors.directors?.[index]?.country?.message} />
                                             )} />
                                         </Grid>
                                         <Grid item xs={12} sm={3}>
@@ -1487,7 +1497,7 @@ const MinuteBookBuilder: React.FC = () => {
                         <Box>
                             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                                 <Typography variant="h6">Shareholders</Typography>
-                                <Button type="button" startIcon={<AddIcon />} variant="outlined" size="small" onClick={() => appendShareholder({ holderType: 'Individual', name: '', corporateAccessNumber: '', businessNumber: '', address: '', city: '', province: '', postalCode: '', sharesClass: shareClassNames[0] || '', numberOfShares: 100, votingPercent: undefined, considerationPaid: undefined, issuanceDate: '', email: '', phone: '' })}>
+                                <Button type="button" startIcon={<AddIcon />} variant="outlined" size="small" onClick={() => appendShareholder({ holderType: 'Individual', name: '', corporateAccessNumber: '', businessNumber: '', address: '', city: '', province: '', postalCode: '', country: 'Canada', sharesClass: shareClassNames[0] || '', numberOfShares: 100, votingPercent: undefined, considerationPaid: undefined, issuanceDate: '', email: '', phone: '' })}>
                                     Add Shareholder
                                 </Button>
                             </Box>
@@ -1535,28 +1545,34 @@ const MinuteBookBuilder: React.FC = () => {
                                             )}
                                             <Grid item xs={12}>
                                                 <Controller name={`shareholders.${index}.address`} control={control} render={({ field: f }) => (
-                                                    <PlacesTextField {...f} fullWidth label={holderType === 'Legal Entity' ? 'Street / Registered Office' : 'Street Address'}
+                                                    <PlacesTextField {...f} fullWidth label={holderType === 'Legal Entity' ? 'Street / Registered Office' : 'Street Address'} worldwide
                                                         onPlaceSelected={(addr) => {
                                                             setValue(`shareholders.${index}.city`, addr.city, { shouldValidate: true });
                                                             setValue(`shareholders.${index}.province`, addr.province, { shouldValidate: true });
                                                             setValue(`shareholders.${index}.postalCode`, addr.postalCode, { shouldValidate: true });
+                                                            setValue(`shareholders.${index}.country`, addr.country || 'Canada', { shouldValidate: true });
                                                         }}
                                                     />
                                                 )} />
                                             </Grid>
-                                            <Grid item xs={12} sm={5}>
+                                            <Grid item xs={12} sm={4}>
                                                 <Controller name={`shareholders.${index}.city`} control={control} render={({ field: f }) => (
                                                     <TextField {...f} fullWidth label="City" />
                                                 )} />
                                             </Grid>
-                                            <Grid item xs={12} sm={4}>
+                                            <Grid item xs={12} sm={3}>
                                                 <Controller name={`shareholders.${index}.province`} control={control} render={({ field: f }) => (
-                                                    <TextField {...f} fullWidth label="Province" />
+                                                    <TextField {...f} fullWidth label="Province / State" />
+                                                )} />
+                                            </Grid>
+                                            <Grid item xs={12} sm={2}>
+                                                <Controller name={`shareholders.${index}.postalCode`} control={control} render={({ field: f }) => (
+                                                    <TextField {...f} fullWidth label="Postal / ZIP" />
                                                 )} />
                                             </Grid>
                                             <Grid item xs={12} sm={3}>
-                                                <Controller name={`shareholders.${index}.postalCode`} control={control} render={({ field: f }) => (
-                                                    <TextField {...f} fullWidth label="Postal Code" />
+                                                <Controller name={`shareholders.${index}.country`} control={control} render={({ field: f }) => (
+                                                    <TextField {...f} fullWidth label="Country" />
                                                 )} />
                                             </Grid>
                                             <Grid item xs={12} sm={6}>

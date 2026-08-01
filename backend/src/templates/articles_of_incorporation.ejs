@@ -122,7 +122,7 @@
                 <% company.directors.forEach(function(director) { %>
                     <tr>
                         <td><%= director.name || ((director.firstName || '') + ' ' + (director.middleName || '') + ' ' + (director.lastName || '')).replace(/\s+/g,' ').trim() %></td>
-                        <td><%= [director.address, director.city, director.province, director.postalCode].filter(Boolean).join(', ') %></td>
+                        <td><%= [director.address, director.city, director.province, director.postalCode, director.country].filter(Boolean).join(', ') %></td>
                         <td><%= director.residentCanadian === false ? 'No' : 'Yes' %></td>
                         <td><%= director.appointedDate ? new Date(director.appointedDate).toLocaleDateString() : '' %></td>
                     </tr>

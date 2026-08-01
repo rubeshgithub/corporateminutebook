@@ -75,17 +75,22 @@ export const createEvent = async (req: AuthRequest, res: Response) => {
             const company = await Company.findOne({ _id: companyId, userId, deletedAt: null }).session(session);
             if (!company) throw new Error('Company not found.');
 
+            // Apply BEFORE creating the event doc: applyEventToCompany backfills
+            // auto-assigned certificate numbers into eventData, and the ledger
+            // renders from the event record — creating it first would freeze the
+            // event without the number the certificate ends up showing.
+            const eventData = data || {};
+            applyEventToCompany(company, eventType as CorporateEventType, eventData, new Date(effectiveDate));
+            await company.save({ session });
+
             const [event] = await CorporateEvent.create([{
                 companyId,
                 userId,
                 eventType,
                 effectiveDate: new Date(effectiveDate),
-                data: data || {},
+                data: eventData,
                 notes,
             }], { session });
-
-            applyEventToCompany(company, eventType as CorporateEventType, data || {}, new Date(effectiveDate));
-            await company.save({ session });
 
             await ActivityLog.create([{
                 userId,
@@ -642,6 +647,10 @@ function applyEventToCompany(company: any, eventType: CorporateEventType, data: 
                 const maxCert = company.shareholders.reduce(
                     (m: number, s: any) => Math.max(m, s.certificateNumber || 0), 0,
                 );
+                // Write the assigned number back into the event data — the share
+                // ledger renders from the event, the certificate from the snapshot;
+                // they must carry the same number.
+                data.certificateNumber = data.certificateNumber || (maxCert + 1);
                 company.shareholders.push({
                     name: data.name,
                     holderType: data.holderType || 'Individual',
@@ -650,7 +659,7 @@ function applyEventToCompany(company: any, eventType: CorporateEventType, data: 
                     numberOfShares: data.numberOfShares || 0,
                     considerationPaid: data.considerationPaid,
                     issuanceDate: effectiveDate,
-                    certificateNumber: data.certificateNumber || (maxCert + 1),
+                    certificateNumber: data.certificateNumber,
                     votingPercent: data.votingPercent,
                     corporateAccessNumber: data.corporateAccessNumber || '',
                     businessNumber: data.businessNumber || '',
@@ -677,6 +686,10 @@ function applyEventToCompany(company: any, eventType: CorporateEventType, data: 
                 const maxCert = company.shareholders.reduce(
                     (m: number, s: any) => Math.max(m, s.certificateNumber || 0), 0,
                 );
+                // Honor a typed "Certificate No. Issued" and backfill the assigned
+                // number into the event data — the transfer register and ledger
+                // render from the event, the certificate from the snapshot.
+                data.certificateNumberIssued = data.certificateNumberIssued || (maxCert + 1);
                 company.shareholders.push({
                     name: data.toName,
                     holderType: data.toHolderType || 'Individual',
@@ -684,7 +697,7 @@ function applyEventToCompany(company: any, eventType: CorporateEventType, data: 
                     sharesClass: data.sharesClass,
                     numberOfShares: data.numberOfShares || 0,
                     issuanceDate: effectiveDate,
-                    certificateNumber: maxCert + 1,
+                    certificateNumber: data.certificateNumberIssued,
                     corporateAccessNumber: '',
                     businessNumber: '',
                     email: data.toEmail || '',

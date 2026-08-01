@@ -15,7 +15,7 @@
             <% company.directors.forEach(function(d) { %>
                 <tr>
                     <td><%= d.name || ((d.firstName || '') + ' ' + (d.middleName || '') + ' ' + (d.lastName || '')).replace(/\s+/g,' ').trim() %></td>
-                    <td><%= d.address %></td>
+                    <td><%= [d.address, d.city, d.province, d.postalCode, d.country].filter(Boolean).join(', ') %></td>
                     <td><%= d.residentCanadian === false ? 'No' : 'Yes' %></td>
                     <td><%= d.appointedDate ? new Date(d.appointedDate).toLocaleDateString() : '' %></td>
                     <td><%= d.resignedDate ? new Date(d.resignedDate).toLocaleDateString() : '—' %></td>
@@ -77,7 +77,7 @@
                         <% } %>
                     </td>
                     <td><%= s.holderType || 'Individual' %></td>
-                    <td><%= s.address || '—' %></td>
+                    <td><%= [s.address, s.city, s.province, s.postalCode, s.country].filter(Boolean).join(', ') || '—' %></td>
                     <td><%= s.votingPercent != null ? s.votingPercent + '%' : '—' %></td>
                     <td><%= company.incorporationDate ? new Date(company.incorporationDate).toLocaleDateString() : '' %></td>
                 </tr>

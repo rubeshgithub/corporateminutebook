@@ -35,6 +35,8 @@ export interface ParsedAddress {
 
 type PlacesTextFieldProps = TextFieldProps & {
     onPlaceSelected?: (address: ParsedAddress) => void;
+    /** Suggest addresses worldwide instead of Canada-only — for directors/shareholders residing abroad. */
+    worldwide?: boolean;
 };
 
 const API_KEY = (import.meta as any).env?.VITE_GOOGLE_PLACES_API_KEY as string | undefined;
@@ -67,7 +69,6 @@ function loadPlacesLibrary(): Promise<any> {
             const h = (window as any).google || ((window as any).google = { maps: {} });
             const c = h.maps || (h.maps = {});
             let a: Promise<any> | undefined;
-            const e = 'AIzaSyC-DUMMY'; // placeholder — real key wired below
             c.importLibrary = c.importLibrary || ((f: string) => a ? a.then((r) => r(f)) : (a = new Promise((r, s) => {
                 const d = document.createElement('script');
                 d.async = true;
@@ -76,8 +77,6 @@ function loadPlacesLibrary(): Promise<any> {
                 d.onload = () => { r((h.maps as any).importLibrary); };
                 document.head.appendChild(d);
             })).then((im: any) => im(f)));
-            // silence unused-var lint on 'e'
-            void e;
         })({ key: API_KEY });
 
         (window as any).google.maps.importLibrary('places').then(resolve).catch(reject);
@@ -103,7 +102,7 @@ function parseComponents(components: any[]): Omit<ParsedAddress, 'formatted'> {
 }
 
 const PlacesTextField = React.forwardRef<HTMLDivElement, PlacesTextFieldProps>(
-    ({ onPlaceSelected, onChange, value, ...props }, ref) => {
+    ({ onPlaceSelected, worldwide, onChange, value, ...props }, ref) => {
         const containerRef = useRef<HTMLDivElement>(null);
         const elementRef   = useRef<any>(null);
         const [ready, setReady] = useState(false);
@@ -123,7 +122,9 @@ const PlacesTextField = React.forwardRef<HTMLDivElement, PlacesTextFieldProps>(
                 .then((placesLib: any) => {
                     if (cancelled || !containerRef.current) return;
                     const el = new placesLib.PlaceAutocompleteElement({
-                        includedRegionCodes: ['ca'],
+                        // Company addresses stay Canada-only; directors and
+                        // shareholders may reside anywhere.
+                        ...(worldwide ? {} : { includedRegionCodes: ['ca'] }),
                         types: ['address'],
                     });
                     // Reasonable defaults that mimic the old inline input.

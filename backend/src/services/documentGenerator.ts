@@ -152,16 +152,19 @@ type EventAttach = { role: string; fileId: string };
 type EventLike = { attachments?: EventAttach[] };
 
 export const generateMinuteBookPDF = async (company: ICompany, events: unknown[] = []): Promise<Buffer> => {
+    // No shareholders -> no certificate section. An empty certificate render
+    // still produces one blank page, which would get stamped and merged.
+    const hasShareholders = Array.isArray(company.shareholders) && company.shareholders.length > 0;
     const mainHtml = renderTemplate('minute_book', { company, events });
-    const certHtml = renderTemplate('share_certificate', { company });
+    const certHtml = hasShareholders ? renderTemplate('share_certificate', { company }) : null;
 
     const browser = await getBrowser();
     const mainPage = await browser.newPage();
-    const certPage = await browser.newPage();
+    const certPage = certHtml ? await browser.newPage() : null;
     mainPage.setDefaultTimeout(PAGE_TIMEOUT_MS);
-    certPage.setDefaultTimeout(PAGE_TIMEOUT_MS);
+    certPage?.setDefaultTimeout(PAGE_TIMEOUT_MS);
     let mainPdfBytes: Buffer = Buffer.alloc(0);
-    let certPdfBytes: Buffer = Buffer.alloc(0);
+    let certPdfBytes: Buffer | null = null;
     try {
         await mainPage.setContent(mainHtml, { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT_MS });
         mainPdfBytes = Buffer.from(await mainPage.pdf({
@@ -170,17 +173,19 @@ export const generateMinuteBookPDF = async (company: ICompany, events: unknown[]
             margin: { top: '0.7in', right: '0.7in', bottom: '0.7in', left: '0.7in' },
             timeout: PAGE_TIMEOUT_MS,
         }));
-        await certPage.setContent(certHtml, { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT_MS });
-        certPdfBytes = Buffer.from(await certPage.pdf({
-            format: 'Letter',
-            landscape: true,
-            printBackground: true,
-            margin: { top: '1in', right: '1in', bottom: '1in', left: '1in' },
-            timeout: PAGE_TIMEOUT_MS,
-        }));
+        if (certPage && certHtml) {
+            await certPage.setContent(certHtml, { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT_MS });
+            certPdfBytes = Buffer.from(await certPage.pdf({
+                format: 'Letter',
+                landscape: true,
+                printBackground: true,
+                margin: { top: '1in', right: '1in', bottom: '1in', left: '1in' },
+                timeout: PAGE_TIMEOUT_MS,
+            }));
+        }
     } finally {
         await mainPage.close().catch(() => {});
-        await certPage.close().catch(() => {});
+        await certPage?.close().catch(() => {});
     }
 
     const merged = await PDFDocument.create();
@@ -201,8 +206,10 @@ export const generateMinuteBookPDF = async (company: ICompany, events: unknown[]
         }
     }
 
-    const certDoc = await PDFDocument.load(certPdfBytes);
-    (await merged.copyPages(certDoc, certDoc.getPageIndices())).forEach((p) => merged.addPage(p));
+    if (certPdfBytes) {
+        const certDoc = await PDFDocument.load(certPdfBytes);
+        (await merged.copyPages(certDoc, certDoc.getPageIndices())).forEach((p) => merged.addPage(p));
+    }
 
     const font = await merged.embedFont(StandardFonts.Helvetica);
     addHeadersFooters(merged, font, 'Corporate Minute Book', true);
@@ -265,11 +272,14 @@ export const generateInauguralPackagePDF = async (company: ICompany, events: unk
         postBuffers.push(await renderTemplateToPdf(browser, tpl, { company }));
     }
 
-    // Share certificates — landscape.
-    const certPdf = await renderTemplateToPdf(browser, 'share_certificate', { company }, {
-        landscape: true,
-        margin: { top: '1in', right: '1in', bottom: '1in', left: '1in' },
-    });
+    // Share certificates — landscape. Skipped with no shareholders: an empty
+    // render would still inject a blank stamped page into the package.
+    const certPdf = Array.isArray(company.shareholders) && company.shareholders.length > 0
+        ? await renderTemplateToPdf(browser, 'share_certificate', { company }, {
+            landscape: true,
+            margin: { top: '1in', right: '1in', bottom: '1in', left: '1in' },
+        })
+        : null;
 
     // Corporate Registers — portrait.
     const regPdf = await renderTemplateToPdf(browser, 'registers', { company, events });
@@ -291,8 +301,10 @@ export const generateInauguralPackagePDF = async (company: ICompany, events: unk
         (await merged.copyPages(doc, doc.getPageIndices())).forEach((p) => merged.addPage(p));
     }
 
-    const certDoc = await PDFDocument.load(certPdf);
-    (await merged.copyPages(certDoc, certDoc.getPageIndices())).forEach((p) => merged.addPage(p));
+    if (certPdf) {
+        const certDoc = await PDFDocument.load(certPdf);
+        (await merged.copyPages(certDoc, certDoc.getPageIndices())).forEach((p) => merged.addPage(p));
+    }
 
     const regDoc = await PDFDocument.load(regPdf);
     (await merged.copyPages(regDoc, regDoc.getPageIndices())).forEach((p) => merged.addPage(p));

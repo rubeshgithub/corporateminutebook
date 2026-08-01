@@ -73,7 +73,7 @@
                     certSurrendered: '—',
                     transferor: 'Treasury',
                     transferee: s.name,
-                    address: s.address || '',
+                    address: [s.address, s.city, s.province, s.postalCode, s.country].filter(Boolean).join(', '),
                     certIssued: (s.certificateNumber ? 'A' + s.certificateNumber : 'A' + (idx + 1)) + ' / ' + s.numberOfShares,
                 });
             });
