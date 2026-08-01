@@ -181,9 +181,61 @@ async function resolveShare(token: string): Promise<
 }
 
 /**
+ * Viewer-facing projection of a Company doc. The share token is the only
+ * credential on this endpoint, so the payload must carry zero personal
+ * contact info (emails, phones, home addresses) and none of the internal
+ * state (incorporationDocumentFile, crsCustomerEmail, notifications,
+ * drift, origin/claim bookkeeping). Explicit allow-list — a new Company
+ * field stays private here unless deliberately added.
+ */
+function viewerCompany(c: any) {
+    return {
+        name:                  c.name,
+        corporateAccessNumber: c.corporateAccessNumber,
+        businessNumber:        c.businessNumber,
+        jurisdiction:          c.registrySignature?.provinceKey,
+        incorporationDate:     c.incorporationDate,
+        registeredOfficeAddress: c.registeredOfficeAddress && {
+            street:     c.registeredOfficeAddress.street,
+            city:       c.registeredOfficeAddress.city,
+            province:   c.registeredOfficeAddress.province,
+            postalCode: c.registeredOfficeAddress.postalCode,
+            country:    c.registeredOfficeAddress.country,
+        },
+        shareClasses: (c.shareClasses ?? []).map((sc: any) => ({
+            name:          sc.name,
+            type:          sc.type,
+            voting:        sc.voting,
+            maxAuthorized: sc.maxAuthorized,
+            parValue:      sc.parValue,
+        })),
+        directors: (c.directors ?? []).map((d: any) => ({
+            name:          d.name,
+            firstName:     d.firstName,
+            middleName:    d.middleName,
+            lastName:      d.lastName,
+            appointedDate: d.appointedDate,
+            resignedDate:  d.resignedDate,
+        })),
+        officers: (c.officers ?? []).map((o: any) => ({
+            name:          o.name,
+            title:         o.title,
+            appointedDate: o.appointedDate,
+            resignedDate:  o.resignedDate,
+        })),
+        shareholders: (c.shareholders ?? []).map((s: any) => ({
+            name:              s.name,
+            sharesClass:       s.sharesClass,
+            numberOfShares:    s.numberOfShares,
+            certificateNumber: s.certificateNumber,
+        })),
+    };
+}
+
+/**
  * GET /api/share/:token — public read-only view. Returns the company data
- * + events (soft-delete filtered) shaped for the shared-view SPA page.
- * Access logging tracks who's actually consuming the link.
+ * (viewer projection) + events (soft-delete filtered) shaped for the
+ * shared-view SPA page. Access logging tracks who's consuming the link.
  */
 export const resolveShareEndpoint = async (req: Request, res: Response) => {
     try {
@@ -204,9 +256,21 @@ export const resolveShareEndpoint = async (req: Request, res: Response) => {
             .sort({ effectiveDate: -1, recordedAt: -1 })
             .lean();
 
+        // Events get the same allow-list treatment: the raw `data` blob can
+        // carry director home addresses, emails, and phones (e.g. the
+        // auto-generated founding events), and the viewer page renders none
+        // of it — only the label, date, notes, and attachment badges.
+        const viewerEvents = events.map((ev: any) => ({
+            _id:           ev._id,
+            eventType:     ev.eventType,
+            effectiveDate: ev.effectiveDate,
+            notes:         ev.notes,
+            attachments:   (ev.attachments ?? []).map((a: any) => ({ role: a.role })),
+        }));
+
         return res.json({
-            company: r.company,
-            events,
+            company: viewerCompany(r.company),
+            events: viewerEvents,
             share: {
                 label:      r.share.label,
                 expiresAt:  r.share.expiresAt,

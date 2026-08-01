@@ -8,6 +8,7 @@
     "test:owner": "playwright test business-owner",
     "test:cpa": "playwright test cpa",
     "test:lawyer": "playwright test lawyer",
+    "test:share": "playwright test share-viewer",
     "test:ui": "playwright test --ui",
     "report": "playwright show-report"
   },

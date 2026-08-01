@@ -4,6 +4,7 @@ import multer from 'multer';
 import { v4 as uuidv4 } from 'uuid';
 import Anthropic from '@anthropic-ai/sdk';
 import { putFile, getFile } from '../services/uploadStorage';
+import { Company } from '../models/Company';
 
 // Memory storage — we only persist to uploadStorage (S3 or disk) after a
 // successful parse. Old code wrote to backend/uploads/ directly, which
@@ -194,6 +195,23 @@ export const serveIncorporationDocument = async (req: AuthRequest, res: Response
     if (filename.includes('/') || filename.includes('\\') || !filename.endsWith('.pdf')) {
         return res.status(400).json({ error: 'Invalid filename.' });
     }
+    // `protect` guarantees req.user, but assert it anyway: Mongoose strips
+    // undefined keys out of a filter, so a userId that ever went missing
+    // would silently widen the ownership query below to every tenant.
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Not authorized.' });
+
+    // Tenant isolation: filenames are UUIDs but they do leak (e.g. anyone the
+    // owner has ever shown the company to could have seen one), so possession
+    // of a filename must not grant access. Serve only to the owner of the
+    // company the file is attached to; 404 (not 403) so non-owners can't
+    // distinguish "exists but not yours" from "doesn't exist".
+    const owned = await Company.findOne({
+        incorporationDocumentFile: filename,
+        userId,
+        deletedAt: null,
+    }).select('_id').lean();
+    if (!owned) return res.status(404).json({ error: 'File not found.' });
     let bytes: Buffer;
     try {
         bytes = await getFile(filename);

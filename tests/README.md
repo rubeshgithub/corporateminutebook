@@ -16,6 +16,9 @@ The goal is to catch the class of bugs that unit tests miss:
 | **Business Owner** | Create corp → add a director → change address → download minute book | Full compile |
 | **CPA** | Declare a dividend → log an annual return with T2 ref → issue Class B shares → download CRA bundle | CRA audit bundle |
 | **Lawyer** | Grant signing authority → transfer shares → change corporate name → download DD bundle | Due-diligence bundle (Board + Shareholder split) |
+| **Share viewer** | Open a share link anonymously → verify the page renders → assert the payload carries no PII; separately, try to fetch another tenant's incorporation PDF | None (JSON payload + access control) |
+
+The share-viewer persona is the regression net for two security fixes and asserts negatives as well as positives — it seeds a corp with distinctive PII markers (director email/phone/home address) and fails if any of them appear in the public `GET /api/share/:token` payload, and it fails if a second logged-in account can fetch the first account's incorporation document.
 
 ## Prerequisites
 
@@ -47,6 +50,7 @@ TEST_MODE_TOKEN=<your-secret> npm test
 TEST_MODE_TOKEN=<your-secret> npm run test:owner
 TEST_MODE_TOKEN=<your-secret> npm run test:cpa
 TEST_MODE_TOKEN=<your-secret> npm run test:lawyer
+TEST_MODE_TOKEN=<your-secret> npm run test:share
 
 # Interactive mode (pick tests + step through)
 TEST_MODE_TOKEN=<your-secret> npm run test:ui

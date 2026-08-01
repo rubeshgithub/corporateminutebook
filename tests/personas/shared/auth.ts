@@ -65,7 +65,7 @@ export async function loginAs(context: BrowserContext, email: string): Promise<A
  * unless FRESH_EMAIL is set — useful when you want to test the
  * first-run empty state.
  */
-export function testEmailFor(persona: 'owner' | 'cpa' | 'lawyer'): string {
+export function testEmailFor(persona: string): string {
     if (process.env.FRESH_EMAIL === 'true') {
         return `${persona}+${Date.now()}@personatest.minutebook.local`;
     }
