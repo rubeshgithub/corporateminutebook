@@ -28,7 +28,11 @@
     var ev = (typeof event !== 'undefined' && event) ? event : {};
     var d = ev.data || {};
     var effDate = ev.effectiveDate ? new Date(ev.effectiveDate) : new Date();
-    var effDateStr = effDate.toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' });
+    // Stored dates are UTC midnight (date-only) — format in UTC or servers west
+    // of UTC print the previous day; the "now" fallback stays local.
+    var effDateOpts = { month: 'long', day: 'numeric', year: 'numeric' };
+    if (ev.effectiveDate) effDateOpts.timeZone = 'UTC';
+    var effDateStr = effDate.toLocaleDateString('en-CA', effDateOpts);
 
     var activeDirectors = (company.directors || []).filter(function(dir) { return !dir.resignedDate; });
     var dirName = function(dir) {

@@ -25,7 +25,9 @@
         var shareEvents = (events || []).filter(function(e) {
             return e.eventType === 'shares_issued' || e.eventType === 'shares_transferred' || e.eventType === 'shares_cancelled';
         });
-        var fmtDate = function(d) { return d ? new Date(d).toLocaleDateString() : ''; };
+        // Stored dates are UTC midnight (date-only) — format in UTC or servers
+        // west of UTC print the previous day.
+        var fmtDate = function(d) { return d ? new Date(d).toLocaleDateString(undefined, { timeZone: 'UTC' }) : ''; };
 
         // Build register rows — prefer event history; fall back to snapshot issuances
         var rows = [];

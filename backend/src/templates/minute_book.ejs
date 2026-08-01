@@ -205,7 +205,9 @@
 
 <body>
     <% var today = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }); %>
-    <% var incorpDate = company.incorporationDate ? new Date(company.incorporationDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : '—'; %>
+    <%// Stored dates are UTC midnight (date-only) — format in UTC or servers west
+      // of UTC print the previous day. "today" above is a real timestamp, stays local. %>
+    <% var incorpDate = company.incorporationDate ? new Date(company.incorporationDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) : '—'; %>
 
     <!-- ============ COVER ============ -->
     <div class="cover">
@@ -367,7 +369,7 @@
                             <td><%= d.name || ((d.firstName || '') + ' ' + (d.middleName || '') + ' ' + (d.lastName || '')).replace(/\s+/g,' ').trim() %></td>
                             <td><%= d.address %></td>
                             <td><%= d.residentCanadian === false ? 'No' : 'Yes' %></td>
-                            <td><%= d.appointedDate ? new Date(d.appointedDate).toLocaleDateString() : '' %></td>
+                            <td><%= d.appointedDate ? new Date(d.appointedDate).toLocaleDateString(undefined, { timeZone: 'UTC' }) : '' %></td>
                         </tr>
                     <% }); %>
                 </tbody>
@@ -529,7 +531,7 @@
             <h1>CONSENT TO ACT AS DIRECTOR</h1>
             <h2><%= company.name %></h2>
             <p class="preamble">(the "Corporation")</p>
-            <p style="margin-top: 28px; text-align: justify;">I, <strong><%= director.name %></strong>, of <%= director.address %>, hereby consent to act as a director of the Corporation, effective <%= director.appointedDate ? new Date(director.appointedDate).toLocaleDateString() : '_________________' %>.</p>
+            <p style="margin-top: 28px; text-align: justify;">I, <strong><%= director.name %></strong>, of <%= director.address %>, hereby consent to act as a director of the Corporation, effective <%= director.appointedDate ? new Date(director.appointedDate).toLocaleDateString(undefined, { timeZone: 'UTC' }) : '_________________' %>.</p>
             <p style="text-align: justify;">I acknowledge that I am not disqualified under the applicable corporate legislation from acting as a director of the Corporation, and I undertake to notify the Corporation forthwith if I become so disqualified.</p>
             <div class="signature">
                 <p>Date: <%= today %></p>
@@ -609,7 +611,7 @@
             <div class="clause">RESOLVED THAT the persons whose names appear below are confirmed as the directors of the Corporation:</div>
             <ul>
                 <% company.directors.forEach(function(d){ %>
-                    <li><%= d.name %> &mdash; appointed <%= d.appointedDate ? new Date(d.appointedDate).toLocaleDateString() : '' %></li>
+                    <li><%= d.name %> &mdash; appointed <%= d.appointedDate ? new Date(d.appointedDate).toLocaleDateString(undefined, { timeZone: 'UTC' }) : '' %></li>
                 <% }); %>
             </ul>
         </div>
@@ -759,7 +761,7 @@
                 var needsReg = registryTypes.indexOf(ev.eventType) !== -1;
                 var regNA = !!ev.registryFilingNotApplicable;
                 out += '<tr>';
-                out += '<td>' + new Date(ev.effectiveDate).toLocaleDateString() + '</td>';
+                out += '<td>' + new Date(ev.effectiveDate).toLocaleDateString(undefined, { timeZone: 'UTC' }) + '</td>';
                 out += '<td>' + (CHANGE_EVENT_LABELS[ev.eventType] || ev.eventType) + '</td>';
                 out += '<td style="font-size: 10pt;">' + evtSummary(ev.eventType, ev.data);
                 if (ev.notes) out += '<div style="color:#888; font-size:9.5pt;">' + ev.notes + '</div>';
@@ -846,7 +848,7 @@
                                 var hasDoc = (ev.attachments || []).some(function(a){ return a.role === 'registry_filing'; });
                             %>
                             <tr>
-                                <td><%= new Date(ev.effectiveDate).toLocaleDateString() %></td>
+                                <td><%= new Date(ev.effectiveDate).toLocaleDateString(undefined, { timeZone: 'UTC' }) %></td>
                                 <td><%= (ev.data && ev.data.year) ? ev.data.year : '—' %></td>
                                 <td style="font-size: 10pt;"><%= (ev.data && ev.data.confirmationNumber) ? ev.data.confirmationNumber : '—' %></td>
                                 <td style="text-align:center; font-size: 10pt;"><%= hasDoc ? '✓ Attached' : '—' %></td>
@@ -882,7 +884,7 @@
             <p><strong>TO:</strong> THE DIRECTORS OF <%= company.name.toUpperCase() %></p>
             <p style="margin-top: 16px; text-align: justify;">The undersigned subscribes for and agrees to take <strong><%= s.numberOfShares %></strong> <strong><%= s.sharesClass %></strong> of the capital of the Corporation and tenders herewith the sum of <strong>$<%= totalPrice %></strong> in full payment of the subscription price for these shares.</p>
             <p style="text-align: justify;">The undersigned hereby requests that the said shares be allotted to the undersigned, that the shares be issued as fully paid and non-assessable, and that a certificate for the shares be issued to the undersigned.</p>
-            <p style="margin-top: 16px;">DATED effective <%= company.incorporationDate ? new Date(company.incorporationDate).toLocaleDateString() : today %>.</p>
+            <p style="margin-top: 16px;">DATED effective <%= company.incorporationDate ? new Date(company.incorporationDate).toLocaleDateString(undefined, { timeZone: 'UTC' }) : today %>.</p>
             <div class="signature">
                 <div class="sig-line"><%= s.name %></div>
                 <% if (s.holderType === 'Legal Entity') { %>
@@ -923,7 +925,7 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td><%= company.incorporationDate ? new Date(company.incorporationDate).toLocaleDateString() : today %></td>
+                        <td><%= company.incorporationDate ? new Date(company.incorporationDate).toLocaleDateString(undefined, { timeZone: 'UTC' }) : today %></td>
                         <td>A<%= holderIdx + 1 %></td>
                         <td>—</td>
                         <td>Initial</td>
@@ -961,7 +963,7 @@
                 <% (company.shareholders || []).forEach(function(s, idx) { %>
                     <tr>
                         <td><%= idx + 1 %></td>
-                        <td><%= company.incorporationDate ? new Date(company.incorporationDate).toLocaleDateString() : today %></td>
+                        <td><%= company.incorporationDate ? new Date(company.incorporationDate).toLocaleDateString(undefined, { timeZone: 'UTC' }) : today %></td>
                         <td><%= s.sharesClass %></td>
                         <td>—</td>
                         <td>From Treasury</td>

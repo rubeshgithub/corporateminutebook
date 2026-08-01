@@ -124,7 +124,7 @@
                         <td><%= director.name || ((director.firstName || '') + ' ' + (director.middleName || '') + ' ' + (director.lastName || '')).replace(/\s+/g,' ').trim() %></td>
                         <td><%= [director.address, director.city, director.province, director.postalCode].filter(Boolean).join(', ') %></td>
                         <td><%= director.residentCanadian === false ? 'No' : 'Yes' %></td>
-                        <td><%= director.appointedDate ? new Date(director.appointedDate).toLocaleDateString() : '' %></td>
+                        <td><%= director.appointedDate ? new Date(director.appointedDate).toLocaleDateString(undefined, { timeZone: 'UTC' }) : '' %></td>
                     </tr>
                 <% }); %>
             </tbody>

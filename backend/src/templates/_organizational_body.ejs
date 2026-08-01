@@ -25,7 +25,7 @@
                 <tr>
                     <td><%= o.name %></td>
                     <td><%= o.title %></td>
-                    <td><%= o.appointedDate ? new Date(o.appointedDate).toLocaleDateString() : '' %></td>
+                    <td><%= o.appointedDate ? new Date(o.appointedDate).toLocaleDateString(undefined, { timeZone: 'UTC' }) : '' %></td>
                 </tr>
             <% }); %>
             <% if (!company.officers || company.officers.length === 0) { %>
