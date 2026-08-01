@@ -3,13 +3,19 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
+import mongoose from 'mongoose';
 import rateLimit from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
 import { connectDB } from './config/db';
+import { validateEnv } from './config/env';
+import { csrfGuard } from './middleware/csrf';
 import { startNotificationScheduler } from './services/notificationScheduler';
 import { startRegistryDriftChecker } from './services/registryDriftChecker';
 
 dotenv.config();
+
+// Fail the boot on missing required config rather than 500ing at first use.
+validateEnv();
 
 const app: Express = express();
 const PORT = process.env.PORT || 5000;
@@ -59,6 +65,10 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 // req.cookies so authMiddleware.protect can read it.
 app.use(cookieParser());
 
+// CSRF guard runs after cookieParser (it reads the auth cookie) and before
+// any route. Safe methods and cookie-less requests pass straight through.
+app.use('/api', csrfGuard);
+
 // Routes
 import authRoutes from './routes/authRoutes';
 import companyRoutes from './routes/companyRoutes';
@@ -85,8 +95,30 @@ app.use('/api/crs-feed', crsFeedRoutes);
 // /api/companies/:id/shares + /api/shares/:shareId (auth-guarded inside).
 app.use('/api', shareRoutes);
 
-app.get('/api/health', (req: Request, res: Response) => {
-    res.status(200).json({ status: 'ok', message: 'Corporate Minute Book API is running' });
+/**
+ * Health check. Reports degraded (503) when the database is unreachable so an
+ * uptime monitor actually catches a broken instance — a static 200 told us
+ * only that the process had not crashed.
+ */
+app.get('/api/health', async (_req: Request, res: Response) => {
+    // 1 === connected, per mongoose.ConnectionStates
+    const dbUp = mongoose.connection.readyState === 1;
+    let dbPing = false;
+    if (dbUp) {
+        try {
+            await mongoose.connection.db!.admin().ping();
+            dbPing = true;
+        } catch {
+            dbPing = false;
+        }
+    }
+
+    const healthy = dbUp && dbPing;
+    res.status(healthy ? 200 : 503).json({
+        status: healthy ? 'ok' : 'degraded',
+        database: healthy ? 'connected' : 'unavailable',
+        uptimeSeconds: Math.round(process.uptime()),
+    });
 });
 
 // Generic Error Handler

@@ -1,5 +1,5 @@
 import { APIRequestContext, BrowserContext, request } from '@playwright/test';
-import { API_URL, TEST_TOKEN } from './config';
+import { API_URL, APP_URL, TEST_TOKEN } from './config';
 
 /**
  * Mints an authenticated session for the given test email using the
@@ -21,7 +21,15 @@ export async function loginAs(context: BrowserContext, email: string): Promise<A
     // A dedicated request context lets Playwright manage its own cookie jar.
     // We call test-mint-session through it — the Set-Cookie header lands in
     // that jar — and then port those cookies into the browser context.
-    const apiContext = await request.newContext({ baseURL: API_URL });
+    //
+    // The Origin header is not optional: the API's CSRF guard rejects any
+    // cookie-authenticated write that doesn't declare a recognized origin.
+    // A real browser always sends one on POST; APIRequestContext does not,
+    // so we set it explicitly to keep these calls faithful to the SPA.
+    const apiContext = await request.newContext({
+        baseURL: API_URL,
+        extraHTTPHeaders: { Origin: APP_URL },
+    });
     const res = await apiContext.post('/api/auth/test-mint-session', {
         data:    { email },
         headers: { 'x-test-token': TEST_TOKEN, 'Content-Type': 'application/json' },

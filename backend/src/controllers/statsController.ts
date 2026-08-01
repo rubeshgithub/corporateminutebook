@@ -3,6 +3,7 @@ import { AuthRequest } from '../middleware/authMiddleware';
 import { Company } from '../models/Company';
 import { DocumentModel } from '../models/Document';
 import { ActivityLog } from '../models/ActivityLog';
+import { serverError } from '../utils/apiError';
 
 export const getStats = async (req: AuthRequest, res: Response) => {
     try {
@@ -37,6 +38,6 @@ export const getStats = async (req: AuthRequest, res: Response) => {
             activityLast7Days: weekActivityCount,
         });
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        serverError(res, 'getStats', error);
     }
 };

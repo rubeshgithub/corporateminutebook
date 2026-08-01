@@ -1,14 +1,20 @@
 import { Request, Response } from 'express';
+import crypto from 'crypto';
+import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User';
 import { Company } from '../models/Company';
 import { sendOtpEmail } from '../services/emailService';
 import { AuthRequest } from '../middleware/authMiddleware';
+import { serverError } from '../utils/apiError';
 
 const generateToken = (id: string, role: string) =>
     jwt.sign({ id, role }, process.env.JWT_SECRET as string, { expiresIn: '30d' });
 
 const OTP_TTL_MINUTES = 10;
+/** Wrong guesses allowed per issued code before it is burned. */
+const OTP_MAX_ATTEMPTS = 5;
+const OTP_BCRYPT_ROUNDS = 10;
 const AUTH_COOKIE = 'mb_auth';
 const COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;   // matches the JWT expiry
 
@@ -45,12 +51,21 @@ export const requestOtp = async (req: Request, res: Response) => {
         const email = (req.body.email as string)?.toLowerCase().trim();
         if (!email) return res.status(400).json({ error: 'Email is required' });
 
-        const code = String(Math.floor(100000 + Math.random() * 900000));
+        // crypto.randomInt is a CSPRNG — Math.random() is seeded predictably
+        // and its output can be reconstructed from observed values.
+        const code = String(crypto.randomInt(100_000, 1_000_000));
         const expiry = new Date(Date.now() + OTP_TTL_MINUTES * 60_000);
 
         await User.findOneAndUpdate(
             { email },
-            { $set: { otpCode: code, otpExpiry: expiry } },
+            {
+                $set: {
+                    otpHash: await bcrypt.hash(code, OTP_BCRYPT_ROUNDS),
+                    otpExpiry: expiry,
+                    otpAttempts: 0,
+                },
+                $unset: { otpCode: '' },   // drop any legacy plaintext code
+            },
             { upsert: true, new: true }
         );
 
@@ -58,7 +73,7 @@ export const requestOtp = async (req: Request, res: Response) => {
 
         res.json({ message: 'Code sent. Check your email.' });
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        serverError(res, 'requestOtp', error);
     }
 };
 
@@ -72,7 +87,7 @@ export const verifyOtp = async (req: Request, res: Response) => {
         }
 
         const user = await User.findOne({ email });
-        if (!user || !user.otpCode || !user.otpExpiry) {
+        if (!user || !user.otpHash || !user.otpExpiry) {
             return res.status(401).json({ error: 'No code found. Request a new one.' });
         }
 
@@ -80,12 +95,26 @@ export const verifyOtp = async (req: Request, res: Response) => {
             return res.status(401).json({ error: 'Code has expired. Request a new one.' });
         }
 
-        if (user.otpCode !== code) {
+        // Burn the code once it has been guessed at too many times, so a
+        // distributed attacker can't walk the 1M-code space with one code.
+        if ((user.otpAttempts ?? 0) >= OTP_MAX_ATTEMPTS) {
+            user.otpHash = undefined;
+            user.otpExpiry = undefined;
+            user.otpAttempts = 0;
+            await user.save();
+            return res.status(401).json({ error: 'Too many incorrect attempts. Request a new code.' });
+        }
+
+        // bcrypt.compare is constant-time for a given hash.
+        if (!(await bcrypt.compare(code, user.otpHash))) {
+            user.otpAttempts = (user.otpAttempts ?? 0) + 1;
+            await user.save();
             return res.status(401).json({ error: 'Invalid code.' });
         }
 
-        user.otpCode = undefined;
+        user.otpHash = undefined;
         user.otpExpiry = undefined;
+        user.otpAttempts = 0;
         if (!user.name) user.name = email.split('@')[0];
 
         // First successful OTP verify is the "claim" moment for accounts that
@@ -117,7 +146,7 @@ export const verifyOtp = async (req: Request, res: Response) => {
             justClaimed: isFirstLogin,  // frontend uses this to show a welcome flash
         });
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        serverError(res, 'verifyOtp', error);
     }
 };
 
@@ -189,6 +218,6 @@ export const me = async (req: AuthRequest, res: Response) => {
         if (!user) return res.status(404).json({ error: 'User not found.' });
         res.json({ _id: user._id, name: user.name, email: user.email, role: user.role });
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        serverError(res, 'me', error);
     }
 };

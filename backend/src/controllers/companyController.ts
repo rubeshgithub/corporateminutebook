@@ -3,6 +3,7 @@ import { AuthRequest } from '../middleware/authMiddleware';
 import { Company } from '../models/Company';
 import { ActivityLog } from '../models/ActivityLog';
 import { CorporateEvent } from '../models/CorporateEvent';
+import { serverError } from '../utils/apiError';
 
 const ACTIVE = { deletedAt: null };
 
@@ -33,7 +34,7 @@ const createFoundingEvents = async (company: any, userId: string) => {
                 firstName: d.firstName || '',
                 middleName: d.middleName || '',
                 lastName: d.lastName || '',
-                address: [d.address, d.city, d.province, d.postalCode].filter(Boolean).join(', '),
+                address: [d.address, d.city, d.province, d.postalCode, d.country].filter(Boolean).join(', '),
                 residentCanadian: d.residentCanadian ?? true,
             },
             notes: 'Founding',
@@ -96,7 +97,7 @@ export const createCompany = async (req: AuthRequest, res: Response) => {
 
         res.status(201).json(company);
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        serverError(res, 'createCompany', error);
     }
 };
 
@@ -106,7 +107,7 @@ export const getCompanies = async (req: AuthRequest, res: Response) => {
         const companies = await Company.find({ userId, ...ACTIVE });
         res.json(companies);
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        serverError(res, 'getCompanies', error);
     }
 };
 
@@ -119,7 +120,7 @@ export const getCompany = async (req: AuthRequest, res: Response) => {
         }
         res.json(company);
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        serverError(res, 'getCompany', error);
     }
 };
 
@@ -130,7 +131,18 @@ export const updateCompany = async (req: AuthRequest, res: Response) => {
 
         if (Array.isArray(updates.shareholders)) {
             const existing = await Company.findOne({ _id: req.params.id, userId, ...ACTIVE });
-            const maxExisting = (existing?.shareholders ?? []).reduce(
+            const existingShareholders = existing?.shareholders ?? [];
+            // A row resubmitted without its certificateNumber reclaims the number
+            // already on record for that holder+class — assigning a fresh one here
+            // would contradict the issuance events the share ledger renders from.
+            updates.shareholders = updates.shareholders.map((s: any) => {
+                if (s.certificateNumber) return s;
+                const prior = existingShareholders.find(
+                    (e: any) => e.name === s.name && e.sharesClass === s.sharesClass,
+                );
+                return prior?.certificateNumber ? { ...s, certificateNumber: prior.certificateNumber } : s;
+            });
+            const maxExisting = [...existingShareholders, ...updates.shareholders].reduce(
                 (max: number, s: any) => Math.max(max, s.certificateNumber || 0), 0
             );
             updates.shareholders = assignCertNumbers(updates.shareholders, maxExisting + 1);
@@ -155,7 +167,7 @@ export const updateCompany = async (req: AuthRequest, res: Response) => {
 
         res.json(company);
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        serverError(res, 'updateCompany', error);
     }
 };
 
@@ -181,7 +193,7 @@ export const deleteCompany = async (req: AuthRequest, res: Response) => {
 
         res.json({ success: true });
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        serverError(res, 'deleteCompany', error);
     }
 };
 
@@ -351,7 +363,7 @@ export const getComplianceSummary = async (req: AuthRequest, res: Response) => {
 
         return res.json(summary);
     } catch (error: any) {
-        return res.status(500).json({ error: error.message });
+        return serverError(res, 'getComplianceSummary', error);
     }
 };
 
@@ -396,7 +408,7 @@ export const getUpsellCandidates = async (req: AuthRequest, res: Response) => {
 
         return res.json(candidates);
     } catch (error: any) {
-        return res.status(500).json({ error: error.message });
+        return serverError(res, 'getUpsellCandidates', error);
     }
 };
 
@@ -432,7 +444,7 @@ export const resolveDrift = async (req: AuthRequest, res: Response) => {
 
         return res.json({ ok: true });
     } catch (error: any) {
-        return res.status(500).json({ error: error.message });
+        return serverError(res, 'resolveDrift', error);
     }
 };
 

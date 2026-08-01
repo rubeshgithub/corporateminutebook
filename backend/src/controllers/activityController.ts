@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { ActivityLog } from '../models/ActivityLog';
+import { serverError } from '../utils/apiError';
 
 export const getActivity = async (req: AuthRequest, res: Response) => {
     try {
@@ -11,6 +12,6 @@ export const getActivity = async (req: AuthRequest, res: Response) => {
             .limit(limit);
         res.json(logs);
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        serverError(res, 'getActivity', error);
     }
 };

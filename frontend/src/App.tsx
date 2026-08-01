@@ -7,6 +7,7 @@ import MinuteBookBuilder from './components/MinuteBookBuilder';
 import DocumentManagement from './components/DocumentManagement';
 import RecordsVault from './components/RecordsVault';
 import SharedCompanyView from './components/SharedCompanyView';
+import { PrivacyPolicy, TermsOfService } from './components/LegalPage';
 import Layout from './components/Layout';
 import { useSelector } from 'react-redux';
 import { SnackbarProvider } from './context/SnackbarContext';
@@ -57,6 +58,8 @@ function App() {
                     {/* Public read-only share view — no auth. The token IS
                         the credential; backend enforces expiry + revoke. */}
                     <Route path="/share/:token" element={<SharedCompanyView />} />
+                    <Route path="/privacy" element={<PrivacyPolicy />} />
+                    <Route path="/terms" element={<TermsOfService />} />
                 </Routes>
             </BrowserRouter>
             </SnackbarProvider>

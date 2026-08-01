@@ -76,8 +76,10 @@ const LandingFooter: React.FC = () => {
 
                 <div>
                     <div style={COL_HEADING}>Legal</div>
-                    <a href="https://www.corporateregistryservices.ca/privacy" style={LINK}>Privacy</a>
-                    <a href="https://www.corporateregistryservices.ca/terms" style={LINK}>Terms</a>
+                    {/* MinuteBook's own policies — the CRS site's versions don't
+                        cover this app's processors (AI parsing, e-sign, share links). */}
+                    <a href="/privacy" style={LINK}>Privacy</a>
+                    <a href="/terms" style={LINK}>Terms</a>
                     <a href="https://www.corporateregistryservices.ca/disclaimer" style={LINK}>Disclaimer</a>
                 </div>
             </div>

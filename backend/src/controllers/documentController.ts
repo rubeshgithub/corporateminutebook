@@ -5,6 +5,7 @@ import { ActivityLog } from '../models/ActivityLog';
 import { Company } from '../models/Company';
 import { CorporateEvent } from '../models/CorporateEvent';
 import { generatePDFBuffer, generateMinuteBookPDF, generateInauguralPackagePDF } from '../services/documentGenerator';
+import { serverError } from '../utils/apiError';
 
 const TEMPLATE_LABELS: Record<string, string> = {
     glossary: 'Glossary',
@@ -164,7 +165,7 @@ export const generateDocument = async (req: AuthRequest, res: Response) => {
         res.setHeader('Content-Disposition', `attachment; filename=${company.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${documentType}.pdf`);
         return res.send(pdfBuffer);
     } catch (error: any) {
-        return res.status(500).json({ error: error.message });
+        return serverError(res, 'generateDocument', error);
     }
 };
 
@@ -181,7 +182,7 @@ export const getDocuments = async (req: AuthRequest, res: Response) => {
             .populate('generatedBy', 'name email');
         return res.json(documents);
     } catch (error: any) {
-        return res.status(500).json({ error: error.message });
+        return serverError(res, 'getDocuments', error);
     }
 };
 
@@ -221,13 +222,17 @@ export const compileMinuteBook = async (req: AuthRequest, res: Response) => {
             details: `Compiled Minute Book generated for ${company.name}.`,
         });
 
-        const safeName = company.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        // <Company_Name_Inc>-MinuteBook-<YYYYMMDD>-<HHMMSS>.pdf — matches the frontend convention
+        const safeName = company.name.replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '');
+        const now = new Date();
+        const pad = (n: number) => String(n).padStart(2, '0');
+        const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename=${safeName}_minute_book.pdf`);
+        res.setHeader('Content-Disposition', `attachment; filename=${safeName}-MinuteBook-${stamp}.pdf`);
         return res.send(pdfBuffer);
     } catch (error: any) {
         console.error('Failed to compile minute book:', error);
-        return res.status(500).json({ error: error.message });
+        return serverError(res, 'compileMinuteBook', error);
     }
 };
 
@@ -325,7 +330,7 @@ export const generateBundle = async (req: AuthRequest, res: Response) => {
         return res.send(pdfBuffer);
     } catch (error: any) {
         console.error('Failed to generate bundle:', error);
-        return res.status(500).json({ error: error.message });
+        return serverError(res, 'generateBundle', error);
     }
 };
 
@@ -363,6 +368,6 @@ export const generateInauguralPackage = async (req: AuthRequest, res: Response) 
         return res.send(pdfBuffer);
     } catch (error: any) {
         console.error('Failed to generate inaugural package:', error);
-        return res.status(500).json({ error: error.message });
+        return serverError(res, 'generateInauguralPackage', error);
     }
 };
