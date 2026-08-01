@@ -9,44 +9,196 @@ import { tryGetFile } from './uploadStorage';
 
 const TEMPLATES_DIR = path.join(__dirname, '..', 'templates');
 
-// ─── Singleton browser — avoids Windows lockfile conflicts ────────────────────
+// ─── Singleton browser ────────────────────────────────────────────────────────
 //
-// Concurrent requests must NOT both launch. Two callers each seeing
-// `_browser === null` and racing to puppeteer.launch() with the same
-// userDataDir crashes the second one — Chrome takes an exclusive lock
-// on the profile directory. The persona test suite caught this: two
-// personas hitting /api/documents/bundle in parallel = one 500.
+// Chrome takes an exclusive lock on its userDataDir, which used to bite in
+// three separate ways:
 //
-// Fix: share a launch promise across concurrent callers. First arrival
-// starts the launch; every subsequent arrival awaits the same promise.
-let _browser: Browser | null = null;
-let _browserLaunching: Promise<Browser> | null = null;
+// 1. Two callers in one process racing to launch. Handled by sharing a launch
+//    promise: first arrival launches, every subsequent arrival awaits the same
+//    promise. The persona suite caught this one — two personas hitting
+//    /api/documents/bundle in parallel = one 500.
+//
+// 2. Two *processes* on one machine. The profile path used to be a single
+//    fixed `os.tmpdir()/minutebook_chrome_profile`, which is machine-global,
+//    so an in-process singleton could not help: a second backend (a test
+//    instance on :5001, a second dev server, a second worker) has its own
+//    module state and every PDF request there 500'd with "The browser is
+//    already running for <tmpdir>/minutebook_chrome_profile". Fixed by giving
+//    each launch its own profile directory, namespaced by pid.
+//
+// 3. Unrecoverable recovery. The health check nulled out the handle and fell
+//    straight through to a fresh launch, without stopping the old Chrome. If
+//    that Chrome was alive but wedged (or orphaned when its parent node
+//    process was killed) it still held the lock, so the relaunch threw on the
+//    same lock and the singleton could never recover. Fixed by closing/killing
+//    the old browser first, *and* by launching into a new profile directory so
+//    recovery survives even when the kill doesn't land.
+//
+// One profile dir per launch means nothing ever overwrites the previous one,
+// so they are cleaned up on disconnect, on process exit, and — for the process
+// that got SIGKILLed and ran no handler at all — by a sweep on next launch.
 
-const getBrowser = async (): Promise<Browser> => {
-    if (_browser) {
+const PROFILE_ROOT = path.join(os.tmpdir(), 'minutebook_chrome_profiles');
+
+/** Bounded so a wedged Chrome that never answers CDP can't hang a request. */
+const BROWSER_HEALTH_TIMEOUT_MS = 5_000;
+const BROWSER_CLOSE_TIMEOUT_MS = 5_000;
+
+type BrowserHandle = { browser: Browser; profileDir: string };
+
+let _handle: BrowserHandle | null = null;
+let _launching: Promise<Browser> | null = null;
+let _swept = false;
+
+const withTimeout = <T>(p: Promise<T>, ms: number, label: string): Promise<T> =>
+    new Promise<T>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+        p.then(resolve, reject).finally(() => clearTimeout(timer));
+    });
+
+/**
+ * Remove profile dirs belonging to processes that died without running any
+ * cleanup (SIGKILL, hard crash). Never touches a dir whose owning pid is still
+ * alive — that is another backend's live profile, and deleting it would break
+ * exactly the multi-process case this whole scheme exists to support.
+ */
+const sweepStaleProfiles = (): void => {
+    let entries: string[];
+    try {
+        entries = fs.readdirSync(PROFILE_ROOT);
+    } catch {
+        return; // root doesn't exist yet — nothing to sweep
+    }
+    for (const entry of entries) {
+        const owner = /^p(\d+)-/.exec(entry);
+        if (!owner) continue;
+        const pid = Number(owner[1]);
+        if (pid === process.pid) continue;
         try {
-            await _browser.version();
-            return _browser;
+            // Signal 0 delivers nothing; it only probes whether the pid exists.
+            process.kill(pid, 0);
+            continue; // still running — not ours to delete
+        } catch (e: any) {
+            // EPERM means the process exists but belongs to another user.
+            if (e?.code === 'EPERM') continue;
+        }
+        try {
+            fs.rmSync(path.join(PROFILE_ROOT, entry), { recursive: true, force: true });
         } catch {
-            _browser = null;
+            // Locked or racing another sweeper. Next launch tries again.
         }
     }
-    if (!_browserLaunching) {
-        _browserLaunching = puppeteer.launch({
+};
+
+/** mkdtemp gives an atomically-unique dir, so two processes (or a relaunch
+ *  racing its own predecessor's teardown) can never pick the same path. */
+const createProfileDir = (): string => {
+    if (!_swept) {
+        _swept = true;
+        sweepStaleProfiles();
+    }
+    fs.mkdirSync(PROFILE_ROOT, { recursive: true });
+    return fs.mkdtempSync(path.join(PROFILE_ROOT, `p${process.pid}-`));
+};
+
+/**
+ * Windows keeps handles on the profile open for a moment after Chrome exits,
+ * so the first unlink routinely loses that race. rm's own retry loop rides it
+ * out; async so the retry delay never blocks the event loop. Anything still
+ * locked at the end is left for sweepStaleProfiles() on a later launch.
+ */
+const removeProfileDir = (profileDir: string): Promise<void> =>
+    fs.promises
+        .rm(profileDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+        .catch(() => {});
+
+/** Tear down a browser we've given up on. close() first so Chrome releases the
+ *  profile lock cleanly; SIGKILL when close hangs or throws, because a wedged
+ *  Chrome will never answer a CDP close request. Never rejects. */
+const disposeHandle = async (handle: BrowserHandle): Promise<void> => {
+    try {
+        await withTimeout(handle.browser.close(), BROWSER_CLOSE_TIMEOUT_MS, 'browser close');
+    } catch {
+        try {
+            handle.browser.process()?.kill('SIGKILL');
+        } catch {
+            // Already exited.
+        }
+    }
+    await removeProfileDir(handle.profileDir);
+};
+
+const launchBrowser = async (): Promise<Browser> => {
+    const profileDir = createProfileDir();
+    try {
+        const browser = await puppeteer.launch({
             headless: true,
             args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
-            userDataDir: path.join(os.tmpdir(), 'minutebook_chrome_profile'),
-        }).then((b) => {
-            _browser = b;
-            _browserLaunching = null;
-            return b;
-        }).catch((err) => {
-            _browserLaunching = null;
-            throw err;
+            userDataDir: profileDir,
         });
+        const handle: BrowserHandle = { browser, profileDir };
+        // Chrome can die on its own (OOM kill, renderer crash). Drop the
+        // singleton the moment it does, so the next caller launches instead of
+        // waiting on a health check to discover the corpse.
+        browser.on('disconnected', () => {
+            if (_handle === handle) _handle = null;
+            void removeProfileDir(profileDir);
+        });
+        _handle = handle;
+        return browser;
+    } catch (err) {
+        await removeProfileDir(profileDir);
+        throw err;
+    } finally {
+        _launching = null;
     }
-    return _browserLaunching;
 };
+
+const getBrowser = async (): Promise<Browser> => {
+    const current = _handle;
+    if (current) {
+        try {
+            // version() round-trips over CDP, so it catches a Chrome that is
+            // alive but not answering — which a connected-flag check wouldn't.
+            await withTimeout(current.browser.version(), BROWSER_HEALTH_TIMEOUT_MS, 'browser health check');
+            return current.browser;
+        } catch (e: any) {
+            console.warn(`[documentGenerator] browser unhealthy, recycling: ${e?.message ?? e}`);
+            if (_handle === current) _handle = null;
+            // Not awaited: a wedged Chrome can burn the full close timeout, and
+            // the caller waiting on a PDF shouldn't pay for it. Safe to overlap
+            // because the relaunch below claims a brand-new profile dir.
+            void disposeHandle(current);
+        }
+    }
+    if (!_launching) {
+        _launching = launchBrowser();
+    }
+    return _launching;
+};
+
+// Best-effort teardown on shutdown. Everything here is synchronous — an 'exit'
+// handler is the last thing that runs, so a promise queued from it never
+// settles. Chrome is killed rather than closed for the same reason, and there
+// is no retry loop: whatever the OS still has locked at this instant is left
+// for sweepStaleProfiles() on a later launch, which is also what covers the
+// SIGKILLed process that runs no handler at all.
+process.once('exit', () => {
+    const handle = _handle;
+    _handle = null;
+    if (!handle) return;
+    try {
+        handle.browser.process()?.kill('SIGKILL');
+    } catch {
+        // Already exited.
+    }
+    try {
+        fs.rmSync(handle.profileDir, { recursive: true, force: true });
+    } catch {
+        // Swept on a later launch.
+    }
+});
 
 const renderTemplate = (templateName: string, data: Record<string, unknown>): string => {
     const templatePath = path.join(TEMPLATES_DIR, `${templateName}.ejs`);
