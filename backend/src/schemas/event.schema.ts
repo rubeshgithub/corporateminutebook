@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { objectId, isoDate, mediumString } from './common';
+import { objectId, isoDate, mediumString, shortString } from './common';
 
 /**
  * Event-type enum mirrors backend/src/models/CorporateEvent.ts. Kept as a
@@ -39,12 +39,66 @@ const eventDataObject = z
         message: 'Event data too large (max 32 KB).',
     });
 
+/**
+ * The three event types whose `data` carries share counts. Unlike most event
+ * payloads — which are read back as free text — these numbers are printed into
+ * the compiled minute book, the share ledger, and the share transfer register,
+ * so a malformed payload isn't a crash, it's a wrong figure in a legal record.
+ * Every entry point that accepts one of these should validate with
+ * `shareChangeDataSchema` below.
+ */
+export const SHARE_CHANGE_EVENT_TYPES = [
+    'shares_issued',
+    'shares_transferred',
+    'shares_cancelled',
+] as const;
+
+export type ShareChangeEventType = (typeof SHARE_CHANGE_EVENT_TYPES)[number];
+
+export function isShareChangeEventType(type: string): type is ShareChangeEventType {
+    return (SHARE_CHANGE_EVENT_TYPES as readonly string[]).includes(type);
+}
+
+/**
+ * Loose rather than strict on purpose: the rest of a share-change payload
+ * varies by type — `name` for an issuance, `fromName`/`toName` for a transfer,
+ * `holderName` for a cancellation, plus optional address / email / certificate
+ * fields that `applyEventToCompany` reads directly. We pin only the two fields
+ * every share change must have and pass everything else through untouched.
+ */
+export const shareChangeDataSchema = z.looseObject({
+    numberOfShares: z.number().int().positive(),
+    sharesClass:    shortString.min(1),
+});
+
+/** Flatten a share-data ZodError into one line suitable for an API message. */
+export function formatShareChangeIssues(error: z.ZodError): string {
+    return error.issues
+        .map((i) => `${i.path.join('.') || 'data'}: ${i.message}`)
+        .join('; ');
+}
+
 export const createEventSchema = z.object({
     companyId:     objectId,
     eventType:     eventTypeEnum,
     effectiveDate: isoDate,
     data:          eventDataObject.optional(),
     notes:         mediumString.optional(),
+}).superRefine((body, ctx) => {
+    // `data` is deliberately loose for most event types, but a share change
+    // has to carry a usable count and class — those get printed into the
+    // ledger. Re-issue each failure under a `data.*` path so the client sees
+    // which field is wrong rather than a bare "invalid body".
+    if (!isShareChangeEventType(body.eventType)) return;
+    const parsed = shareChangeDataSchema.safeParse(body.data ?? {});
+    if (parsed.success) return;
+    for (const issue of parsed.error.issues) {
+        ctx.addIssue({
+            code:    z.ZodIssueCode.custom,
+            path:    ['data', ...issue.path],
+            message: issue.message,
+        });
+    }
 });
 
 export type CreateEventInput = z.infer<typeof createEventSchema>;

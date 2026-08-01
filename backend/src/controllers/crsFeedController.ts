@@ -5,6 +5,11 @@ import { User } from '../models/User';
 import { Company } from '../models/Company';
 import { CorporateEvent, CorporateEventType } from '../models/CorporateEvent';
 import { CrsProcessedOrder } from '../models/CrsProcessedOrder';
+import {
+    isShareChangeEventType,
+    shareChangeDataSchema,
+    formatShareChangeIssues,
+} from '../schemas/event.schema';
 
 /**
  * POST /api/crs-feed/order-completed
@@ -90,6 +95,26 @@ function isValid(body: CrsFeedBody): string | null {
         for (const e of body.events) {
             if (!ALLOWED_EVENT_TYPES.includes(e.type)) return `Unknown event type: ${e.type}`;
             if (!e.effectiveDate)                       return 'Every event needs an effectiveDate.';
+            // An unparseable date becomes an Invalid Date, which Mongoose
+            // rejects at cast time — that aborts the transaction and returns a
+            // 500, which CRS then retries forever. Reject it here as a 400 so
+            // the retry loop stops on a bad payload.
+            if (Number.isNaN(Date.parse(e.effectiveDate))) {
+                return `Invalid effectiveDate on ${e.type} event: ${e.effectiveDate}`;
+            }
+            // Share events print their numbers straight into the compiled
+            // minute book and share ledger, so hold them to the same rules the
+            // main event API applies. Note we deliberately do NOT check
+            // sharesClass against company.shareClasses the way the API path
+            // can: a CRS-seeded company is created here with an empty
+            // shareClasses array, so that check would reject every share event
+            // on a brand-new company.
+            if (isShareChangeEventType(e.type)) {
+                const parsed = shareChangeDataSchema.safeParse(e.data ?? {});
+                if (!parsed.success) {
+                    return `Invalid data for ${e.type} event: ${formatShareChangeIssues(parsed.error)}`;
+                }
+            }
         }
     }
     return null;

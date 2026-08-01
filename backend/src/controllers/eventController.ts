@@ -11,6 +11,11 @@ import { putFile, getFile } from '../services/uploadStorage';
 import { generatePDFBuffer } from '../services/documentGenerator';
 import { sendResolutionEmail } from '../services/emailService';
 import { createESignRequest, getSubmissionStatus, createTemplateWithFields, createBuilderToken } from '../services/docusealService';
+import {
+    isShareChangeEventType,
+    shareChangeDataSchema,
+    formatShareChangeIssues,
+} from '../schemas/event.schema';
 
 // ─── Multer: memory storage — bytes go to uploadStorage (S3 or disk) ─────────
 
@@ -48,6 +53,40 @@ const RESOLUTION_TEMPLATES: Partial<Record<CorporateEventType, string>> = {
     dividend_declared:          'resolution_dividend_declaration',
 };
 
+// ─── Share-change guards ─────────────────────────────────────────────────────
+
+/**
+ * `createEventSchema` already pins the shape of a share-change payload, but it
+ * can't know which classes this particular company has authorized — that needs
+ * the DB. Mirrors the cross-field rule `companySchema` applies to shareholders:
+ * a ledger row for a class that was never authorized is a defect in the
+ * compiled minute book.
+ *
+ * Returns an error string, or null when the payload is acceptable.
+ *
+ * Deliberately skipped when the company has no share classes on record at all.
+ * That's the same "skip if either side is absent" stance company.schema.ts
+ * takes, and it keeps the check from blocking companies whose share structure
+ * hasn't been entered yet (notably CRS-seeded ones, which start empty).
+ */
+function shareClassError(company: any, data: any): string | null {
+    const known = (company?.shareClasses ?? []).map((sc: any) => sc?.name).filter(Boolean);
+    if (!known.length) return null;
+    const requested = data?.sharesClass;
+    if (requested && !known.includes(requested)) {
+        return `Share class "${requested}" is not defined on this company.`;
+    }
+    return null;
+}
+
+/** Full share-change validation for paths that don't run createEventSchema. */
+function shareChangeError(eventType: string, company: any, data: any): string | null {
+    if (!isShareChangeEventType(eventType)) return null;
+    const parsed = shareChangeDataSchema.safeParse(data ?? {});
+    if (!parsed.success) return `data: ${formatShareChangeIssues(parsed.error)}`;
+    return shareClassError(company, data);
+}
+
 // ─── Create event ─────────────────────────────────────────────────────────────
 
 export const createEvent = async (req: AuthRequest, res: Response) => {
@@ -62,6 +101,12 @@ export const createEvent = async (req: AuthRequest, res: Response) => {
     // early without paying the session-start cost.
     const companyPreCheck = await Company.findOne({ _id: companyId, userId, deletedAt: null }).lean();
     if (!companyPreCheck) return res.status(404).json({ error: 'Company not found.' });
+
+    // Class-existence needs the company, so it can't live in the schema.
+    if (isShareChangeEventType(eventType)) {
+        const classErr = shareClassError(companyPreCheck, data);
+        if (classErr) return res.status(400).json({ error: classErr });
+    }
 
     // Event + company-snapshot are a single atomic unit. Without the
     // transaction, a failed company.save() leaves the event on record while
@@ -153,6 +198,14 @@ export const updateEvent = async (req: AuthRequest, res: Response) => {
         // Ownership check via company.
         const company = await Company.findOne({ _id: event.companyId, userId, deletedAt: null });
         if (!company) return res.status(403).json({ error: 'Forbidden.' });
+
+        // `updateEventSchema` can't do this: a PUT body carries no eventType,
+        // so only the stored event knows whether `data` is a share change.
+        // Runs before any field is mutated so a rejected edit changes nothing.
+        if (data && typeof data === 'object') {
+            const shareErr = shareChangeError(event.eventType, company, data);
+            if (shareErr) return res.status(400).json({ error: shareErr });
+        }
 
         let snapshotWarning = false;
         if (typeof notes === 'string' || notes === null) event.notes = notes || undefined;
