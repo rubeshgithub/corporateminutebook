@@ -11,6 +11,7 @@ import { putFile, getFile } from '../services/uploadStorage';
 import { generatePDFBuffer } from '../services/documentGenerator';
 import { sendResolutionEmail } from '../services/emailService';
 import { createESignRequest, getSubmissionStatus, createTemplateWithFields, createBuilderToken } from '../services/docusealService';
+import { serverError } from '../utils/apiError';
 import {
     isShareChangeEventType,
     shareChangeDataSchema,
@@ -148,7 +149,7 @@ export const createEvent = async (req: AuthRequest, res: Response) => {
         });
         return res.status(201).json(createdEvent);
     } catch (error: any) {
-        return res.status(500).json({ error: error.message });
+        return serverError(res, 'createEvent', error);
     } finally {
         await session.endSession();
     }
@@ -171,7 +172,7 @@ export const getEvents = async (req: AuthRequest, res: Response) => {
             .sort({ effectiveDate: -1, recordedAt: -1 });
         return res.json(events);
     } catch (error: any) {
-        return res.status(500).json({ error: error.message });
+        return serverError(res, 'getEvents', error);
     }
 };
 
@@ -239,7 +240,7 @@ export const updateEvent = async (req: AuthRequest, res: Response) => {
                 : undefined,
         });
     } catch (error: any) {
-        return res.status(500).json({ error: error.message });
+        return serverError(res, 'updateEvent', error);
     }
 };
 
@@ -292,7 +293,7 @@ export const deleteEvent = async (req: AuthRequest, res: Response) => {
                 : undefined,
         });
     } catch (error: any) {
-        return res.status(500).json({ error: error.message });
+        return serverError(res, 'deleteEvent', error);
     }
 };
 
@@ -337,7 +338,7 @@ export const attachEvent = async (req: AuthRequest, res: Response) => {
 
         return res.json(event);
     } catch (error: any) {
-        return res.status(500).json({ error: error.message });
+        return serverError(res, 'attachEvent', error);
     }
 };
 
@@ -369,7 +370,7 @@ export const serveAttachment = async (req: AuthRequest, res: Response) => {
         res.setHeader('Content-Type', 'application/pdf');
         return res.send(bytes);
     } catch (error: any) {
-        return res.status(500).json({ error: error.message });
+        return serverError(res, 'serveAttachment', error);
     }
 };
 
@@ -399,7 +400,7 @@ export const generateResolution = async (req: AuthRequest, res: Response) => {
         res.setHeader('Content-Disposition', `attachment; filename=${safeName}_${safeType}_resolution.pdf`);
         return res.send(pdfBuffer);
     } catch (error: any) {
-        return res.status(500).json({ error: error.message });
+        return serverError(res, 'generateResolution', error);
     }
 };
 
@@ -454,7 +455,7 @@ export const sendResolution = async (req: AuthRequest, res: Response) => {
 
         return res.json({ success: true });
     } catch (error: any) {
-        return res.status(500).json({ error: error.message });
+        return serverError(res, 'sendResolution', error);
     }
 };
 
@@ -501,7 +502,7 @@ export const sendForESign = async (req: AuthRequest, res: Response) => {
 
         return res.json(result);
     } catch (error: any) {
-        return res.status(500).json({ error: error.message });
+        return serverError(res, 'sendForESign', error);
     }
 };
 
@@ -545,7 +546,7 @@ export const getESignStatus = async (req: AuthRequest, res: Response) => {
             sentAt:       event.eSign.sentAt,
         });
     } catch (error: any) {
-        return res.status(500).json({ error: error.message });
+        return serverError(res, 'getESignStatus', error);
     }
 };
 
@@ -592,7 +593,7 @@ export const getBuilderToken = async (req: AuthRequest, res: Response) => {
 
         return res.json({ token });
     } catch (error: any) {
-        return res.status(500).json({ error: error.message });
+        return serverError(res, 'getBuilderToken', error);
     }
 };
 
@@ -622,7 +623,7 @@ export const recordESignResult = async (req: AuthRequest, res: Response) => {
 
         return res.json({ success: true });
     } catch (error: any) {
-        return res.status(500).json({ error: error.message });
+        return serverError(res, 'recordESignResult', error);
     }
 };
 

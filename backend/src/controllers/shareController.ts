@@ -8,6 +8,7 @@ import { User } from '../models/User';
 import { ActivityLog } from '../models/ActivityLog';
 import { generateMinuteBookPDF } from '../services/documentGenerator';
 import { sendShareInviteEmail } from '../services/emailService';
+import { serverError } from '../utils/apiError';
 
 const APP_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
@@ -96,7 +97,7 @@ export const createShare = async (req: AuthRequest, res: Response) => {
             createdAt:     share.createdAt,
         });
     } catch (error: any) {
-        return res.status(500).json({ error: error.message });
+        return serverError(res, 'createShare', error);
     }
 };
 
@@ -129,7 +130,7 @@ export const listShares = async (req: AuthRequest, res: Response) => {
                           : 'active',
         })));
     } catch (error: any) {
-        return res.status(500).json({ error: error.message });
+        return serverError(res, 'listShares', error);
     }
 };
 
@@ -154,7 +155,7 @@ export const revokeShare = async (req: AuthRequest, res: Response) => {
         }
         return res.json({ ok: true });
     } catch (error: any) {
-        return res.status(500).json({ error: error.message });
+        return serverError(res, 'revokeShare', error);
     }
 };
 
@@ -278,7 +279,7 @@ export const resolveShareEndpoint = async (req: Request, res: Response) => {
             },
         });
     } catch (error: any) {
-        return res.status(500).json({ error: error.message });
+        return serverError(res, 'resolveShareEndpoint', error);
     }
 };
 
