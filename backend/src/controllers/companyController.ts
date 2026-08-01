@@ -54,6 +54,18 @@ const createFoundingEvents = async (company: any, userId: string) => {
     }
 
     for (const s of company.shareholders || []) {
+        // Every shares_issued event must carry a real count and class — the
+        // event API now enforces that, and these founding events land in the
+        // same collection and print through the same ledger templates.
+        // numberOfShares is optional on the shareholder schema, so an
+        // incomplete record would otherwise seed a "0  → Jane Doe" row into
+        // the compiled minute book. Skip the event rather than fabricate a
+        // class or a count; the shareholder itself is still on the company,
+        // so the share register renders them either way.
+        const numberOfShares = s.numberOfShares || 0;
+        const sharesClass = s.sharesClass || '';
+        if (numberOfShares <= 0 || !sharesClass.trim()) continue;
+
         events.push({
             companyId: company._id,
             userId,
@@ -61,8 +73,8 @@ const createFoundingEvents = async (company: any, userId: string) => {
             effectiveDate: s.issuanceDate ? new Date(s.issuanceDate) : effectiveDate,
             data: {
                 name: s.name || '',
-                numberOfShares: s.numberOfShares || 0,
-                sharesClass: s.sharesClass || '',
+                numberOfShares,
+                sharesClass,
                 considerationPaid: s.considerationPaid || 0,
                 certificateNumber: s.certificateNumber,
             },
