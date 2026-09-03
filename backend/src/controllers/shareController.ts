@@ -283,10 +283,72 @@ export const resolveShareEndpoint = async (req: Request, res: Response) => {
     }
 };
 
+const WITHHELD = '[withheld from shared view]';
+
+/** Strip personal contact info from a person record (director / officer /
+ *  shareholder / authorizedBy) before it reaches the PDF templates. Address
+ *  becomes a visible placeholder — the templates join address parts with
+ *  filter(Boolean), so a placeholder reads better than a silent blank in
+ *  running text ("I, Jane Smith, of [withheld from shared view], …"). */
+function redactPerson<T extends Record<string, any>>(p: T): T {
+    if (!p || typeof p !== 'object') return p;
+    return {
+        ...p,
+        address:    p.address ? WITHHELD : p.address,
+        city:       undefined,
+        province:   undefined,
+        postalCode: undefined,
+        country:    undefined,
+        email:      p.email ? WITHHELD : p.email,
+        phone:      p.phone ? WITHHELD : p.phone,
+    };
+}
+
+/** Event `data` blobs can carry addresses/emails/phones (founding events,
+ *  director_address_changed). Replace any key that smells like contact info
+ *  with the placeholder, recursively. */
+function redactEventData(value: any): any {
+    if (Array.isArray(value)) return value.map(redactEventData);
+    if (!value || typeof value !== 'object') return value;
+    const out: Record<string, any> = {};
+    for (const [k, v] of Object.entries(value)) {
+        out[k] = /address|email|phone/i.test(k) && v ? WITHHELD : redactEventData(v);
+    }
+    return out;
+}
+
+/**
+ * The PDF must honor the same promise as the viewerCompany() JSON
+ * projection above: a share token is the only credential, so the output
+ * carries no personal contact info (home addresses, emails, phones) and no
+ * incorporation-document upload (which can carry incorporators' home
+ * addresses). Corporate addresses (registered office, records, service)
+ * stay — they are registry-public. Event attachments the owner explicitly
+ * uploaded (signed resolutions, registry filings) stay: they ARE the
+ * minute book being shared.
+ */
+function redactedForViewer(company: any, events: any[]): { company: any; events: any[] } {
+    return {
+        company: {
+            ...company,
+            directors:    (company.directors ?? []).map(redactPerson),
+            officers:     (company.officers ?? []).map(redactPerson),
+            shareholders: (company.shareholders ?? []).map(redactPerson),
+            authorizedBy: company.authorizedBy ? redactPerson(company.authorizedBy) : company.authorizedBy,
+            addressForService: company.addressForService
+                ? { ...company.addressForService, email: undefined }
+                : company.addressForService,
+            incorporationDocumentFile: undefined,
+        },
+        events: events.map((ev: any) => ({ ...ev, data: redactEventData(ev.data ?? {}) })),
+    };
+}
+
 /**
  * GET /api/share/:token/minute-book — streams the compiled minute book PDF
  * for the shared company. Same PDF pipeline as the owner's compile, but
- * bypasses ownership + the compliance-gap gate (viewers get what they get).
+ * bypasses ownership + the compliance-gap gate, and renders from the
+ * viewer-redacted projection (see redactedForViewer).
  */
 export const shareMinuteBookEndpoint = async (req: Request, res: Response) => {
     try {
@@ -296,13 +358,14 @@ export const shareMinuteBookEndpoint = async (req: Request, res: Response) => {
             return res.status(r.status === 'not_found' ? 404 : 410).json({ error: 'Share link is no longer available.' });
         }
 
-        const events = await CorporateEvent.find({ companyId: r.company._id, deletedAt: null })
+        const rawEvents = await CorporateEvent.find({ companyId: r.company._id, deletedAt: null })
             .sort({ effectiveDate: 1, recordedAt: 1 })
             .lean();
+        const { company, events } = redactedForViewer(r.company, rawEvents);
         // Cast — the Company model instance is needed by the PDF pipeline;
         // .lean() returns a plain object which works because the template
         // reads properties without invoking Mongoose methods.
-        const pdfBuffer = await generateMinuteBookPDF(r.company as any, events);
+        const pdfBuffer = await generateMinuteBookPDF(company as any, events);
 
         CompanyShare.updateOne({ _id: r.share._id }, {
             $set: { lastAccessedAt: new Date() },

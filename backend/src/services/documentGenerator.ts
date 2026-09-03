@@ -240,6 +240,31 @@ const appendUploadedDoc = async (merged: PDFDocument, filename?: string): Promis
  *  keep the browser page open forever and starve the pool. */
 const PAGE_TIMEOUT_MS = 60_000;
 
+/**
+ * UPL guard: these PDFs leave the system as standalone legal-looking
+ * instruments — emailed to signatories, handed to bankers and CRA, sent to
+ * DocuSeal — fully detached from the ToS where the not-legal-advice
+ * disclaimer lives. Stamping every page keeps the disclaimer attached to
+ * the document wherever it travels. Deliberately in the PDF layer, not the
+ * EJS templates, so every template (and every future one) is covered by a
+ * single code path.
+ */
+const DISCLAIMER =
+    'Prepared with MinuteBook from user-provided information. Not legal advice — have a lawyer review anything consequential.';
+
+const stampDisclaimer = (
+    doc: PDFDocument,
+    font: Awaited<ReturnType<PDFDocument['embedFont']>>,
+): void => {
+    const sz = 6.5;
+    const color = rgb(0.55, 0.55, 0.55);
+    const textWidth = font.widthOfTextAtSize(DISCLAIMER, sz);
+    doc.getPages().forEach((page) => {
+        const { width } = page.getSize();
+        page.drawText(DISCLAIMER, { x: (width - textWidth) / 2, y: 12, size: sz, font, color });
+    });
+};
+
 const addHeadersFooters = (
     merged: PDFDocument,
     font: Awaited<ReturnType<PDFDocument['embedFont']>>,
@@ -294,7 +319,12 @@ export const generatePDFBuffer = async (
             timeout: PAGE_TIMEOUT_MS,
             ...TEMPLATE_OPTIONS[templateName],
         });
-        return Buffer.from(pdfBuffer);
+        // Standalone documents (resolutions, registers, certificates) don't go
+        // through the merge pipeline, so they get the disclaimer stamp here.
+        const doc = await PDFDocument.load(pdfBuffer);
+        const font = await doc.embedFont(StandardFonts.Helvetica);
+        stampDisclaimer(doc, font);
+        return Buffer.from(await doc.save());
     } finally {
         await page.close().catch(() => {});
     }
@@ -365,6 +395,7 @@ export const generateMinuteBookPDF = async (company: ICompany, events: unknown[]
 
     const font = await merged.embedFont(StandardFonts.Helvetica);
     addHeadersFooters(merged, font, 'Corporate Minute Book', true);
+    stampDisclaimer(merged, font);
 
     return Buffer.from(await merged.save());
 };
@@ -463,6 +494,7 @@ export const generateInauguralPackagePDF = async (company: ICompany, events: unk
 
     const font = await merged.embedFont(StandardFonts.Helvetica);
     addHeadersFooters(merged, font, 'Organizational Documents', true);
+    stampDisclaimer(merged, font);
 
     return Buffer.from(await merged.save());
 };

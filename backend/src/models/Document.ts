@@ -23,4 +23,7 @@ const documentSchema: Schema = new Schema(
     { timestamps: true }
 );
 
+// Every document list and version-count query filters on companyId.
+documentSchema.index({ companyId: 1 });
+
 export const DocumentModel = mongoose.model<IDocument>('Document', documentSchema);

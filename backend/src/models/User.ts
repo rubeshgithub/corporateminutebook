@@ -21,6 +21,11 @@ export interface IUser extends Document {
     // First successful OTP verify — for crs_seeded accounts this is the
     // moment they "claim" any pre-populated companies attached to them.
     firstLoggedInAt?: Date | null;
+    // CASL withdrawal of consent for reminder emails (FYE / annual return).
+    // Set via the signed unsubscribe link; the notification scheduler skips
+    // opted-out users. Transactional mail (OTP, invites) is unaffected.
+    reminderOptOut?: boolean;
+    reminderOptOutAt?: Date | null;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -37,6 +42,8 @@ const userSchema: Schema = new Schema(
         otpCode: { type: String },   // legacy plaintext field, cleared on next code request
         origin: { type: String, enum: ['self_signup', 'crs_seeded'], default: 'self_signup' },
         firstLoggedInAt: { type: Date, default: null },
+        reminderOptOut: { type: Boolean, default: false },
+        reminderOptOutAt: { type: Date, default: null },
     },
     { timestamps: true }
 );

@@ -294,4 +294,9 @@ companySchema.index({
     'registrySignature.registryId':  1,
 });
 
+// The hottest query in the app: every list, stats, and per-request ownership
+// check filters on { userId, deletedAt } (often with _id). Without this every
+// one of those is a collection scan.
+companySchema.index({ userId: 1, deletedAt: 1 });
+
 export const Company = mongoose.model<ICompany>('Company', companySchema);

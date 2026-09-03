@@ -89,8 +89,9 @@ Frontend proxies API calls to `http://localhost:5000` in dev. The httpOnly auth 
 | Var | Purpose |
 |---|---|
 | `MONGODB_URI` | Atlas connection string |
-| `JWT_SECRET` | 32+ chars in production. Signs the httpOnly session cookie |
+| `JWT_SECRET` | 32+ chars in production. Signs the httpOnly session cookie + the unsubscribe-link tokens |
 | `FRONTEND_URL` | **Required in production only** — backs CORS allowlist + CSRF origin check. Without it the app boots but every authed write from the real SPA is rejected as foreign-origin. Falls back to `http://localhost:5173` in dev |
+| `S3_ATTACHMENTS_BUCKET` | **Required in production only** — without it uploads fall back to the ephemeral container disk and signed resolutions are destroyed on the next deploy. Falls back to local disk in dev |
 
 **Feature vars (feature no-ops silently if missing — warned at boot):**
 
@@ -98,7 +99,10 @@ Frontend proxies API calls to `http://localhost:5000` in dev. The httpOnly auth 
 |---|---|
 | `ANTHROPIC_API_KEY` | Incorporation-PDF parsing (Claude Haiku) |
 | `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` + `AWS_REGION` + `SES_FROM` | Transactional email (OTP, reminders, share invites, resolutions) |
-| `S3_ATTACHMENTS_BUCKET` + `S3_ATTACHMENTS_PREFIX` | Durable attachment storage. Falls back to local disk in dev (wiped on Render redeploy — must be set in prod) |
+| `S3_ATTACHMENTS_PREFIX` | Key prefix inside the attachments bucket |
+| `S3_REGION` | Region of the attachments bucket when it differs from `AWS_REGION` (bucket in `ca-central-1`, SES elsewhere). Falls back to `AWS_REGION` |
+| `BACKEND_PUBLIC_URL` | Backend's own public origin — backs the CASL unsubscribe links in reminder emails. Set to the Render backend URL in prod; falls back to `http://localhost:5000` |
+| `SENTRY_DSN` | Error tracking. Without it server errors exist only in stdout logs |
 | `DOCUSEAL_API_KEY` | e-Signature |
 | `CRS_FEED_SECRET` | Shared secret for HMAC-verified CRS order webhook |
 | `NODE_ENV=production` | Flips auth cookie to `secure=true` + `sameSite=none` for cross-origin XHR |

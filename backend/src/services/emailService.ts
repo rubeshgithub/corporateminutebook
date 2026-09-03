@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { SESClient, SendRawEmailCommand } from '@aws-sdk/client-ses';
+import { unsubscribeUrl } from '../utils/unsubscribe';
 
 const ses = new SESClient({
     region: process.env.AWS_REGION || 'us-east-1',
@@ -39,6 +40,21 @@ export const sendOtpEmail = async (opts: { to: string; code: string }) => {
 const APP_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 /**
+ * CASL machinery for the reminder emails. The reminders are commercial
+ * electronic messages (the AR reminder carries a paid-CRS-filing CTA), so
+ * each one needs a functioning unsubscribe: an RFC 8058 one-click header
+ * pair for mail clients, plus a visible footer link for humans. OTP,
+ * share-invite, and resolution emails are transactional and stay as-is.
+ */
+const unsubscribeHeaders = (to: string): Record<string, string> => ({
+    'List-Unsubscribe': `<${unsubscribeUrl(to)}>`,
+    'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+});
+
+const unsubscribeFooterHtml = (to: string): string =>
+    `<a href="${unsubscribeUrl(to)}" style="color:#888;text-decoration:underline">Unsubscribe from reminder emails</a>`;
+
+/**
  * Fiscal-year-end reminder — fires 30 days before FYE. Framed for the
  * business owner + their accountant: this is the moment annual director
  * and shareholder resolutions get dated, and the T2 corporate tax return
@@ -58,6 +74,7 @@ export const sendFyeReminderEmail = async (opts: {
     await sendMail({
         from: FROM,
         to,
+        headers: unsubscribeHeaders(to),
         subject: `${companyName}: fiscal year-end in ${daysUntil} days`,
         html: `
             <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#222;line-height:1.6">
@@ -82,7 +99,7 @@ export const sendFyeReminderEmail = async (opts: {
                     <a href="${url}" style="display:inline-block;background:#1a237e;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:600">Record an event →</a>
                 </div>
 
-                <p style="color:#888;font-size:12px;margin-top:32px">You're receiving this because ${companyName} has this fiscal year end on file with MinuteBook. To adjust or turn off reminders, edit the company in the app.</p>
+                <p style="color:#888;font-size:12px;margin-top:32px">You're receiving this because ${companyName} has this fiscal year end on file with MinuteBook. ${unsubscribeFooterHtml(to)}</p>
             </div>`,
     });
 };
@@ -107,6 +124,7 @@ export const sendAnnualReturnReminderEmail = async (opts: {
     await sendMail({
         from: FROM,
         to,
+        headers: unsubscribeHeaders(to),
         subject: `${companyName}: annual return due in ${daysUntil} days`,
         html: `
             <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#222;line-height:1.6">
@@ -137,7 +155,7 @@ export const sendAnnualReturnReminderEmail = async (opts: {
                     <a href="${url}" style="display:inline-block;background:#1a237e;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:600">Open ${companyName} →</a>
                 </div>
 
-                <p style="color:#888;font-size:12px;margin-top:32px">You're receiving this because ${companyName}'s annual return date is on file with MinuteBook.</p>
+                <p style="color:#888;font-size:12px;margin-top:32px">You're receiving this because ${companyName}'s annual return date is on file with MinuteBook. ${unsubscribeFooterHtml(to)}</p>
             </div>`,
     });
 };

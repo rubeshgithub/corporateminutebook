@@ -57,10 +57,13 @@ function startOfDay(d: Date): Date {
 }
 
 /** Look up the owner's email in one shot per user id. Cheap enough with
- *  small user counts; if this ever gets big we can batch with $in. */
+ *  small user counts; if this ever gets big we can batch with $in.
+ *  Returns null for opted-out users — CASL: an unsubscribed recipient
+ *  must receive no further reminder emails at all. */
 async function ownerEmail(userId: any): Promise<string | null> {
-    const u = await User.findById(userId).select('email').lean();
-    return u?.email ?? null;
+    const u = await User.findById(userId).select('email reminderOptOut').lean();
+    if (!u?.email || u.reminderOptOut) return null;
+    return u.email;
 }
 
 /**

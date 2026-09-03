@@ -204,10 +204,13 @@ const OtpForm: React.FC<Props> = ({
                 </form>
             )}
 
+            {/* Must point at THIS app's policies, not the CRS site's — the CRS
+                versions don't cover this app's processors (AI parsing, e-sign,
+                share links), so they are not the agreement being formed here. */}
             <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '0.875rem', textAlign: 'center' }}>
                 By continuing, you agree to our{' '}
-                <a href="https://www.corporateregistryservices.ca/terms" style={{ color: '#0C3D61' }}>Terms</a> &amp;{' '}
-                <a href="https://www.corporateregistryservices.ca/privacy" style={{ color: '#0C3D61' }}>Privacy</a>.
+                <a href="/terms" target="_blank" rel="noopener" style={{ color: '#0C3D61' }}>Terms</a> &amp;{' '}
+                <a href="/privacy" target="_blank" rel="noopener" style={{ color: '#0C3D61' }}>Privacy</a>.
             </div>
         </div>
     );

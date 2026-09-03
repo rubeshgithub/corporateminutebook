@@ -19,4 +19,9 @@ const activityLogSchema: Schema = new Schema(
     { timestamps: false }
 );
 
+// Backs the activity feed's find({ userId }).sort({ timestamp: -1 }). Without
+// it that query is a collection scan plus an in-memory sort, which hard-fails
+// at Mongo's 32 MB sort limit once the collection grows.
+activityLogSchema.index({ userId: 1, timestamp: -1 });
+
 export const ActivityLog = mongoose.model<IActivityLog>('ActivityLog', activityLogSchema);

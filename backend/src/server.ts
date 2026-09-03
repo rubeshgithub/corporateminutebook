@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import rateLimit from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
+import * as Sentry from '@sentry/node';
 import { connectDB } from './config/db';
 import { validateEnv } from './config/env';
 import { csrfGuard } from './middleware/csrf';
@@ -16,6 +17,15 @@ dotenv.config();
 
 // Fail the boot on missing required config rather than 500ing at first use.
 validateEnv();
+
+// Error tracking — no-ops without a DSN (warned at boot by validateEnv).
+// Every serverError() call and the global handler below report through this.
+if (process.env.SENTRY_DSN) {
+    Sentry.init({
+        dsn: process.env.SENTRY_DSN,
+        environment: process.env.NODE_ENV || 'development',
+    });
+}
 
 const app: Express = express();
 const PORT = process.env.PORT || 5000;
@@ -80,6 +90,7 @@ import incorporationRoutes from './routes/incorporationRoutes';
 import eventRoutes from './routes/eventRoutes';
 import crsFeedRoutes from './routes/crsFeedRoutes';
 import shareRoutes from './routes/shareRoutes';
+import emailRoutes from './routes/emailRoutes';
 
 // Basic Route
 app.use('/api/auth', authRoutes);
@@ -94,6 +105,8 @@ app.use('/api/crs-feed', crsFeedRoutes);
 // Sharing routes contribute BOTH /api/share/:token (public) AND owner-scoped
 // /api/companies/:id/shares + /api/shares/:shareId (auth-guarded inside).
 app.use('/api', shareRoutes);
+// CASL unsubscribe — public, token-in-URL (see emailRoutes).
+app.use('/api/email', emailRoutes);
 
 /**
  * Health check. Reports degraded (503) when the database is unreachable so an
@@ -123,6 +136,8 @@ app.get('/api/health', async (_req: Request, res: Response) => {
 
 // Generic Error Handler
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+    // No-op when Sentry.init didn't run (no DSN).
+    Sentry.captureException(err);
     console.error(err.stack);
     res.status(500).json({ error: 'Internal Server Error' });
 });

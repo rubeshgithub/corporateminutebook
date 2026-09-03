@@ -14,20 +14,25 @@ const REQUIRED = ['MONGODB_URI', 'JWT_SECRET'] as const;
 /**
  * Absent in production → the app boots but is silently broken. FRONTEND_URL
  * backs both the CORS allowlist and the CSRF origin check, so without it every
- * authenticated write from the real SPA is rejected as a foreign origin. Fail
- * loudly at boot instead of serving an app where saving anything 403s.
+ * authenticated write from the real SPA is rejected as a foreign origin.
+ * S3_ATTACHMENTS_BUCKET missing means uploads silently fall back to the
+ * container's ephemeral disk — signed resolutions are then destroyed on the
+ * next deploy and the loss surfaces days later as a customer's minute book
+ * missing documents. Both fail loudly at boot instead.
  */
-const REQUIRED_IN_PRODUCTION = ['FRONTEND_URL'] as const;
+const REQUIRED_IN_PRODUCTION = ['FRONTEND_URL', 'S3_ATTACHMENTS_BUCKET'] as const;
 
 /** Absent → a specific feature silently no-ops. Worth saying out loud. */
 const FEATURE_VARS: Array<{ name: string; disables: string }> = [
     { name: 'ANTHROPIC_API_KEY', disables: 'incorporation-PDF parsing' },
     { name: 'AWS_ACCESS_KEY_ID', disables: 'email sending (SES) and S3 uploads' },
-    { name: 'S3_ATTACHMENTS_BUCKET', disables: 'durable attachment storage (falls back to local disk)' },
     { name: 'DOCUSEAL_API_KEY', disables: 'e-signature' },
     { name: 'CRS_FEED_SECRET', disables: 'the CRS order webhook' },
-    // Only reached outside production — in production it is fatal above.
+    { name: 'SENTRY_DSN', disables: 'error tracking (Sentry)' },
+    { name: 'BACKEND_PUBLIC_URL', disables: 'correct unsubscribe links in reminder emails (falls back to localhost)' },
+    // Only reached outside production — in production these are fatal above.
     { name: 'FRONTEND_URL', disables: 'CORS and CSRF origin checks (falls back to localhost)' },
+    { name: 'S3_ATTACHMENTS_BUCKET', disables: 'durable attachment storage (falls back to local disk)' },
 ];
 
 export function validateEnv(): void {

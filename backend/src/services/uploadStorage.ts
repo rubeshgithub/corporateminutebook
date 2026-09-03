@@ -30,7 +30,10 @@ let _s3: S3Client | null = null;
 function s3(): S3Client {
     if (!_s3) {
         _s3 = new S3Client({
-            region: process.env.AWS_REGION ?? 'us-east-1',
+            // S3_REGION lets the attachments bucket live in ca-central-1
+            // (Canadian data residency) while SES keeps sending from the
+            // region its identity is verified in (AWS_REGION).
+            region: process.env.S3_REGION ?? process.env.AWS_REGION ?? 'us-east-1',
             credentials: {
                 accessKeyId:     process.env.AWS_ACCESS_KEY_ID     ?? '',
                 secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? '',

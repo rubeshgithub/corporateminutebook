@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import * as Sentry from '@sentry/node';
 
 /**
  * Standard 500 response.
@@ -16,6 +17,11 @@ import { Response } from 'express';
 export function serverError(res: Response, context: string, error: unknown, clientMessage?: string) {
     const detail = error instanceof Error ? error.stack || error.message : String(error);
     console.error(`[${context}] ${detail}`);
+    // No-op when Sentry.init didn't run (no DSN). The context tag is the
+    // grouping handle — same string the log line above carries.
+    Sentry.captureException(error instanceof Error ? error : new Error(detail), {
+        tags: { context },
+    });
     return res.status(500).json({
         error: clientMessage ?? 'Something went wrong on our end. Please try again.',
     });

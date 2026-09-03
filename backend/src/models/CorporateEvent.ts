@@ -112,4 +112,9 @@ const corporateEventSchema = new Schema<ICorporateEvent>(
     { timestamps: false },
 );
 
+// The dominant read shape: find({ companyId, deletedAt: null }) sorted by
+// effectiveDate (both directions — vault, compile, share view). The compound
+// serves filter + sort in one index walk.
+corporateEventSchema.index({ companyId: 1, deletedAt: 1, effectiveDate: 1 });
+
 export const CorporateEvent = mongoose.model<ICorporateEvent>('CorporateEvent', corporateEventSchema);
