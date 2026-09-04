@@ -144,6 +144,7 @@ Two services on the same account:
   - Env vars required: `MONGODB_URI`, `JWT_SECRET`, `FRONTEND_URL`, `NODE_ENV=production`, plus every feature-var above.
 - **Static Site** (frontend) — `frontend/` directory. `npm install && npm run build`. Publish directory: `dist`.
   - Env vars required: `VITE_API_URL=https://corporateminutebook.onrender.com`, `VITE_GOOGLE_PLACES_API_KEY`.
+  - **History fallback:** the SPA uses path routing, so every deep link (`/dashboard`, `/share/<token>`, `/account`, …) must serve `index.html`. Add a Redirect/Rewrite rule on the Static Site in the Render dashboard: source `/*`, destination `/index.html`, action **Rewrite**. Until that rule exists, the build script copies `index.html` to `404.html`, which Render serves for unknown paths — the app renders, but with a 404 status, so emailed share links work either way.
 
 Both are set to auto-deploy on push to `main`.
 
