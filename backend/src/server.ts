@@ -135,7 +135,19 @@ app.get('/api/health', async (_req: Request, res: Response) => {
 });
 
 // Generic Error Handler
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+app.use((err: Error & { status?: number; statusCode?: number; type?: string }, req: Request, res: Response, next: NextFunction) => {
+    // Errors raised by the body parsers carry a 4xx status (malformed JSON,
+    // body over the 1 MB cap, unsupported charset). Those are the client's
+    // fault: answer with that status and keep them out of Sentry — before
+    // this, a curl typo showed up as a 500 in error tracking.
+    const status = Number(err.status ?? err.statusCode);
+    if (status >= 400 && status < 500) {
+        const message =
+            err.type === 'entity.parse.failed' ? 'Malformed JSON body.' :
+            err.type === 'entity.too.large'    ? 'Request body too large (max 1 MB).' :
+            'Bad request.';
+        return res.status(status).json({ error: message });
+    }
     // No-op when Sentry.init didn't run (no DSN).
     Sentry.captureException(err);
     console.error(err.stack);

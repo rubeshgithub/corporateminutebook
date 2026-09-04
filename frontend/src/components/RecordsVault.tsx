@@ -385,7 +385,7 @@ const RecordsVault: React.FC = () => {
             }
         };
         load();
-    }, [companyId]);
+    }, [companyId, showSnackbar]);
 
     /**
      * Toggle the "no registry filing needed for this event" flag. Used for

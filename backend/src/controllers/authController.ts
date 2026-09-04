@@ -4,9 +4,15 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User';
 import { Company } from '../models/Company';
+import { CorporateEvent } from '../models/CorporateEvent';
+import { CompanyShare } from '../models/CompanyShare';
+import { DocumentModel } from '../models/Document';
+import { ActivityLog } from '../models/ActivityLog';
 import { sendOtpEmail } from '../services/emailService';
+import { deleteFile } from '../services/uploadStorage';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { serverError } from '../utils/apiError';
+import { DeleteAccountInput, UpdatePreferencesInput } from '../schemas/auth.schema';
 
 const generateToken = (id: string, role: string) =>
     jwt.sign({ id, role }, process.env.JWT_SECRET as string, { expiresIn: '30d' });
@@ -214,10 +220,107 @@ export const testMintSession = async (req: Request, res: Response) => {
  */
 export const me = async (req: AuthRequest, res: Response) => {
     try {
-        const user = await User.findById(req.user!.id).select('_id name email role');
+        const user = await User.findById(req.user!.id).select('_id name email role reminderOptOut createdAt');
         if (!user) return res.status(404).json({ error: 'User not found.' });
-        res.json({ _id: user._id, name: user.name, email: user.email, role: user.role });
+        res.json({
+            _id:            user._id,
+            name:           user.name,
+            email:          user.email,
+            role:           user.role,
+            reminderOptOut: !!user.reminderOptOut,
+            createdAt:      user.createdAt,
+        });
     } catch (error: any) {
         serverError(res, 'me', error);
+    }
+};
+
+/**
+ * PATCH /api/auth/preferences — in-app counterpart to the emailed CASL
+ * unsubscribe link. Unlike the link, this can also turn reminders back on.
+ * Body is validated by updatePreferencesSchema.
+ */
+export const updatePreferences = async (req: AuthRequest, res: Response) => {
+    try {
+        const { reminderOptOut } = req.body as UpdatePreferencesInput;
+        const user = await User.findByIdAndUpdate(
+            req.user!.id,
+            { $set: { reminderOptOut, reminderOptOutAt: reminderOptOut ? new Date() : null } },
+            { new: true },
+        ).select('reminderOptOut');
+        if (!user) return res.status(404).json({ error: 'User not found.' });
+        res.json({ reminderOptOut: !!user.reminderOptOut });
+    } catch (error: any) {
+        serverError(res, 'updatePreferences', error);
+    }
+};
+
+/**
+ * DELETE /api/auth/account — self-service, permanent account deletion.
+ *
+ * The privacy policy promises users can delete their account and its
+ * contents; this is that promise. Everything the user owns goes: every
+ * company (soft-deleted ones included — a hidden flag is not erasure),
+ * every recorded event, uploaded attachment, generated-document record,
+ * share link, activity-log row, and finally the user itself.
+ *
+ * Ordering is deliberate. Stored files go first, then the rows that point
+ * at them, and the User row last: if any step fails part-way the account
+ * still exists, the session still works, and a retry re-runs the same
+ * idempotent deletes. No transaction — a partially erased account that can
+ * be retried is the right failure mode here, not a rolled-back one.
+ *
+ * The body must carry the account email retyped (deleteAccountSchema);
+ * a session cookie alone is not enough to trigger something irreversible.
+ */
+export const deleteAccount = async (req: AuthRequest, res: Response) => {
+    try {
+        const user = await User.findById(req.user!.id);
+        if (!user) {
+            clearAuthCookie(res);
+            return res.status(404).json({ error: 'User not found.' });
+        }
+
+        const { confirmEmail } = req.body as DeleteAccountInput;
+        if (confirmEmail !== user.email) {
+            return res.status(400).json({ error: 'The email you typed does not match this account.' });
+        }
+
+        const companies = await Company.find({ userId: user._id })
+            .select('_id incorporationDocumentFile')
+            .lean();
+        const companyIds = companies.map((c) => c._id);
+        const events = await CorporateEvent.find({ companyId: { $in: companyIds } })
+            .select('attachments')
+            .lean();
+
+        const fileIds = [
+            ...companies.map((c) => c.incorporationDocumentFile).filter((f): f is string => !!f),
+            ...events.flatMap((e) => (e.attachments ?? []).map((a) => a.fileId)),
+        ];
+        // deleteFile is best-effort and never throws — an S3 hiccup must not
+        // leave the account half-alive. Files that survive are unreachable
+        // once the rows below are gone (UUID keys, no listing endpoint).
+        await Promise.all(fileIds.map((id) => deleteFile(id)));
+
+        await Promise.all([
+            CompanyShare.deleteMany({ companyId: { $in: companyIds } }),
+            CorporateEvent.deleteMany({ companyId: { $in: companyIds } }),
+            DocumentModel.deleteMany({ companyId: { $in: companyIds } }),
+            ActivityLog.deleteMany({ userId: user._id }),
+        ]);
+        await Company.deleteMany({ userId: user._id });
+        await User.deleteOne({ _id: user._id });
+
+        clearAuthCookie(res);
+        // Counts only — the email is personal data and this is the one log
+        // line that outlives the account.
+        console.log(
+            `[deleteAccount] user ${user._id} erased — ${companies.length} companies, ` +
+            `${events.length} events, ${fileIds.length} files`,
+        );
+        return res.json({ ok: true });
+    } catch (error: any) {
+        return serverError(res, 'deleteAccount', error);
     }
 };

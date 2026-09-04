@@ -12,7 +12,29 @@ const ses = new SESClient({
 
 const FROM = process.env.SES_FROM || 'MinuteBook <rubesh@insteadglobal.com>';
 
+/** SES is usable only when both AWS keys are present (env.ts warns at boot
+ *  when they are not). */
+const emailConfigured = () =>
+    !!(process.env.AWS_ACCESS_KEY_ID?.trim() && process.env.AWS_SECRET_ACCESS_KEY?.trim());
+
 const sendMail = async (opts: nodemailer.SendMailOptions) => {
+    // Without credentials every send used to fail inside the SDK — which
+    // turned OTP sign-in into a 500 and made a local stack unusable without
+    // AWS keys. Outside production, log the envelope instead: the subject
+    // line of the OTP mail carries the code, so a developer can sign in
+    // from the server log. Production still fails loudly.
+    if (!emailConfigured()) {
+        if (process.env.NODE_ENV === 'production') {
+            throw new Error('Email is not configured: AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY are missing.');
+        }
+        console.log(
+            `[email] SES not configured — message NOT sent.\n` +
+            `[email]   To:      ${String(opts.to)}\n` +
+            `[email]   Subject: ${String(opts.subject)}`,
+        );
+        return;
+    }
+
     const builder = nodemailer.createTransport({ streamTransport: true, newline: 'unix', buffer: true });
     const { message } = await builder.sendMail(opts);
     await ses.send(new SendRawEmailCommand({ RawMessage: { Data: message as Buffer } }));

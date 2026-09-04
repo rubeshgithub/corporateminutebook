@@ -49,7 +49,7 @@ export const unsubscribe = async (req: Request, res: Response) => {
             'You are unsubscribed',
             `<p><strong>${email}</strong> will no longer receive fiscal-year-end or annual-return reminder emails from MinuteBook.</p>` +
             '<p>Sign-in codes and documents you request yourself are unaffected. ' +
-            'To turn reminders back on, contact support.</p>',
+            'To turn reminders back on, sign in to MinuteBook and use the Account page.</p>',
         ));
     } catch (error) {
         return serverError(res, 'unsubscribe', error);

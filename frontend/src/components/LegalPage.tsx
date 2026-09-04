@@ -14,7 +14,7 @@ import LandingFooter from './LandingFooter';
  * policy that lags the code is worse than no policy.
  */
 
-const LAST_UPDATED = 'July 31, 2026';
+const LAST_UPDATED = 'September 3, 2026';
 const CONTACT = 'support@corporateregistryservices.ca';
 
 const H2: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -115,8 +115,13 @@ export const PrivacyPolicy: React.FC = () => (
         <P>
             We keep your corporate records for as long as your account is active, because a minute book is a
             record you are legally required to maintain. When you delete a company it is removed from your
-            dashboard and retained in our backups for a limited period before permanent erasure. To request
-            deletion of your account and its contents, email us at {CONTACT}.
+            dashboard and retained in our backups for a limited period before permanent erasure.
+        </P>
+        <P>
+            You can delete your account and everything in it yourself, at any time, from the Account page in the
+            application. Your companies, recorded events, uploaded documents, generated-document history, and share
+            links are erased from our systems immediately; copies in our backups age out within a limited period.
+            You can also email us at {CONTACT} to request deletion, and we will complete it within thirty days.
         </P>
 
         <H2>Your rights</H2>
@@ -218,7 +223,8 @@ export const TermsOfService: React.FC = () => (
 
         <H2>Termination</H2>
         <P>
-            You may stop using the service and request deletion at any time. We may suspend or terminate an
+            You may stop using the service at any time, and delete your account and its contents from the
+            Account page or by emailing {CONTACT}. We may suspend or terminate an
             account that breaches these terms, and will give notice and a reasonable opportunity to export
             records except where immediate suspension is necessary.
         </P>

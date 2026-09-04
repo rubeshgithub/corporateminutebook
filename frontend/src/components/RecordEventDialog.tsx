@@ -95,7 +95,6 @@ const RecordEventDialog: React.FC<Props> = ({ open, onClose, companyId, company,
             setEventType(initialEventType);
             setFormData({});
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, initialEventType]);
     const [effectiveDate, setEffectiveDate] = useState('');
     const [notes, setNotes] = useState('');

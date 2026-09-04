@@ -97,6 +97,7 @@ const DocumentManagement = () => {
                 }
             } catch (error) {
                 console.error('Error fetching companies:', error);
+                showSnackbar('Could not load your companies. Refresh the page to try again.', 'error');
             }
         };
         fetchCompanies();
@@ -115,10 +116,11 @@ const DocumentManagement = () => {
             } catch (error) {
                 console.error('Error fetching document history:', error);
                 setHistory([]);
+                showSnackbar('Could not load the document history for this company.', 'error');
             }
         };
         fetchHistory();
-    }, [selectedCompanyId]);
+    }, [selectedCompanyId, showSnackbar]);
 
     const ANNUAL_RESOLUTION_TYPES = new Set(['annual_director_resolution', 'annual_shareholder_resolution']);
 
@@ -208,6 +210,7 @@ const DocumentManagement = () => {
             setHistory(data);
         } catch (error) {
             console.error('Error refreshing history:', error);
+            showSnackbar('Document generated, but the history list could not be refreshed.', 'warning');
         }
     };
 
@@ -223,7 +226,7 @@ const DocumentManagement = () => {
             const text = await (error.response.data as Blob).text();
             const parsed = JSON.parse(text);
             if (parsed?.status === 'compliance_warning') return parsed as ComplianceWarning;
-        } catch {}
+        } catch { /* not a JSON compliance payload — treat as an ordinary error */ }
         return null;
     };
 

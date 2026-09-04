@@ -7,6 +7,8 @@ import MinuteBookBuilder from './components/MinuteBookBuilder';
 import DocumentManagement from './components/DocumentManagement';
 import RecordsVault from './components/RecordsVault';
 import SharedCompanyView from './components/SharedCompanyView';
+import AccountPage from './components/AccountPage';
+import SessionBootCheck from './components/SessionBootCheck';
 import { PrivacyPolicy, TermsOfService } from './components/LegalPage';
 import Layout from './components/Layout';
 import { useSelector } from 'react-redux';
@@ -45,6 +47,9 @@ function App() {
             <CssBaseline />
             <SnackbarProvider>
             <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+                {/* Confirms the cached sign-in against the server once per
+                    page load; signs the shell out if the cookie is gone. */}
+                <SessionBootCheck />
                 <Routes>
                     <Route path="/" element={<Landing />} />
                     <Route path="/login" element={<Login />} />
@@ -55,6 +60,7 @@ function App() {
                     <Route path="/documents" element={<PrivateRoute><DocumentManagement /></PrivateRoute>} />
                     <Route path="/events/:companyId" element={<EventsRedirect />} />
                     <Route path="/records/:companyId" element={<PrivateRoute><RecordsVault /></PrivateRoute>} />
+                    <Route path="/account" element={<PrivateRoute><AccountPage /></PrivateRoute>} />
                     {/* Public read-only share view — no auth. The token IS
                         the credential; backend enforces expiry + revoke. */}
                     <Route path="/share/:token" element={<SharedCompanyView />} />

@@ -6,7 +6,11 @@
   "scripts": {
     "start": "node dist/server.js",
     "dev": "npm run build && nodemon dist/server.js",
-    "build": "tsc && node -e \"require('fs').cpSync('src/templates','dist/templates',{recursive:true})\""
+    "build": "tsc && node -e \"require('fs').cpSync('src/templates','dist/templates',{recursive:true})\"",
+    "typecheck": "tsc --noEmit && tsc -p test/tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "backfill:founding-na": "ts-node --project scripts/tsconfig.json scripts/backfillFoundingRegistryNA.ts"
   },
   "keywords": [],
   "author": "",
@@ -54,6 +58,7 @@
     "@types/uuid": "^10.0.0",
     "nodemon": "^3.1.14",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
   }
 }

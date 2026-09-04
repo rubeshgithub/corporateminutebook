@@ -1,0 +1,173 @@
+# Continuous integration.
+#
+# Render auto-deploys `main` on push, so before this workflow existed every
+# push went to production with no automated check at all. Three jobs:
+#
+#   backend   typecheck (app + unit tests), unit tests, production build
+#   frontend  lint, unit tests, typecheck + Vite build
+#   e2e       the Playwright persona suite against a real backend + Mongo
+#             (single-node replica set — the API uses transactions) with the
+#             SPA served from its production build
+#
+# The e2e job is the slow one (Chrome for Puppeteer, Chromium for Playwright,
+# two builds); it only starts once the fast jobs are green.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: 24
+
+jobs:
+  backend:
+    name: Backend — typecheck, unit tests, build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      # Chrome is not needed to typecheck or unit-test; skip the download.
+      PUPPETEER_SKIP_DOWNLOAD: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  frontend:
+    name: Frontend — lint, unit tests, build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+  e2e:
+    name: Persona tests (Playwright)
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    timeout-minutes: 30
+    env:
+      # CI-only values. The persona suite and the backend must agree on
+      # TEST_MODE_TOKEN; nothing here is reused outside this workflow.
+      TEST_MODE_TOKEN: ci-persona-suite-token
+      JWT_SECRET: ci-only-jwt-secret-0123456789abcdef0123456789abcdef
+      MONGODB_URI: mongodb://localhost:27017/minutebook_ci?directConnection=true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+            tests/package-lock.json
+
+      - name: Start MongoDB as a single-node replica set
+        run: |
+          docker run -d --name mongo -p 27017:27017 mongo:7 --replSet rs0 --bind_ip_all
+          for i in $(seq 1 30); do
+            if docker exec mongo mongosh --quiet --eval 'rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "localhost:27017" }] })' >/dev/null 2>&1; then
+              break
+            fi
+            sleep 2
+          done
+          for i in $(seq 1 30); do
+            if docker exec mongo mongosh --quiet --eval 'db.hello().isWritablePrimary' | grep -q true; then
+              echo "MongoDB primary ready"; exit 0
+            fi
+            sleep 2
+          done
+          echo "MongoDB replica set did not become primary"; docker logs mongo; exit 1
+
+      - name: Install and build backend (Chrome included for PDF compile)
+        working-directory: backend
+        run: |
+          npm ci
+          npx puppeteer browsers install chrome
+          npm run build
+
+      - name: Start backend
+        working-directory: backend
+        env:
+          NODE_ENV: development
+          PORT: 5000
+          FRONTEND_URL: http://localhost:5173
+          BACKEND_PUBLIC_URL: http://localhost:5000
+          TEST_MODE_ENABLED: 'true'
+        run: |
+          nohup npm start > ../backend.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:5000/api/health >/dev/null; then
+              echo "backend healthy"; exit 0
+            fi
+            sleep 2
+          done
+          echo "backend did not become healthy"; cat ../backend.log; exit 1
+
+      - name: Build and serve frontend
+        working-directory: frontend
+        env:
+          VITE_API_URL: http://localhost:5000
+        run: |
+          npm ci
+          npm run build
+          nohup npx vite preview --port 5173 --strictPort > ../frontend.log 2>&1 &
+          for i in $(seq 1 15); do
+            if curl -sf http://localhost:5173 >/dev/null; then
+              echo "frontend serving"; exit 0
+            fi
+            sleep 2
+          done
+          echo "frontend did not start"; cat ../frontend.log; exit 1
+
+      - name: Install persona suite
+        working-directory: tests
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run persona tests
+        working-directory: tests
+        env:
+          MINUTEBOOK_URL: http://localhost:5173
+          MINUTEBOOK_API_URL: http://localhost:5000
+        run: npm test
+
+      - name: Upload Playwright report and server logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: persona-test-output
+          path: |
+            tests/playwright-report
+            tests/test-results
+            backend.log
+            frontend.log
+          if-no-files-found: ignore
+          retention-days: 14

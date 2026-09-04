@@ -541,7 +541,7 @@ const MinuteBookBuilder: React.FC = () => {
             }
         };
         fetchCompany();
-    }, [id, isEdit, navigate, reset]);
+    }, [id, isEdit, navigate, reset, showSnackbar]);
 
     const handleIncorpUpload = async (file: File) => {
         setUploadError('');

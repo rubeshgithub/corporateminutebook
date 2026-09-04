@@ -3,7 +3,8 @@ import {
     Box, Typography, Button, Paper, Grid, IconButton, TextField, InputAdornment,
     Avatar, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
     TablePagination, TableSortLabel, Tooltip, Chip, Divider,
-    Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Stack
+    Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Stack,
+    Alert, CircularProgress
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -286,8 +287,14 @@ const Dashboard: React.FC = () => {
     const [orderBy, setOrderBy] = React.useState<OrderBy>('name');
     const [deleteDialog, setDeleteDialog] = React.useState<{ open: boolean; companyId: string; companyName: string }>({ open: false, companyId: '', companyName: '' });
     const [shareDialog, setShareDialog] = React.useState<{ open: boolean; companyId: string; companyName: string }>({ open: false, companyId: '', companyName: '' });
+    // Load state is explicit so a failed fetch never masquerades as an empty
+    // account — the first-run hero ("Add your first corporation") must only
+    // appear when the server actually said there are no companies.
+    const [loading, setLoading] = React.useState(true);
+    const [loadError, setLoadError] = React.useState<string | null>(null);
 
     const fetchAll = async () => {
+        setLoadError(null);
         try {
             const [companiesRes, complianceRes, activityRes, statsRes, upsellRes] = await Promise.all([
                 api.get('/companies'),
@@ -301,11 +308,20 @@ const Dashboard: React.FC = () => {
             setActivity(activityRes.data);
             setStats(statsRes.data);
             setUpsell(upsellRes.data ?? []);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Dashboard load error:', error);
+            const message = error?.response?.data?.error
+                || 'Could not load your dashboard. Check your connection and try again.';
+            setLoadError(message);
+            showSnackbar(message, 'error');
+        } finally {
+            setLoading(false);
         }
     };
 
+    // Initial load only — fetchAll is re-invoked explicitly after mutations
+    // (delete, drift acknowledgement) and from the Retry button.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     React.useEffect(() => { fetchAll(); }, []);
 
     const complianceMap = React.useMemo(() => {
@@ -426,6 +442,22 @@ const Dashboard: React.FC = () => {
                     </Button>
                 </Box>
             </Box>
+
+            {/* Load failure — shown in place, with a retry, rather than a
+                console line the user never sees. */}
+            {loadError && (
+                <Alert
+                    severity="error"
+                    sx={{ mb: 2.5, borderRadius: 2 }}
+                    action={
+                        <Button color="inherit" size="small" onClick={() => { setLoading(true); fetchAll(); }} sx={{ fontWeight: 700 }}>
+                            Retry
+                        </Button>
+                    }
+                >
+                    {loadError}
+                </Alert>
+            )}
 
             {/* Annual return compliance banner */}
             {urgentCompanies.length > 0 && (
@@ -635,8 +667,17 @@ const Dashboard: React.FC = () => {
                         <TableBody>
                             {paginatedCompanies.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={7} sx={{ py: search ? 5 : 8, border: 'none' }}>
-                                        {search ? (
+                                    <TableCell colSpan={7} sx={{ py: search || loading || loadError ? 5 : 8, border: 'none' }}>
+                                        {loading ? (
+                                            <Box display="flex" alignItems="center" justifyContent="center" gap={1.5} color="text.secondary" fontSize={13}>
+                                                <CircularProgress size={18} />
+                                                Loading your companies…
+                                            </Box>
+                                        ) : loadError ? (
+                                            <Box textAlign="center" color="text.secondary" fontSize={13}>
+                                                Your companies could not be loaded. Use Retry above to try again.
+                                            </Box>
+                                        ) : search ? (
                                             <Box textAlign="center" color="text.secondary" fontSize={13}>
                                                 No companies match &ldquo;{search}&rdquo;
                                             </Box>

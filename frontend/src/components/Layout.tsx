@@ -10,6 +10,7 @@ const NAV_ITEMS = [
     { label: 'Dashboard', path: '/dashboard' },
     { label: 'New Company', path: '/builder' },
     { label: 'Documents', path: '/documents' },
+    { label: 'Account', path: '/account' },
 ];
 
 const CrsBrandStrip: React.FC = () => (

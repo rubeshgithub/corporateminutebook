@@ -8,6 +8,9 @@ interface SnackbarContextValue {
 
 const SnackbarContext = createContext<SnackbarContextValue>({ showSnackbar: () => {} });
 
+// The hook and its provider belong in one file; a hook export is what the
+// fast-refresh rule flags, and it is harmless here (no component state).
+// eslint-disable-next-line react-refresh/only-export-components
 export const useSnackbar = () => useContext(SnackbarContext);
 
 export const SnackbarProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

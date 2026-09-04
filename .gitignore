@@ -52,6 +52,9 @@ frontend/dist/
 # Uploaded incorporation documents (stored server-side, not in git)
 backend/uploads/
 
+# Local dev MongoDB data (replica-set mongod started by the dev stack)
+backend/.mongo-data/
+
 # Optional npm/yarn caches
 .npm/
 .yarn/
