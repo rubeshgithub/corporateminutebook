@@ -4,6 +4,7 @@ import { Company } from '../models/Company';
 import { ActivityLog } from '../models/ActivityLog';
 import { CorporateEvent } from '../models/CorporateEvent';
 import { serverError } from '../utils/apiError';
+import { annualReturnCompliance } from '../utils/annualReturns';
 
 const ACTIVE = { deletedAt: null };
 
@@ -210,44 +211,10 @@ export const deleteCompany = async (req: AuthRequest, res: Response) => {
 };
 
 // ─── Compliance summary ───────────────────────────────────────────────────────
-
-// Parse fiscalYearEnd string ("December 31", "Dec 31", "12-31", etc.) → [month, day] 1-indexed
-const parseFYE = (fye: string | undefined): [number, number] => {
-    if (!fye) return [12, 31];
-    const mmdd = fye.match(/^(\d{1,2})-(\d{1,2})$/);
-    if (mmdd) return [parseInt(mmdd[1]), parseInt(mmdd[2])];
-    const MONTHS: Record<string, number> = {
-        january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
-        july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
-        jan: 1, feb: 2, mar: 3, apr: 4, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
-    };
-    const named = fye.toLowerCase().match(/([a-z]+)\s+(\d{1,2})/);
-    if (named && MONTHS[named[1]]) return [MONTHS[named[1]], parseInt(named[2])];
-    return [12, 31];
-};
-
-// Returns the list of fiscal years (by FYE year) for which an annual return is expected.
-// A year is expected once its FYE date has passed (strictly before today).
-const computeExpectedFiscalYears = (
-    incorporationDate: Date | undefined,
-    fiscalYearEnd: string | undefined,
-    today: Date,
-): number[] => {
-    if (!incorporationDate) return [];
-    const [mm, dd] = parseFYE(fiscalYearEnd);
-    const incorpYear = incorporationDate.getFullYear();
-    // First FYE strictly after the incorporation date
-    let fye = new Date(incorpYear, mm - 1, dd);
-    if (fye <= incorporationDate) {
-        fye = new Date(incorpYear + 1, mm - 1, dd);
-    }
-    const years: number[] = [];
-    while (fye < today) {
-        years.push(fye.getFullYear());
-        fye = new Date(fye.getFullYear() + 1, mm - 1, dd);
-    }
-    return years;
-};
+//
+// Annual-return expectations come from utils/annualReturns (anniversary-based,
+// first return due on the first anniversary). They used to be derived from the
+// fiscal year-end here, which expected a return days after incorporation.
 
 const RESOLUTION_ELIGIBLE = new Set([
     'director_appointed', 'director_resigned', 'director_address_changed',
@@ -299,53 +266,25 @@ export const getComplianceSummary = async (req: AuthRequest, res: Response) => {
                     !(e as any).registryFilingNotApplicable,
             ).length;
 
-            let annualReturnStatus: 'not_set' | 'ok' | 'due_soon' | 'overdue' = 'not_set';
-            let daysUntilAnnualReturn: number | null = null;
-
-            const dueMMDD = (company as any).annualReturnDueDate as string | undefined;
-            if (dueMMDD) {
-                const [mm, dd] = dueMMDD.split('-').map(Number);
-
-                const thisYearDue = new Date(today.getFullYear(), mm - 1, dd);
-                const prevDue = thisYearDue >= today
-                    ? new Date(today.getFullYear() - 1, mm - 1, dd)
-                    : thisYearDue;
-                const nextDue = thisYearDue >= today ? thisYearDue : new Date(today.getFullYear() + 1, mm - 1, dd);
-
-                daysUntilAnnualReturn = Math.ceil((nextDue.getTime() - today.getTime()) / 86400000);
-
-                const lastFiled = compEvents
-                    .filter((e) => e.eventType === 'annual_return_filed')
-                    .map((e) => new Date(e.effectiveDate))
-                    .sort((a, b) => b.getTime() - a.getTime())[0];
-
-                const filedThisPeriod = lastFiled && lastFiled >= prevDue;
-
-                if (today > prevDue && !filedThisPeriod) {
-                    annualReturnStatus = 'overdue';
-                } else if (daysUntilAnnualReturn <= 30 && !filedThisPeriod) {
-                    annualReturnStatus = 'due_soon';
-                } else {
-                    annualReturnStatus = 'ok';
-                }
-            }
+            // Annual returns — one shared, UTC-safe, anniversary-based schedule
+            // (also used by the compile gate, the reminder scheduler and the
+            // Records Vault). A company incorporated 28 Dec 2025 owes its first
+            // return on 28 Dec 2026, not on the 28 Dec before it existed.
+            const arFilings = compEvents.filter((e) => e.eventType === 'annual_return_filed');
+            const ar = annualReturnCompliance({
+                incorporationDate: (company as any).incorporationDate,
+                dueMMDD:           (company as any).annualReturnDueDate,
+                filings:           arFilings.map((e) => ({ effectiveDate: e.effectiveDate, data: e.data as { year?: unknown } })),
+                today,
+            });
+            const annualReturnStatus = ar.status;
+            const daysUntilAnnualReturn = ar.daysUntilNext;
+            const expectedYears = ar.expectedYears;
+            const missingAnnualReturnYears = ar.missingYears;
+            const filedAnnualReturns = arFilings.length;
 
             // Document-level expectations
             const missingIncorpDoc = !(company as any).incorporationDocumentFile;
-
-            const incorpDate = (company as any).incorporationDate
-                ? new Date((company as any).incorporationDate)
-                : undefined;
-            const expectedYears = computeExpectedFiscalYears(incorpDate, (company as any).fiscalYearEnd, today);
-
-            const filedYearSet = new Set(
-                compEvents
-                    .filter((e) => e.eventType === 'annual_return_filed' && (e.data as any)?.year != null)
-                    .map((e) => Number((e.data as any).year))
-                    .filter((y) => !isNaN(y)),
-            );
-            const missingAnnualReturnYears = expectedYears.filter((y) => !filedYearSet.has(y));
-            const filedAnnualReturns = compEvents.filter((e) => e.eventType === 'annual_return_filed').length;
 
             const issues = missingResolutions + missingRegistryFilings
                 + (missingIncorpDoc ? 1 : 0)
@@ -364,6 +303,7 @@ export const getComplianceSummary = async (req: AuthRequest, res: Response) => {
                 missingRegistryFilings,
                 annualReturnStatus,
                 daysUntilAnnualReturn,
+                nextAnnualReturnDue: ar.nextDue,
                 missingIncorpDoc,
                 expectedAnnualReturns: expectedYears.length,
                 filedAnnualReturns,

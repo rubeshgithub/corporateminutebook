@@ -23,6 +23,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import api from '../utils/api';
 import { useNavigate } from 'react-router-dom';
 import { useSnackbar } from '../context/SnackbarContext';
+import { formatDateOnly } from '../utils/annualReturns';
 import ShareDialog from './ShareDialog';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -43,6 +44,7 @@ interface ComplianceEntry {
     missingRegistryFilings: number;
     annualReturnStatus: 'not_set' | 'ok' | 'due_soon' | 'overdue';
     daysUntilAnnualReturn: number | null;
+    nextAnnualReturnDue?: string | null;
     missingIncorpDoc: boolean;
     expectedAnnualReturns: number;
     filedAnnualReturns: number;
@@ -215,11 +217,12 @@ const ComplianceBadge: React.FC<{ c: ComplianceEntry | undefined; onClick: () =>
 
     // Build tooltip lines
     const lines: string[] = [];
+    const nextDue = c.nextAnnualReturnDue ? ` (${formatDateOnly(c.nextAnnualReturnDue, { month: 'short' })})` : '';
     if (isOverdue) lines.push('Annual return OVERDUE');
-    else if (isDueSoon) lines.push(`Annual return due in ${c.daysUntilAnnualReturn}d`);
+    else if (isDueSoon) lines.push(`Annual return due in ${c.daysUntilAnnualReturn}d${nextDue}`);
     if (c.missingIncorpDoc) lines.push('No incorporation document uploaded');
     if (c.missingAnnualReturnYears?.length > 0)
-        lines.push(`Annual return${c.missingAnnualReturnYears.length > 1 ? 's' : ''} not filed: FY ${c.missingAnnualReturnYears.join(', ')}`);
+        lines.push(`Annual return${c.missingAnnualReturnYears.length > 1 ? 's' : ''} not filed: ${c.missingAnnualReturnYears.join(', ')}`);
     if (c.missingResolutions > 0) lines.push(`${c.missingResolutions} event${c.missingResolutions > 1 ? 's' : ''} missing a signed resolution`);
     if (c.missingRegistryFilings > 0) lines.push(`${c.missingRegistryFilings} event${c.missingRegistryFilings > 1 ? 's' : ''} missing a registry filing`);
     if (lines.length === 0) lines.push('All records complete');
@@ -769,7 +772,7 @@ const Dashboard: React.FC = () => {
                                             <TableCell sx={{ py: 0.75 }}>
                                                 <Typography variant="body2" color="text.secondary" fontSize={12}>
                                                     {company.incorporationDate
-                                                        ? new Date(company.incorporationDate).toLocaleDateString()
+                                                        ? formatDateOnly(company.incorporationDate, { month: 'short' })
                                                         : '—'}
                                                 </Typography>
                                                 {company.fiscalYearEnd && (

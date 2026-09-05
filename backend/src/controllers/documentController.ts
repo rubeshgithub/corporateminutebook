@@ -6,6 +6,7 @@ import { Company } from '../models/Company';
 import { CorporateEvent } from '../models/CorporateEvent';
 import { generatePDFBuffer, generateMinuteBookPDF, generateInauguralPackagePDF } from '../services/documentGenerator';
 import { serverError } from '../utils/apiError';
+import { annualReturnCompliance } from '../utils/annualReturns';
 
 const TEMPLATE_LABELS: Record<string, string> = {
     glossary: 'Glossary',
@@ -51,38 +52,6 @@ const COMPILE_REGISTRY_REQUIRED = new Set([
     'shares_cancelled', 'share_class_added',
 ]);
 
-const parseFYELocal = (fye: string | undefined): [number, number] => {
-    if (!fye) return [12, 31];
-    const mmdd = fye.match(/^(\d{1,2})-(\d{1,2})$/);
-    if (mmdd) return [parseInt(mmdd[1]), parseInt(mmdd[2])];
-    const MONTHS: Record<string, number> = {
-        january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
-        july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
-        jan: 1, feb: 2, mar: 3, apr: 4, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
-    };
-    const named = fye.toLowerCase().match(/([a-z]+)\s+(\d{1,2})/);
-    if (named && MONTHS[named[1]]) return [MONTHS[named[1]], parseInt(named[2])];
-    return [12, 31];
-};
-
-const computeExpectedYearsLocal = (
-    incorporationDate: Date | undefined,
-    fiscalYearEnd: string | undefined,
-    today: Date,
-): number[] => {
-    if (!incorporationDate) return [];
-    const [mm, dd] = parseFYELocal(fiscalYearEnd);
-    const incorpYear = incorporationDate.getFullYear();
-    let fye = new Date(incorpYear, mm - 1, dd);
-    if (fye <= incorporationDate) fye = new Date(incorpYear + 1, mm - 1, dd);
-    const years: number[] = [];
-    while (fye < today) {
-        years.push(fye.getFullYear());
-        fye = new Date(fye.getFullYear() + 1, mm - 1, dd);
-    }
-    return years;
-};
-
 const buildComplianceGaps = (company: any, events: any[]): string[] => {
     const gaps: string[] = [];
 
@@ -101,20 +70,15 @@ const buildComplianceGaps = (company: any, events: any[]): string[] => {
         gaps.push('Certificate of Incorporation not uploaded');
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const incorpDate = company.incorporationDate ? new Date(company.incorporationDate) : undefined;
-    const expectedYears = computeExpectedYearsLocal(incorpDate, company.fiscalYearEnd, today);
-    const filedYears = new Set(
-        events
-            .filter((e) => e.eventType === 'annual_return_filed' && e.data?.year != null)
-            .map((e) => Number(e.data.year))
-            .filter((y) => !isNaN(y)),
-    );
-    const missingARYears = expectedYears.filter((y) => !filedYears.has(y));
+    // Same anniversary-based schedule the dashboard uses (utils/annualReturns).
+    const { missingYears } = annualReturnCompliance({
+        incorporationDate: company.incorporationDate,
+        dueMMDD:           company.annualReturnDueDate,
+        filings:           events.filter((e) => e.eventType === 'annual_return_filed'),
+    });
 
-    if (missingARYears.length > 0) {
-        gaps.push(`Annual returns not filed for FY ${missingARYears.join(', ')}`);
+    if (missingYears.length > 0) {
+        gaps.push(`Annual return${missingYears.length !== 1 ? 's' : ''} not filed for ${missingYears.join(', ')}`);
     }
     if (missingRes > 0) {
         gaps.push(`${missingRes} corporate change event${missingRes !== 1 ? 's' : ''} missing a signed resolution`);

@@ -154,7 +154,9 @@ const SharedCompanyView: React.FC = () => {
     const shareClasses = c.shareClasses || [];
     const expiresLabel = new Date(data.share.expiresAt).toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' });
 
-    const fmtDate = (iso: string) => iso ? new Date(iso).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+    // Date-only values (incorporation, event effective dates) are UTC midnight;
+    // format in UTC so 28 Dec does not render as 27 Dec in local time.
+    const fmtDate = (iso: string) => iso ? new Date(iso).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : '—';
 
     return (
         <Box display="flex" flexDirection="column" minHeight="100vh" bgcolor="#f5f7fa">

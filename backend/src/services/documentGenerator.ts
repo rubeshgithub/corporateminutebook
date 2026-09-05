@@ -273,8 +273,10 @@ const PAGE_TIMEOUT_MS = 60_000;
  * EJS templates, so every template (and every future one) is covered by a
  * single code path.
  */
+// Wording set by the founder (2026-09-05). The not-legal-advice language now
+// lives in the Terms of Service only.
 const DISCLAIMER =
-    'Prepared with MinuteBook from user-provided information. Not legal advice — have a lawyer review anything consequential.';
+    'Prepared with MinuteBook from user-provided information and corporate registry information available on registry repositories.';
 
 const stampDisclaimer = (
     doc: PDFDocument,

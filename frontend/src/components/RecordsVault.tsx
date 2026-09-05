@@ -19,6 +19,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import AutorenewIcon from '@mui/icons-material/Autorenew';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import api from '../utils/api';
+import { annualReturnSchedule, filingYear, formatDateOnly } from '../utils/annualReturns';
 import { useSnackbar } from '../context/SnackbarContext';
 import RecordEventDialog from './RecordEventDialog';
 import ChangeWizard, { WizardEventType } from './ChangeWizard';
@@ -234,42 +235,6 @@ const eventSummary = (type: EventType, data: Record<string, any>): string => {
         }
         default: return '';
     }
-};
-
-// ─── FYE helpers ─────────────────────────────────────────────────────────────
-
-const parseFYE = (fye: string | undefined): [number, number] => {
-    if (!fye) return [12, 31];
-    const mmdd = fye.match(/^(\d{1,2})-(\d{1,2})$/);
-    if (mmdd) return [parseInt(mmdd[1]), parseInt(mmdd[2])];
-    const MONTHS: Record<string, number> = {
-        january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
-        july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
-        jan: 1, feb: 2, mar: 3, apr: 4, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
-    };
-    const named = fye.toLowerCase().match(/([a-z]+)\s+(\d{1,2})/);
-    if (named && MONTHS[named[1]]) return [MONTHS[named[1]], parseInt(named[2])];
-    return [12, 31];
-};
-
-const computeExpectedFiscalYears = (
-    incorporationDate: Date | undefined,
-    fiscalYearEnd: string | undefined,
-    today: Date,
-): number[] => {
-    if (!incorporationDate) return [];
-    const [mm, dd] = parseFYE(fiscalYearEnd);
-    const incorpYear = incorporationDate.getFullYear();
-    let fye = new Date(incorpYear, mm - 1, dd);
-    if (fye <= incorporationDate) {
-        fye = new Date(incorpYear + 1, mm - 1, dd);
-    }
-    const years: number[] = [];
-    while (fye < today) {
-        years.push(fye.getFullYear());
-        fye = new Date(fye.getFullYear() + 1, mm - 1, dd);
-    }
-    return years;
 };
 
 // ─── Section header ───────────────────────────────────────────────────────────
@@ -717,12 +682,17 @@ const RecordsVault: React.FC = () => {
             && !e.registryFilingNotApplicable,
     );
 
-    const expectedFiscalYears = useMemo(() =>
-        computeExpectedFiscalYears(
-            company?.incorporationDate ? new Date(company.incorporationDate) : undefined,
-            company?.fiscalYearEnd,
-            new Date(),
-        ), [company]);
+    // Annual returns are anniversary-based (first one due on the first
+    // anniversary of incorporation), mirroring the backend compliance summary.
+    const arSchedule = useMemo(() => annualReturnSchedule({
+        incorporationDate: company?.incorporationDate,
+        dueMMDD:           company?.annualReturnDueDate,
+    }), [company]);
+
+    const expectedReturnYears = useMemo(
+        () => arSchedule.pastDue.map((due) => due.getUTCFullYear()),
+        [arSchedule],
+    );
 
     const annualReturnEvents = useMemo(() =>
         events.filter((e) => e.eventType === 'annual_return_filed'),
@@ -732,14 +702,18 @@ const RecordsVault: React.FC = () => {
         const byYear = new Map<number, CorporateEvent>();
         const unmatched: CorporateEvent[] = [];
         for (const ev of annualReturnEvents) {
-            const year = ev.data?.year != null ? Number(ev.data.year) : NaN;
-            if (!isNaN(year)) byYear.set(year, ev);
+            // Explicit year from the Log Return dialog wins; otherwise the
+            // filing is matched to the anniversary nearest its filing date.
+            const year = arSchedule.dueMMDD
+                ? filingYear(ev, arSchedule.dueMMDD)
+                : (ev.data?.year != null ? Number(ev.data.year) : null);
+            if (year != null && !isNaN(year)) byYear.set(year, ev);
             else unmatched.push(ev);
         }
         return { filedByYear: byYear, unmatchedFilings: unmatched };
-    }, [annualReturnEvents]);
+    }, [annualReturnEvents, arSchedule]);
 
-    const missingAnnualReturnYears = expectedFiscalYears.filter((y) => !filedByYear.has(y));
+    const missingAnnualReturnYears = expectedReturnYears.filter((y) => !filedByYear.has(y));
     const missingIncorpDoc = !company?.incorporationDocumentFile;
 
     const totalGaps = missingResolutions.length + missingRegistry.length
@@ -753,8 +727,9 @@ const RecordsVault: React.FC = () => {
         );
     }
 
-    const fmtDate = (iso: string) =>
-        new Date(iso).toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' });
+    // Incorporation and effective dates are date-only values stored as UTC
+    // midnight; formatting them in local time showed 28 Dec as 27 Dec.
+    const fmtDate = (iso: string) => formatDateOnly(iso);
 
     const scrollTo = (ref: React.RefObject<HTMLDivElement>) =>
         ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -911,9 +886,9 @@ const RecordsVault: React.FC = () => {
                         icon={<EventIcon sx={{ fontSize: 17, color: '#37474f' }} />}
                         title="Annual Returns"
                         chips={
-                            expectedFiscalYears.length > 0 ? (
+                            expectedReturnYears.length > 0 ? (
                                 <Chip
-                                    label={`${filedByYear.size + unmatchedFilings.length} / ${expectedFiscalYears.length} filed`}
+                                    label={`${filedByYear.size + unmatchedFilings.length} / ${expectedReturnYears.length} filed`}
                                     size="small"
                                     sx={{
                                         height: 18, fontSize: 11,
@@ -931,21 +906,22 @@ const RecordsVault: React.FC = () => {
                         <Typography variant="body2" color="text.secondary">
                             Set incorporation date in the company editor to see expected annual returns.
                         </Typography>
-                    ) : expectedFiscalYears.length === 0 ? (
+                    ) : expectedReturnYears.length === 0 ? (
                         <Typography variant="body2" color="text.secondary">
-                            Company incorporated less than one fiscal year ago — no annual returns expected yet.
+                            First annual return is due on the first anniversary of incorporation
+                            {arSchedule.nextDue ? ` — ${formatDateOnly(arSchedule.nextDue)}` : ''}. Nothing is expected yet.
                             {annualReturnEvents.length > 0 && ` (${annualReturnEvents.length} filing${annualReturnEvents.length > 1 ? 's' : ''} recorded early)`}
                         </Typography>
                     ) : (
                         <Box>
-                            {[...expectedFiscalYears].reverse().map((year, i) => {
+                            {[...expectedReturnYears].reverse().map((year, i) => {
                                 const filing = filedByYear.get(year);
                                 return (
                                     <React.Fragment key={year}>
                                         {i > 0 && <Divider />}
                                         <Box display="flex" alignItems="center" gap={1.5} py={1.25} px={0.5} flexWrap="wrap">
                                             <Chip
-                                                label={`FY ${year}`}
+                                                label={`${year}`}
                                                 size="small"
                                                 sx={{ bgcolor: '#37474f', color: '#fff', fontWeight: 600, fontSize: 11, minWidth: 60, flexShrink: 0 }}
                                             />
@@ -1014,9 +990,11 @@ const RecordsVault: React.FC = () => {
                                 </>
                             )}
 
-                            {company?.annualReturnDueDate && (
+                            {arSchedule.nextDue && (
                                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', pt: 1.5, pl: 0.5 }}>
-                                    Annual return due: {company.annualReturnDueDate} each year
+                                    Next annual return due {formatDateOnly(arSchedule.nextDue)}
+                                    {arSchedule.daysUntilNext != null ? ` (${arSchedule.daysUntilNext} day${arSchedule.daysUntilNext === 1 ? '' : 's'})` : ''}
+                                    {' '}· recurs each year on the anniversary of incorporation
                                 </Typography>
                             )}
                         </Box>
@@ -1351,7 +1329,7 @@ const RecordsVault: React.FC = () => {
                 maxWidth="xs"
                 fullWidth
             >
-                <DialogTitle>Log Annual Return — FY {logReturnDialog?.year}</DialogTitle>
+                <DialogTitle>Log Annual Return — {logReturnDialog?.year}</DialogTitle>
                 <DialogContent>
                     <Stack spacing={2} pt={1}>
                         <TextField

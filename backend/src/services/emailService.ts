@@ -90,7 +90,8 @@ export const sendFyeReminderEmail = async (opts: {
     daysUntil: number;
 }) => {
     const { to, companyName, fyeDate, companyId, daysUntil } = opts;
-    const fyeLabel = fyeDate.toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' });
+    // Date-only values are UTC midnight — format in UTC or the day shifts.
+    const fyeLabel = fyeDate.toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
     const url = `${APP_URL}/records/${companyId}?openEvent=1`;
 
     await sendMail({
@@ -140,7 +141,7 @@ export const sendAnnualReturnReminderEmail = async (opts: {
     daysUntil: number;
 }) => {
     const { to, companyName, dueDate, companyId, daysUntil } = opts;
-    const dueLabel = dueDate.toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' });
+    const dueLabel = dueDate.toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
     const url = `${APP_URL}/records/${companyId}`;
 
     await sendMail({

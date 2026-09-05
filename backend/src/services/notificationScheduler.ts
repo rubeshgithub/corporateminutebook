@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { Company } from '../models/Company';
 import { User } from '../models/User';
 import { sendFyeReminderEmail, sendAnnualReturnReminderEmail } from './emailService';
+import { annualReturnSchedule } from '../utils/annualReturns';
 
 /**
  * Daily notification scheduler. Runs once per day (in production) and looks
@@ -108,12 +109,20 @@ export async function runNotificationsPass(): Promise<{ fyeSent: number; arSent:
             }
 
             // ─── Annual return reminder ─────────────────────────────
-            const arParts = parseMMDD(c.annualReturnDueDate);
-            if (arParts) {
-                const nextAr = nextOccurrence(arParts, today);
-                const days = daysBetween(today, nextAr);
+            // Anniversary-based schedule shared with the compliance summary:
+            // the first return is due on the first anniversary, so a company
+            // incorporated last month is never reminded about a due date
+            // that precedes its own incorporation.
+            const arSchedule = annualReturnSchedule({
+                incorporationDate: c.incorporationDate,
+                dueMMDD:           c.annualReturnDueDate,
+                today,
+            });
+            if (arSchedule.nextDue && arSchedule.daysUntilNext !== null) {
+                const nextAr = arSchedule.nextDue;
+                const days = arSchedule.daysUntilNext;
                 const lastRemindedYear = c.notifications?.annualReturnRemindedForYear ?? 0;
-                if (days > 0 && days <= REMINDER_WINDOW_DAYS && lastRemindedYear !== nextAr.getFullYear()) {
+                if (days > 0 && days <= REMINDER_WINDOW_DAYS && lastRemindedYear !== nextAr.getUTCFullYear()) {
                     await sendAnnualReturnReminderEmail({
                         to:          email,
                         companyName: c.name,
@@ -123,7 +132,7 @@ export async function runNotificationsPass(): Promise<{ fyeSent: number; arSent:
                     });
                     await Company.updateOne(
                         { _id: c._id },
-                        { $set: { 'notifications.annualReturnRemindedForYear': nextAr.getFullYear() } },
+                        { $set: { 'notifications.annualReturnRemindedForYear': nextAr.getUTCFullYear() } },
                     );
                     arSent++;
                 }
