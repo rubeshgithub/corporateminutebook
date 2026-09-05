@@ -12,11 +12,16 @@ import { validateEnv } from './config/env';
 import { csrfGuard } from './middleware/csrf';
 import { startNotificationScheduler } from './services/notificationScheduler';
 import { startRegistryDriftChecker } from './services/registryDriftChecker';
+import { logChromeAvailability } from './services/documentGenerator';
 
 dotenv.config();
 
 // Fail the boot on missing required config rather than 500ing at first use.
 validateEnv();
+// PDF generation needs a Chrome binary that is only present if the build
+// installed it where Puppeteer looks. Say so in the log at boot instead of
+// at the first customer download.
+logChromeAvailability();
 
 // Error tracking — no-ops without a DSN (warned at boot by validateEnv).
 // Every serverError() call and the global handler below report through this.

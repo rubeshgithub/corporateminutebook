@@ -129,6 +129,30 @@ const disposeHandle = async (handle: BrowserHandle): Promise<void> => {
     await removeProfileDir(handle.profileDir);
 };
 
+/**
+ * Boot-time check: say in the log which Chrome Puppeteer will launch, or
+ * warn that there is none. Every PDF endpoint reports a missing browser as
+ * the same generic 500, so without this line the first sign of a broken
+ * build (Chrome downloaded outside the deployed tree, wrong cache dir,
+ * skipped install) is a customer's failed download. Never throws — a
+ * server without Chrome must still serve everything that is not a PDF.
+ */
+export const logChromeAvailability = (): void => {
+    try {
+        const exe = puppeteer.executablePath();
+        if (fs.existsSync(exe)) {
+            console.log(`[pdf] Chrome: ${exe}`);
+        } else {
+            console.warn(
+                `[pdf] Chrome not found at ${exe} — every PDF request will fail. ` +
+                'Run "npx puppeteer browsers install chrome" in the build; see backend/.puppeteerrc.cjs.',
+            );
+        }
+    } catch (err) {
+        console.warn(`[pdf] Puppeteer could not resolve a Chrome executable: ${(err as Error).message}`);
+    }
+};
+
 const launchBrowser = async (): Promise<Browser> => {
     const profileDir = createProfileDir();
     try {
