@@ -89,6 +89,12 @@ describe('business owner workflow', () => {
         expect(approvalDenial('approve', crsReviewer, personalBook('draft'), false)?.httpStatus).toBe(409);
     });
 
+    it('stops a CRS reviewer approving or sending back their own personal book', () => {
+        const reviewersOwnBook = { userId: 'crs', organizationId: null, approval: { status: 'submitted' as const } };
+        expect(approvalDenial('approve', crsReviewer, reviewersOwnBook, true)?.httpStatus).toBe(403);
+        expect(approvalDenial('request_changes', crsReviewer, reviewersOwnBook, true)?.httpStatus).toBe(403);
+    });
+
     it('does not let a CRS reviewer submit on the owner\'s behalf', () => {
         expect(approvalDenial('submit', crsReviewer, personalBook('draft'), false)?.httpStatus).toBe(404);
     });

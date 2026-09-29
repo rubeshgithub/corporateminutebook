@@ -47,6 +47,15 @@ export const EDIT_RESETS_FROM: ApprovalStatus[] = ['approved', 'submitted'];
 
 const NOT_FOUND: ApprovalDenial = { httpStatus: 404, error: 'Company not found.' };
 
+const OWN_BOOK: ApprovalDenial = {
+    httpStatus: 403,
+    error: 'You cannot review your own minute book. Another CRS reviewer must review it.',
+};
+
+/** A CRS reviewer who also owns the personal company must not decide on it. */
+const reviewingOwnBook = (actor: Actor, company: ApprovalSubject): boolean =>
+    reviewerTypeFor(company) === 'crs_reviewer' && String(company.userId) === actor.ws.userId;
+
 /**
  * Null when `actor` may take `action` on `company`, otherwise why not.
  * `hasAccess` is whether the company is inside the actor's own workspace
@@ -79,6 +88,7 @@ export const approvalDenial = (
                         : 'A CRS reviewer approves this minute book. Submit it for review.',
                 };
             }
+            if (reviewingOwnBook(actor, company)) return OWN_BOOK;
             if (status === 'approved') return { httpStatus: 409, error: 'This minute book is already approved.' };
             // A supervisor may sign off their own draft directly (the
             // supervising lawyer's approval); a CRS reviewer only decides on
@@ -91,6 +101,7 @@ export const approvalDenial = (
         case 'request_changes':
             if (!hasAccess && !reviewer) return NOT_FOUND;
             if (!reviewer) return { httpStatus: 403, error: 'Only the reviewer can send this minute book back for changes.' };
+            if (reviewingOwnBook(actor, company)) return OWN_BOOK;
             if (status !== 'submitted') return { httpStatus: 409, error: 'Only a minute book waiting for review can be sent back.' };
             return null;
 
