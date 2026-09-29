@@ -1,0 +1,84 @@
+Corporation/Non-Profit Search
+Corporate Registration System
+Date of Search: 	2026/08/21
+Time of Search: 	11:11 AM
+Search provided by: 	SAMPLE REGISTRY SERVICES LTD.
+Service Request Number: 	12345678
+Customer Reference Number: Test Ref
+Corporate Access Number: 2123456789
+Business Number:
+Legal Entity Name: 	EXAMPLE CLEANING LTD.
+Legal Entity Status: 	Active
+Extra-Provincial Type: 	Federal Corporation
+Registration Date: 	2021/05/11 YYYY/MM/DD
+Date Of Formation in Home Jurisdiction: 2020/01/04 YYYY/MM/DD
+Home Jurisdiction: 	CANADA
+Home Jurisdiction CAN: 	12345670
+Head Office Address:
+Street: 	1 SAMPLE GREEN
+City: 	OKOTOKS
+Province: 	ALBERTA
+Postal Code: 	T1S1A1
+Email Address: 	HELLO@EXAMPLE.CA
+Primary Agent for Service:
+Last
+Name
+First
+Name
+Middle
+Name
+Firm
+Name Street City 	Province Postal
+Code Email
+GREEN LISA MARIE 	1
+SAMPLE
+GREEN
+OKOTOKS ALBERTA T1S1A2 HELLO@EXAMPLE.CA
+Directors:
+Last Name: 	BROWN
+First Name: 	ANNA
+Street/Box Number: 2 EXAMPLE CRESCENT
+City: 	CALGARY
+Province: 	ALBERTA
+Postal Code: 	T2C1A1
+
+-- 1 of 3 --
+
+Last Name: 	GREEN
+First Name: 	LISA
+Street/Box Number: 1 SAMPLE GREEN
+City: 	OKOTOKS
+Province: 	ALBERTA
+Postal Code: 	T1S1A1
+Voting Shareholders:
+Last Name: 	BROWN
+First Name: 	ANNA
+Street: 	2 EXAMPLE CRES
+City: 	CALGARY
+Province: 	ALBERTA
+Postal Code: 	T2C1A1
+Percent Of Voting Shares: 50
+Last Name: 	GREEN
+First Name: 	LISA
+Middle Name: 	MARIE
+Street: 	1 SAMPLE GREEN
+City: 	OKOTOKS
+Province: 	ALBERTA
+Postal Code: 	T1S1A2
+Percent Of Voting Shares: 50
+Other Information:
+Last Annual Return Filed:
+File Year Date Filed (YYYY/MM/DD)
+2026 2026/05/19
+Filing History:
+List Date (YYYY/MM/DD) Type of Filing
+2021/05/11 	Register Extra-Provincial Profit / Non-Profit Corporation
+2026/05/19 	Enter Annual Returns for Alberta and Extra-Provincial Corp.
+
+-- 2 of 3 --
+
+The Registrar of Corporations certifies that, as of the date of this search, the above information is an accurate
+reproduction of data contained in the official public records of Corporate Registry.
+
+-- 3 of 3 --
+

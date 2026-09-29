@@ -463,7 +463,7 @@ const Dashboard: React.FC = () => {
                     <Button variant="outlined" size="small" onClick={() => navigate('/documents')}>
                         Document Vault
                     </Button>
-                    <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => navigate('/builder')}>
+                    <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => navigate('/new')}>
                         New Company
                     </Button>
                 </Box>
@@ -734,7 +734,7 @@ const Dashboard: React.FC = () => {
                                                         variant="contained"
                                                         size="medium"
                                                         startIcon={<AddIcon />}
-                                                        onClick={() => navigate('/builder')}
+                                                        onClick={() => navigate('/new')}
                                                         sx={{ fontWeight: 700, textTransform: 'none' }}
                                                     >
                                                         Add corporation

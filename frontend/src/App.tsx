@@ -10,6 +10,8 @@ import SharedCompanyView from './components/SharedCompanyView';
 import AccountPage from './components/AccountPage';
 import FirmPage from './components/FirmPage';
 import ReviewQueue from './components/ReviewQueue';
+import NewCompanyChoice from './components/NewCompanyChoice';
+import ProfileReportImport from './components/ProfileReportImport';
 import SessionBootCheck from './components/SessionBootCheck';
 import { PrivacyPolicy, TermsOfService } from './components/LegalPage';
 import Layout from './components/Layout';
@@ -57,6 +59,8 @@ function App() {
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Navigate to="/login" />} />
                     <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+                    <Route path="/new" element={<PrivateRoute><NewCompanyChoice /></PrivateRoute>} />
+                    <Route path="/import" element={<PrivateRoute><ProfileReportImport /></PrivateRoute>} />
                     <Route path="/builder" element={<PrivateRoute><MinuteBookBuilder /></PrivateRoute>} />
                     <Route path="/builder/:id" element={<PrivateRoute><MinuteBookBuilder /></PrivateRoute>} />
                     <Route path="/documents" element={<PrivateRoute><DocumentManagement /></PrivateRoute>} />

@@ -1,0 +1,112 @@
+Date and time of Corporate Profile (YYYY-MM-DD) (AAAA-MM-JJ) Date et heure du Profil corporatif	2026-09-15 3:29 PM
+Corporate Profile / Profil corporatif
+CORPORATE INFORMATION RENSEIGNEMENTS CORPORATIFS
+Corporate name Dénomination
+Corporation number Numéro de société ou d'organisation	1234567-8
+Business number Numéro d'entreprise	123456789RC0001
+Governing legislation Régime législatif
+Canada Business Corporations Act (CBCA) - 2020-09-13
+Loi canadienne sur les sociétés par actions (LCSA) - 2020-09-13
+12345678 Canada Inc.
+Status Statut
+Active
+Active
+REGISTERED OFFICE ADDRESS ADRESSE DU SIÈGE
+10 Sample Avenue
+Toronto ON M5V 1A1
+Canada
+ANNUAL FILINGS DÉPÔTS ANNUELS
+Anniversary date (MM-DD) (MM-JJ) Date anniversaire	09-13
+Filing period (MM-DD) (MM-JJ) Période de dépôt	09-13 to/au 11-12
+Status of annual filings Statut des dépôts annuels
+Due to be filed 2026 Dépôt dû
+Filed 2025 Déposé
+Filed 2024 Déposé
+Date of last annual meeting (YYYY-MM-DD) (AAAA-MM-JJ) Date de la dernière assemblée annuelle	2025-08-31
+Type Type
+Non-distributing corporation with 50 or fewer shareholders
+Société n'ayant pas fait appel au public et comptant 50 actionnaires ou moins
+Corporations Canada
+C. D. Howe Building
+235 Queen St
+Ottawa ON K1A 0H5
+Corporations Canada
+Édifice C.D.Howe
+235 rue Queen
+Ottawa ON K1A 0H5
+1 3	/
+Telephone / Téléphone
+1-866-333-5556
+Email / Courriel
+ic.corporationscanada.ic@ised-isde.gc.
+Website / Site Web
+https://corporationscanada.ic.gc.
+
+-- 1 of 3 --
+
+DIRECTORS ADMINISTRATEURS
+Minimum number Nombre minimal	1
+Maximum number Nombre maximal	10
+Current number Nombre actuel	1
+Alex Morgan 10 Sample Avenue, Toronto ON M5V 1A1, Canada
+CORPORATE HISTORY HISTORIQUE CORPORATIF
+Corporate name history (YYYY-MM-DD) (AAAA-MM-JJ) Historique de la dénomination
+2020-09-13 to present / à maintenant 12345678 Canada Inc.
+Certificates issued (YYYY-MM-DD) (AAAA-MM-JJ) Certificats émis
+Certificate of Incorporation Certificat de constitution en société	2020-09-13
+Amendments details are only available for amendments effected after
+2010-03-20. Some certificates issued prior to 2000 may not be listed.
+Seuls les renseignements concernant les modifications effectuées après
+2010-03-20 sont disponibles. Certains certificats émis avant 2000 pourraient ne
+pas être listés.
+Documents filed (YYYY-MM-DD) (AAAA-MM-JJ) Documents déposés
+INDIVIDUALS WITH SIGNIFICANT CONTROL PERSONNES AYANT UN CONTRÔLE IMPORTANT
+Last updated (YYYY-MM-DD) 2025-09-13 (AAAA-MM-JJ) Dernière mise à jour
+Current 1 Actuel
+ALEX MORGAN
+55 Example Crescent, Toronto, Ontario, M1B 2C3, Canada
+Has a combination of shares and control in fact /
+Possède une combinaison d’actions et de contrôle de fait
+Directly
+Directement
+Individually
+Individuellement
+More than 75% of the shares
+Plus de 75 % des actions
+2020-09-13
+Type of interest or control Type d'intérêt ou de contrôle
+Ce particulier détient les actions
+Ce particulier possède un contrôle important de
+la société
+Ce particulier détient
+(AAAA-MM-JJ) Date de début
+This individual holds the shares
+This individual is an individual with significant control
+over the corporation
+This individual holds
+Start date (YYYY-MM-DD)
+2 3	/
+Telephone / Téléphone
+1-866-333-5556
+Email / Courriel
+ic.corporationscanada.ic@ised-isde.gc.
+Website / Site Web
+https://corporationscanada.ic.gc.
+
+-- 2 of 3 --
+
+The Corporate Profile sets out the most recent information filed with and
+accepted by Corporations Canada as of the date and time set out on the
+Profile.
+Le Profil corporatif fait état des renseignements fournis et acceptés par
+Corporations Canada à la date et à l'heure indiquées dans le profil.
+3 3	/
+Telephone / Téléphone
+1-866-333-5556
+Email / Courriel
+ic.corporationscanada.ic@ised-isde.gc.
+Website / Site Web
+https://corporationscanada.ic.gc.
+
+-- 3 of 3 --
+

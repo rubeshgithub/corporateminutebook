@@ -38,7 +38,8 @@ type EventType =
     | 'fiscal_year_end_changed'
     | 'name_changed'
     | 'signing_authority_granted' | 'signing_authority_revoked'
-    | 'dividend_declared';
+    | 'dividend_declared'
+    | 'revival_filed';
 
 type AttachRole = 'resolution' | 'registry_filing' | 'supporting';
 
@@ -87,8 +88,11 @@ const RESOLUTION_EVENT_TYPES = new Set<EventType>([
 const REGISTRY_EVENT_TYPES = new Set<EventType>([
     'director_appointed', 'director_resigned', 'director_address_changed',
     'address_changed', 'name_changed', 'shares_transferred', 'shares_issued',
-    'shares_cancelled', 'share_class_added',
+    'shares_cancelled', 'share_class_added', 'revival_filed',
 ]);
+
+// Registry acts with no resolution template: listed for their proof of filing only.
+const REGISTRY_ONLY_EVENT_TYPES = new Set<EventType>(['revival_filed']);
 
 const EVENT_LABELS: Record<EventType, string> = {
     director_appointed: 'Director Appointed',
@@ -107,6 +111,7 @@ const EVENT_LABELS: Record<EventType, string> = {
     signing_authority_granted: 'Signing Authority Granted',
     signing_authority_revoked: 'Signing Authority Revoked',
     dividend_declared: 'Dividend Declared',
+    revival_filed: 'Revived / Restored',
 };
 
 const EVENT_COLORS: Record<EventType, string> = {
@@ -126,6 +131,7 @@ const EVENT_COLORS: Record<EventType, string> = {
     signing_authority_granted: '#00695c',
     signing_authority_revoked: '#795548',
     dividend_declared: '#f9a825',
+    revival_filed: '#2e7d32',
 };
 
 const ATTACH_ROLE_COLORS: Record<AttachRole, string> = {
@@ -192,7 +198,7 @@ const FilingStatusPills: React.FC<{ ev: CorporateEvent }> = ({ ev }) => {
     return (
         <Box sx={{ display: 'inline-flex', gap: 0.3, ml: 0.5 }}>
             {pill('D', 'ok', 'Drafted — the event is recorded internally.')}
-            {pill('S',
+            {!REGISTRY_ONLY_EVENT_TYPES.has(ev.eventType) && pill('S',
                 s.signed ? 'ok' : 'pending',
                 s.signed ? 'Signed — resolution is signed and attached.' : 'Not yet signed — upload the signed resolution or send for e-signature.',
             )}
@@ -424,6 +430,17 @@ const RecordsVault: React.FC = () => {
             window.URL.revokeObjectURL(url);
         } catch {
             showSnackbar('Failed to download incorporation document.', 'error');
+        }
+    };
+
+    const handleOpenProfileReport = async () => {
+        try {
+            const response = await api.get(`/profile-reports/${companyId}`, { responseType: 'blob' });
+            const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+            window.open(url, '_blank', 'noopener');
+            setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        } catch {
+            showSnackbar('Could not open the profile report.', 'error');
         }
     };
 
@@ -674,10 +691,10 @@ const RecordsVault: React.FC = () => {
 
     // ─── Derived data ─────────────────────────────────────────────────────────
 
-    const changeEvents = events.filter((e) => RESOLUTION_EVENT_TYPES.has(e.eventType));
+    const changeEvents = events.filter((e) => RESOLUTION_EVENT_TYPES.has(e.eventType) || REGISTRY_ONLY_EVENT_TYPES.has(e.eventType));
 
     const missingResolutions = changeEvents.filter(
-        (e) => !e.attachments?.some((a) => a.role === 'resolution'),
+        (e) => RESOLUTION_EVENT_TYPES.has(e.eventType) && !e.attachments?.some((a) => a.role === 'resolution'),
     );
     const missingRegistry = changeEvents.filter(
         (e) => REGISTRY_EVENT_TYPES.has(e.eventType)
@@ -879,6 +896,27 @@ const RecordsVault: React.FC = () => {
                         )}
                     </Box>
 
+                    {company?.profileReport?.fileId && (
+                        <Box display="flex" alignItems="center" gap={1.5} p={1.5} mt={1}
+                            sx={{ borderRadius: 1, border: '1px solid', borderColor: 'divider', bgcolor: '#fafafa' }}>
+                            <AttachFileIcon sx={{ color: '#1a237e', fontSize: 20 }} />
+                            <Box flex={1}>
+                                <Typography variant="body2" fontWeight={600}>
+                                    Registry Profile Report
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                    {company.profileReport.reportDate ? `Dated ${fmtDate(company.profileReport.reportDate)} · ` : ''}
+                                    the report this book was built from
+                                </Typography>
+                            </Box>
+                            <Tooltip title="Open">
+                                <IconButton size="small" onClick={handleOpenProfileReport}>
+                                    <DownloadIcon fontSize="small" />
+                                </IconButton>
+                            </Tooltip>
+                        </Box>
+                    )}
+
                     {company?.incorporationDate && (
                         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, pl: 0.5 }}>
                             Incorporated: {fmtDate(company.incorporationDate)}
@@ -942,7 +980,7 @@ const RecordsVault: React.FC = () => {
                                                         Filed {fmtDate(filing.effectiveDate)}
                                                         {filing.data?.confirmationNumber ? ` · Conf: ${filing.data.confirmationNumber}` : ''}
                                                     </Typography>
-                                                    {filing.attachments?.length > 0 && (
+                                                    {filing.attachments?.length > 0 ? (
                                                         <Box display="flex" gap={0.5} flexWrap="wrap">
                                                             {filing.attachments.map((att) => (
                                                                 <Chip
@@ -955,6 +993,17 @@ const RecordsVault: React.FC = () => {
                                                                 />
                                                             ))}
                                                         </Box>
+                                                    ) : (
+                                                        <Button
+                                                            size="small"
+                                                            variant="outlined"
+                                                            color="warning"
+                                                            startIcon={<AttachFileIcon sx={{ fontSize: 13 }} />}
+                                                            sx={{ fontSize: 11, py: 0.2, px: 1, flexShrink: 0 }}
+                                                            onClick={() => { setAttachDialog({ eventId: filing._id, role: 'registry_filing', label: `${year} Annual Return Filing Confirmation` }); setAttachFile(null); }}
+                                                        >
+                                                            Upload proof
+                                                        </Button>
                                                     )}
                                                 </>
                                             ) : (
