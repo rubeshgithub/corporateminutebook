@@ -23,6 +23,7 @@ import { annualReturnSchedule, filingYear, formatDateOnly } from '../utils/annua
 import { useSnackbar } from '../context/SnackbarContext';
 import RecordEventDialog from './RecordEventDialog';
 import ChangeWizard, { WizardEventType } from './ChangeWizard';
+import ApprovalPanel from './ApprovalPanel';
 import AddIcon from '@mui/icons-material/Add';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -383,6 +384,8 @@ const RecordsVault: React.FC = () => {
             const res = await api.delete(`/events/${deleteEventDialog.eventId}`);
             setEvents((prev) => prev.filter((e) => e._id !== deleteEventDialog.eventId));
             setDeleteEventDialog(null);
+            // Deleting an event returns an approved book to draft server-side.
+            api.get(`/companies/${companyId}`).then((r) => setCompany(r.data)).catch(() => {});
             // Surface the snapshot warning inline (not just the ok toast) —
             // the honest version of "we removed the record but didn't rewind".
             if (res.data?.snapshotWarning && res.data?.snapshotMessage) {
@@ -762,6 +765,13 @@ const RecordsVault: React.FC = () => {
                 <Typography variant="subtitle2" color="text.secondary" mb={3} ml={6}>
                     {company?.name}
                 </Typography>
+
+                {company && (
+                    <ApprovalPanel
+                        company={company}
+                        onChange={(approval) => setCompany((c: any) => ({ ...c, approval }))}
+                    />
+                )}
 
                 {/* ── Compliance status bar ── */}
                 {totalGaps === 0 ? (

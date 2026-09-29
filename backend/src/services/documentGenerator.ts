@@ -3,7 +3,8 @@ import puppeteer, { Browser, PDFOptions } from 'puppeteer';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { PDFDocument, StandardFonts, rgb, degrees } from 'pdf-lib';
+import { isDraftOutput } from '../utils/approval';
 import { ICompany } from '../models/Company';
 import { tryGetFile } from './uploadStorage';
 
@@ -291,6 +292,37 @@ const stampDisclaimer = (
     });
 };
 
+const DRAFT_MARK = 'DRAFT';
+const DRAFT_BANNER = 'DRAFT — not yet approved. Do not rely on or circulate this copy.';
+
+/**
+ * Marks every page of a compiled book that has not been approved: a large
+ * diagonal DRAFT plus a line at the top. Applied in the PDF layer (like the
+ * disclaimer) so bundles, shared-link downloads and the inaugural package
+ * are all covered. Standalone resolutions sent out for signature are not
+ * watermarked — signing them is part of getting to approval.
+ */
+export const stampDraftWatermark = async (doc: PDFDocument): Promise<void> => {
+    const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+    const markSize = 120;
+    const bannerSize = 8;
+    const theta = Math.PI / 4;
+    const markWidth = bold.widthOfTextAtSize(DRAFT_MARK, markSize);
+    const markHeight = markSize * 0.7;
+    const bannerWidth = bold.widthOfTextAtSize(DRAFT_BANNER, bannerSize);
+    const red = rgb(0.75, 0.15, 0.15);
+
+    doc.getPages().forEach((page) => {
+        const { width, height } = page.getSize();
+        // pdf-lib rotates about the text origin, so offset it to put the
+        // centre of the rotated word at the centre of the page.
+        const x = width / 2 - (markWidth / 2) * Math.cos(theta) + (markHeight / 2) * Math.sin(theta);
+        const y = height / 2 - (markWidth / 2) * Math.sin(theta) - (markHeight / 2) * Math.cos(theta);
+        page.drawText(DRAFT_MARK, { x, y, size: markSize, font: bold, color: red, opacity: 0.12, rotate: degrees(45) });
+        page.drawText(DRAFT_BANNER, { x: (width - bannerWidth) / 2, y: height - 12, size: bannerSize, font: bold, color: red });
+    });
+};
+
 const addHeadersFooters = (
     merged: PDFDocument,
     font: Awaited<ReturnType<PDFDocument['embedFont']>>,
@@ -422,6 +454,7 @@ export const generateMinuteBookPDF = async (company: ICompany, events: unknown[]
     const font = await merged.embedFont(StandardFonts.Helvetica);
     addHeadersFooters(merged, font, 'Corporate Minute Book', true);
     stampDisclaimer(merged, font);
+    if (isDraftOutput(company as any)) await stampDraftWatermark(merged);
 
     return Buffer.from(await merged.save());
 };
@@ -521,6 +554,7 @@ export const generateInauguralPackagePDF = async (company: ICompany, events: unk
     const font = await merged.embedFont(StandardFonts.Helvetica);
     addHeadersFooters(merged, font, 'Organizational Documents', true);
     stampDisclaimer(merged, font);
+    if (isDraftOutput(company as any)) await stampDraftWatermark(merged);
 
     return Buffer.from(await merged.save());
 };

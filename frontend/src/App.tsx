@@ -9,6 +9,7 @@ import RecordsVault from './components/RecordsVault';
 import SharedCompanyView from './components/SharedCompanyView';
 import AccountPage from './components/AccountPage';
 import FirmPage from './components/FirmPage';
+import ReviewQueue from './components/ReviewQueue';
 import SessionBootCheck from './components/SessionBootCheck';
 import { PrivacyPolicy, TermsOfService } from './components/LegalPage';
 import Layout from './components/Layout';
@@ -63,6 +64,7 @@ function App() {
                     <Route path="/records/:companyId" element={<PrivateRoute><RecordsVault /></PrivateRoute>} />
                     <Route path="/account" element={<PrivateRoute><AccountPage /></PrivateRoute>} />
                     <Route path="/firm" element={<PrivateRoute><FirmPage /></PrivateRoute>} />
+                    <Route path="/reviews" element={<PrivateRoute><ReviewQueue /></PrivateRoute>} />
                     {/* Public read-only share view — no auth. The token IS
                         the credential; backend enforces expiry + revoke. */}
                     <Route path="/share/:token" element={<SharedCompanyView />} />

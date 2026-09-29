@@ -6,6 +6,7 @@ import { CorporateEvent } from '../models/CorporateEvent';
 import { serverError } from '../utils/apiError';
 import { annualReturnCompliance } from '../utils/annualReturns';
 import { workspaceFor, canDeleteCompany, canMoveToFirm } from '../utils/workspace';
+import { resetApprovalOnEdit } from '../services/approvalService';
 
 const ACTIVE = { deletedAt: null };
 
@@ -109,7 +110,8 @@ export const createCompany = async (req: AuthRequest, res: Response) => {
             companyData.shareholders = assignCertNumbers(companyData.shareholders, 1);
         }
 
-        const company = await Company.create({ ...companyData, userId, organizationId });
+        // Every new book starts as a draft awaiting approval.
+        const company = await Company.create({ ...companyData, userId, organizationId, approval: { status: 'draft' } });
 
         await createFoundingEvents(company, userId!);
 
@@ -194,7 +196,8 @@ export const updateCompany = async (req: AuthRequest, res: Response) => {
             details: `Company ${company.name} updated.`,
         });
 
-        res.json(company);
+        const reset = await resetApprovalOnEdit(company._id, userId);
+        res.json(reset ? await Company.findById(company._id) : company);
     } catch (error: any) {
         serverError(res, 'updateCompany', error);
     }
@@ -445,6 +448,9 @@ export const moveCompanyToFirm = async (req: AuthRequest, res: Response) => {
 
         company.organizationId = ws.organizationId as any;
         await company.save();
+        // The approver changes from a CRS reviewer to the firm's supervisor,
+        // so any approval given under the old workspace no longer stands.
+        await resetApprovalOnEdit(company._id, userId);
 
         await ActivityLog.create({
             userId,
