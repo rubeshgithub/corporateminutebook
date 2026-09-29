@@ -417,6 +417,14 @@ const DocumentManagement = () => {
                         <Typography variant="body2" sx={{ opacity: 0.9 }}>
                             One PDF: cover page, table of contents, articles, by-laws, resolutions, consents, share certificates and registers.
                         </Typography>
+                        {(() => {
+                            const status = companies.find((c) => c._id === selectedCompanyId)?.approval?.status;
+                            return status && status !== 'approved' ? (
+                                <Typography variant="caption" sx={{ display: 'block', mt: 0.5, fontWeight: 600, opacity: 0.95 }}>
+                                    Not yet approved — the PDF carries a DRAFT watermark. Submit it for approval from the company&apos;s Records page.
+                                </Typography>
+                            ) : null;
+                        })()}
                     </Box>
                     <IconButton
                         title="Preview"

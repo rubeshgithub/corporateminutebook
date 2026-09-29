@@ -144,6 +144,23 @@ export interface ICompany extends Document {
         fields?: string[];                       // which fields differ (e.g. ["name", "status"])
         resolvedAt?: Date | null;                // when user marked drift as resolved
     };
+    // Minute book approval. Absent on companies created before approvals
+    // existed — those print as they always did until someone submits them.
+    approval?: {
+        status?: 'draft' | 'submitted' | 'changes_requested' | 'approved';
+        reviewerType?: 'firm_supervisor' | 'crs_reviewer';
+        submittedAt?: Date | null;
+        submittedBy?: mongoose.Types.ObjectId | null;
+        reviewedAt?: Date | null;
+        reviewedBy?: mongoose.Types.ObjectId | null;
+        note?: string;
+        history?: Array<{
+            action: 'submitted' | 'approved' | 'changes_requested' | 'reopened' | 'reset_by_edit';
+            by?: mongoose.Types.ObjectId | null;
+            at: Date;
+            note?: string;
+        }>;
+    };
     deletedAt?: Date | null;
     createdAt: Date;
     updatedAt: Date;
@@ -287,6 +304,23 @@ const companySchema: Schema = new Schema(
             fields:     { type: [String], default: [] },
             resolvedAt: { type: Date, default: null },
         },
+        approval: {
+            status:       { type: String, enum: ['draft', 'submitted', 'changes_requested', 'approved'] },
+            reviewerType: { type: String, enum: ['firm_supervisor', 'crs_reviewer'] },
+            submittedAt:  { type: Date, default: null },
+            submittedBy:  { type: Schema.Types.ObjectId, ref: 'User', default: null },
+            reviewedAt:   { type: Date, default: null },
+            reviewedBy:   { type: Schema.Types.ObjectId, ref: 'User', default: null },
+            note:         { type: String, maxlength: 2000 },
+            history: [
+                {
+                    action: { type: String, enum: ['submitted', 'approved', 'changes_requested', 'reopened', 'reset_by_edit'], required: true },
+                    by:     { type: Schema.Types.ObjectId, ref: 'User', default: null },
+                    at:     { type: Date, default: Date.now },
+                    note:   { type: String, maxlength: 2000 },
+                },
+            ],
+        },
         deletedAt: { type: Date, default: null },
     },
     { timestamps: true }
@@ -305,5 +339,7 @@ companySchema.index({
 // one of those is a collection scan.
 companySchema.index({ userId: 1, deletedAt: 1 });
 companySchema.index({ organizationId: 1, deletedAt: 1 });
+// CRS review queue: personal books waiting for a reviewer.
+companySchema.index({ 'approval.status': 1, organizationId: 1 });
 
 export const Company = mongoose.model<ICompany>('Company', companySchema);

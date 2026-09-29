@@ -27,6 +27,7 @@ import { useSelector } from 'react-redux';
 import { useSnackbar } from '../context/SnackbarContext';
 import { formatDateOnly } from '../utils/annualReturns';
 import ShareDialog from './ShareDialog';
+import { ApprovalChip } from './ApprovalPanel';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -794,6 +795,7 @@ const Dashboard: React.FC = () => {
                                                             }}
                                                         />
                                                     )}
+                                                    <ApprovalChip approval={company.approval} />
                                                 </Box>
                                                 <Typography variant="caption" color="text.secondary">
                                                     {company.corporateAccessNumber

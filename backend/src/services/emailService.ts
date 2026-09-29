@@ -221,6 +221,65 @@ export const sendFirmInviteEmail = async (opts: {
     });
 };
 
+/** A minute book was submitted for approval — sent to whoever can approve it. */
+export const sendApprovalRequestEmail = async (opts: {
+    to:            string[];
+    companyName:   string;
+    submitterName: string;
+    reviewUrl:     string;
+    note?:         string;
+}) => {
+    if (opts.to.length === 0) return;
+    const company = escapeHtml(opts.companyName);
+    const submitter = escapeHtml(opts.submitterName);
+    await sendMail({
+        from: FROM,
+        to: opts.to,
+        subject: `Minute book ready for approval — ${opts.companyName}`,
+        html: `
+            <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#222;line-height:1.6">
+                <h2 style="color:#1a237e;margin-bottom:8px">A minute book is waiting for your approval</h2>
+                <p><strong>${submitter}</strong> submitted the minute book for <strong>${company}</strong> for review.</p>
+                ${opts.note ? `<p style="background:#f5f7fa;border-left:3px solid #1a237e;padding:10px 14px">${escapeHtml(opts.note)}</p>` : ''}
+                <div style="margin:28px 0">
+                    <a href="${opts.reviewUrl}" style="display:inline-block;background:#1a237e;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:600">Review ${company}</a>
+                </div>
+                <p style="color:#888;font-size:12px;margin-top:32px">Sent via MinuteBook — Corporate Records Management.</p>
+            </div>`,
+    });
+};
+
+/** The reviewer approved the minute book or sent it back — sent to the submitter. */
+export const sendApprovalDecisionEmail = async (opts: {
+    to:           string;
+    companyName:  string;
+    reviewerName: string;
+    decision:     'approved' | 'changes_requested';
+    note?:        string;
+    companyUrl:   string;
+}) => {
+    const company = escapeHtml(opts.companyName);
+    const reviewer = escapeHtml(opts.reviewerName);
+    const approved = opts.decision === 'approved';
+    await sendMail({
+        from: FROM,
+        to: opts.to,
+        subject: approved
+            ? `Minute book approved — ${opts.companyName}`
+            : `Changes requested on the minute book — ${opts.companyName}`,
+        html: `
+            <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#222;line-height:1.6">
+                <h2 style="color:${approved ? '#2e7d32' : '#b45309'};margin-bottom:8px">${approved ? 'Minute book approved' : 'Changes requested'}</h2>
+                <p><strong>${reviewer}</strong> ${approved ? 'approved' : 'sent back'} the minute book for <strong>${company}</strong>.${approved ? ' The DRAFT watermark is now removed from the compiled book.' : ''}</p>
+                ${opts.note ? `<p style="background:#f5f7fa;border-left:3px solid ${approved ? '#2e7d32' : '#b45309'};padding:10px 14px">${escapeHtml(opts.note)}</p>` : ''}
+                <div style="margin:28px 0">
+                    <a href="${opts.companyUrl}" style="display:inline-block;background:#1a237e;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:600">Open ${company}</a>
+                </div>
+                <p style="color:#888;font-size:12px;margin-top:32px">Sent via MinuteBook — Corporate Records Management.</p>
+            </div>`,
+    });
+};
+
 /**
  * Sharing invitation — a CPA / lawyer / partner has been given read-only
  * access to a company's minute book. The share link IS the credential;

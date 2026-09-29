@@ -115,7 +115,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
                     {/* In-app nav */}
                     <Box sx={{ display: 'flex', gap: 0.5 }}>
-                        {NAV_ITEMS.map((item) => (
+                        {(user?.role === 'admin'
+                            ? [...NAV_ITEMS, { label: 'Reviews', path: '/reviews' }]
+                            : NAV_ITEMS
+                        ).map((item) => (
                             <Button
                                 key={item.path}
                                 onClick={() => navigate(item.path)}

@@ -97,6 +97,7 @@ import crsFeedRoutes from './routes/crsFeedRoutes';
 import shareRoutes from './routes/shareRoutes';
 import emailRoutes from './routes/emailRoutes';
 import organizationRoutes from './routes/organizationRoutes';
+import reviewRoutes from './routes/reviewRoutes';
 
 // Basic Route
 app.use('/api/auth', authRoutes);
@@ -109,6 +110,7 @@ app.use('/api/incorporation', incorporationRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/crs-feed', crsFeedRoutes);
 app.use('/api/organization', organizationRoutes);
+app.use('/api/reviews', reviewRoutes);
 // Sharing routes contribute BOTH /api/share/:token (public) AND owner-scoped
 // /api/companies/:id/shares + /api/shares/:shareId (auth-guarded inside).
 app.use('/api', shareRoutes);

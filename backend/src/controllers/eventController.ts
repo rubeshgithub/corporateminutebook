@@ -13,6 +13,7 @@ import { sendResolutionEmail } from '../services/emailService';
 import { createESignRequest, getSubmissionStatus, createTemplateWithFields, createBuilderToken } from '../services/docusealService';
 import { serverError } from '../utils/apiError';
 import { workspaceFor } from '../utils/workspace';
+import { resetApprovalOnEdit } from '../services/approvalService';
 import {
     isShareChangeEventType,
     shareChangeDataSchema,
@@ -149,6 +150,7 @@ export const createEvent = async (req: AuthRequest, res: Response) => {
 
             createdEvent = event;
         });
+        await resetApprovalOnEdit(companyId, userId);
         return res.status(201).json(createdEvent);
     } catch (error: any) {
         return serverError(res, 'createEvent', error);
@@ -236,6 +238,11 @@ export const updateEvent = async (req: AuthRequest, res: Response) => {
             details: `Event ${event.eventType} updated.`,
         });
 
+        // Toggling "no registry filing expected" is filing bookkeeping, not a
+        // change to what the book records, so it leaves an approval standing.
+        const contentChanged = notes !== undefined || !!effectiveDate || (!!data && typeof data === 'object');
+        if (contentChanged) await resetApprovalOnEdit(event.companyId, userId);
+
         return res.json({
             event,
             snapshotWarning,
@@ -279,6 +286,7 @@ export const deleteEvent = async (req: AuthRequest, res: Response) => {
             action: 'RECORDED_EVENT',
             details: `Event ${event.eventType} deleted.`,
         });
+        await resetApprovalOnEdit(event.companyId, userId);
 
         // Types that mutate company state — everything except annual_return_filed
         // (which only sets the filedThisPeriod flag derived from the event list).
