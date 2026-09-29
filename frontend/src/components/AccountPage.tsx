@@ -168,8 +168,9 @@ const AccountPage: React.FC = () => {
                 <Paper elevation={0} sx={{ p: 2.5, border: '1px solid #ef9a9a', borderRadius: 2, bgcolor: 'white' }}>
                     <Typography variant="subtitle1" fontWeight={700} color="#c62828" mb={0.5}>Delete account</Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
-                        Permanently erases your account and every company in it — recorded events, uploaded documents,
-                        generated-document history, and share links. This cannot be undone, and a minute book is a record
+                        Permanently erases your account and every personal company in it — recorded events, uploaded documents,
+                        generated-document history, and share links. Companies that belong to your firm stay with the firm
+                        (unless you are its only member). This cannot be undone, and a minute book is a record
                         your corporation is legally required to keep, so{' '}
                         <Link component={RouterLink} to="/documents" underline="hover">download your compiled minute books</Link>
                         {' '}first.

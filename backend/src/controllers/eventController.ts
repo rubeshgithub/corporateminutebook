@@ -12,6 +12,7 @@ import { generatePDFBuffer } from '../services/documentGenerator';
 import { sendResolutionEmail } from '../services/emailService';
 import { createESignRequest, getSubmissionStatus, createTemplateWithFields, createBuilderToken } from '../services/docusealService';
 import { serverError } from '../utils/apiError';
+import { workspaceFor } from '../utils/workspace';
 import {
     isShareChangeEventType,
     shareChangeDataSchema,
@@ -92,6 +93,7 @@ function shareChangeError(eventType: string, company: any, data: any): string | 
 
 export const createEvent = async (req: AuthRequest, res: Response) => {
     const userId = req.user?.id;
+    const { scope } = await workspaceFor(req);
     const { companyId, eventType, effectiveDate, data, notes } = req.body;
 
     if (!companyId || !eventType || !effectiveDate) {
@@ -100,7 +102,7 @@ export const createEvent = async (req: AuthRequest, res: Response) => {
 
     // Ownership + existence check runs outside the transaction so we can 404
     // early without paying the session-start cost.
-    const companyPreCheck = await Company.findOne({ _id: companyId, userId, deletedAt: null }).lean();
+    const companyPreCheck = await Company.findOne({ _id: companyId, ...scope, deletedAt: null }).lean();
     if (!companyPreCheck) return res.status(404).json({ error: 'Company not found.' });
 
     // Class-existence needs the company, so it can't live in the schema.
@@ -118,7 +120,7 @@ export const createEvent = async (req: AuthRequest, res: Response) => {
         let createdEvent: any;
         await session.withTransaction(async () => {
             // Re-fetch inside the session so mutations are attached to it.
-            const company = await Company.findOne({ _id: companyId, userId, deletedAt: null }).session(session);
+            const company = await Company.findOne({ _id: companyId, ...scope, deletedAt: null }).session(session);
             if (!company) throw new Error('Company not found.');
 
             // Apply BEFORE creating the event doc: applyEventToCompany backfills
@@ -160,9 +162,10 @@ export const createEvent = async (req: AuthRequest, res: Response) => {
 export const getEvents = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user?.id;
+        const { scope } = await workspaceFor(req);
         const { companyId } = req.params;
 
-        const company = await Company.findOne({ _id: companyId, userId, deletedAt: null });
+        const company = await Company.findOne({ _id: companyId, ...scope, deletedAt: null });
         if (!company) return res.status(404).json({ error: 'Company not found.' });
 
         // Filter out soft-deleted events. `deletedAt: null` includes docs
@@ -190,6 +193,7 @@ export const getEvents = async (req: AuthRequest, res: Response) => {
 export const updateEvent = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user?.id;
+        const { scope } = await workspaceFor(req);
         const id = String(req.params.id);
         const { notes, effectiveDate, data, registryFilingNotApplicable } = req.body ?? {};
 
@@ -197,7 +201,7 @@ export const updateEvent = async (req: AuthRequest, res: Response) => {
         if (!event || event.deletedAt) return res.status(404).json({ error: 'Event not found.' });
 
         // Ownership check via company.
-        const company = await Company.findOne({ _id: event.companyId, userId, deletedAt: null });
+        const company = await Company.findOne({ _id: event.companyId, ...scope, deletedAt: null });
         if (!company) return res.status(403).json({ error: 'Forbidden.' });
 
         // `updateEventSchema` can't do this: a PUT body carries no eventType,
@@ -257,12 +261,13 @@ export const updateEvent = async (req: AuthRequest, res: Response) => {
 export const deleteEvent = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user?.id;
+        const { scope } = await workspaceFor(req);
         const id = String(req.params.id);
 
         const event = await CorporateEvent.findById(id);
         if (!event || event.deletedAt) return res.status(404).json({ error: 'Event not found.' });
 
-        const company = await Company.findOne({ _id: event.companyId, userId, deletedAt: null });
+        const company = await Company.findOne({ _id: event.companyId, ...scope, deletedAt: null });
         if (!company) return res.status(403).json({ error: 'Forbidden.' });
 
         event.deletedAt = new Date();
@@ -302,6 +307,7 @@ export const deleteEvent = async (req: AuthRequest, res: Response) => {
 export const attachEvent = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user?.id;
+        const { scope } = await workspaceFor(req);
         const id = String(req.params.id);
         const { role } = req.body;
         const file = (req as any).file as Express.Multer.File | undefined;
@@ -314,7 +320,7 @@ export const attachEvent = async (req: AuthRequest, res: Response) => {
         const event = await CorporateEvent.findById(id);
         if (!event) return res.status(404).json({ error: 'Event not found.' });
 
-        const company = await Company.findOne({ _id: event.companyId, userId, deletedAt: null });
+        const company = await Company.findOne({ _id: event.companyId, ...scope, deletedAt: null });
         if (!company) return res.status(403).json({ error: 'Forbidden.' });
 
         // Persist the bytes via the storage layer (S3 in prod, disk in dev).
@@ -347,13 +353,14 @@ export const attachEvent = async (req: AuthRequest, res: Response) => {
 export const serveAttachment = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user?.id;
+        const { scope } = await workspaceFor(req);
         const id = String(req.params.id);
         const fileId = String(req.params.fileId);
 
         const event = await CorporateEvent.findById(id);
         if (!event) return res.status(404).json({ error: 'Event not found.' });
 
-        const company = await Company.findOne({ _id: event.companyId, userId, deletedAt: null });
+        const company = await Company.findOne({ _id: event.companyId, ...scope, deletedAt: null });
         if (!company) return res.status(403).json({ error: 'Forbidden.' });
 
         const attachment = event.attachments.find((a) => a.fileId === fileId);
@@ -379,12 +386,13 @@ export const serveAttachment = async (req: AuthRequest, res: Response) => {
 export const generateResolution = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user?.id;
+        const { scope } = await workspaceFor(req);
         const id = String(req.params.id);
 
         const event = await CorporateEvent.findById(id);
         if (!event) return res.status(404).json({ error: 'Event not found.' });
 
-        const company = await Company.findOne({ _id: event.companyId, userId, deletedAt: null });
+        const company = await Company.findOne({ _id: event.companyId, ...scope, deletedAt: null });
         if (!company) return res.status(403).json({ error: 'Forbidden.' });
 
         const templateName = RESOLUTION_TEMPLATES[event.eventType];
@@ -424,6 +432,7 @@ const EVENT_LABELS: Partial<Record<CorporateEventType, string>> = {
 export const sendResolution = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user?.id;
+        const { scope } = await workspaceFor(req);
         const id = String(req.params.id);
         const { recipientName, recipientEmail } = req.body;
 
@@ -433,7 +442,7 @@ export const sendResolution = async (req: AuthRequest, res: Response) => {
         const event = await CorporateEvent.findById(id);
         if (!event) return res.status(404).json({ error: 'Event not found.' });
 
-        const company = await Company.findOne({ _id: event.companyId, userId, deletedAt: null });
+        const company = await Company.findOne({ _id: event.companyId, ...scope, deletedAt: null });
         if (!company) return res.status(403).json({ error: 'Forbidden.' });
 
         const templateName = RESOLUTION_TEMPLATES[event.eventType];
@@ -464,6 +473,7 @@ export const sendResolution = async (req: AuthRequest, res: Response) => {
 export const sendForESign = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user?.id;
+        const { scope } = await workspaceFor(req);
         const id = String(req.params.id);
         const { recipientName, recipientEmail } = req.body;
 
@@ -473,7 +483,7 @@ export const sendForESign = async (req: AuthRequest, res: Response) => {
         const event = await CorporateEvent.findById(id);
         if (!event) return res.status(404).json({ error: 'Event not found.' });
 
-        const company = await Company.findOne({ _id: event.companyId, userId, deletedAt: null });
+        const company = await Company.findOne({ _id: event.companyId, ...scope, deletedAt: null });
         if (!company) return res.status(403).json({ error: 'Forbidden.' });
 
         const templateName = RESOLUTION_TEMPLATES[event.eventType];
@@ -511,12 +521,13 @@ export const sendForESign = async (req: AuthRequest, res: Response) => {
 export const getESignStatus = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user?.id;
+        const { scope } = await workspaceFor(req);
         const id = String(req.params.id);
 
         const event = await CorporateEvent.findById(id);
         if (!event) return res.status(404).json({ error: 'Event not found.' });
 
-        const company = await Company.findOne({ _id: event.companyId, userId, deletedAt: null });
+        const company = await Company.findOne({ _id: event.companyId, ...scope, deletedAt: null });
         if (!company) return res.status(403).json({ error: 'Forbidden.' });
 
         if (!event.eSign?.submissionId) {
@@ -555,6 +566,7 @@ export const getESignStatus = async (req: AuthRequest, res: Response) => {
 export const getBuilderToken = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user?.id;
+        const { scope } = await workspaceFor(req);
         const id = String(req.params.id);
         const { recipientName, recipientEmail } = req.body;
 
@@ -568,7 +580,7 @@ export const getBuilderToken = async (req: AuthRequest, res: Response) => {
         const event = await CorporateEvent.findById(id);
         if (!event) return res.status(404).json({ error: 'Event not found.' });
 
-        const company = await Company.findOne({ _id: event.companyId, userId, deletedAt: null });
+        const company = await Company.findOne({ _id: event.companyId, ...scope, deletedAt: null });
         if (!company) return res.status(403).json({ error: 'Forbidden.' });
 
         const templateName = RESOLUTION_TEMPLATES[event.eventType];
@@ -602,6 +614,7 @@ export const getBuilderToken = async (req: AuthRequest, res: Response) => {
 export const recordESignResult = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user?.id;
+        const { scope } = await workspaceFor(req);
         const id = String(req.params.id);
         const { submissionId, signingUrl } = req.body;
 
@@ -610,7 +623,7 @@ export const recordESignResult = async (req: AuthRequest, res: Response) => {
         const event = await CorporateEvent.findById(id);
         if (!event) return res.status(404).json({ error: 'Event not found.' });
 
-        const company = await Company.findOne({ _id: event.companyId, userId, deletedAt: null });
+        const company = await Company.findOne({ _id: event.companyId, ...scope, deletedAt: null });
         if (!company) return res.status(403).json({ error: 'Forbidden.' });
 
         event.eSign = {

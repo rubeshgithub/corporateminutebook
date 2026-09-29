@@ -4,18 +4,21 @@ import { Company } from '../models/Company';
 import { DocumentModel } from '../models/Document';
 import { ActivityLog } from '../models/ActivityLog';
 import { serverError } from '../utils/apiError';
+import { workspaceFor } from '../utils/workspace';
 
 export const getStats = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user?.id;
+        const { scope } = await workspaceFor(req);
 
-        const companies = await Company.find({ userId, deletedAt: null });
+        const companies = await Company.find({ ...scope, deletedAt: null });
         const companyIds = companies.map((c) => c._id);
 
         const [documentsCount, weekActivityCount] = await Promise.all([
             DocumentModel.countDocuments({ companyId: { $in: companyIds } }),
             ActivityLog.countDocuments({
-                userId,
+                // A firm member's feed counts colleagues' work on firm companies too.
+                $or: [{ userId }, { companyId: { $in: companyIds } }],
                 timestamp: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
             }),
         ]);

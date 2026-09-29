@@ -17,6 +17,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import api from '../utils/api';
 import { useSnackbar } from '../context/SnackbarContext';
 import PlacesTextField from './PlacesTextField';
@@ -285,6 +286,11 @@ const MinuteBookBuilder: React.FC = () => {
     const isEdit = Boolean(id);
     const { showSnackbar } = useSnackbar();
     const [loading, setLoading] = useState(isEdit);
+
+    // Firm members choose where a new company lives; it defaults to the firm,
+    // since client files are what a firm workspace is for.
+    const firm: { name: string } | null = useSelector((state: any) => state.auth?.user?.organization) ?? null;
+    const [workspace, setWorkspace] = useState<'firm' | 'personal'>(firm ? 'firm' : 'personal');
 
     // Registry search dialog
     const [searchOpen, setSearchOpen]           = useState(false);
@@ -772,7 +778,7 @@ const MinuteBookBuilder: React.FC = () => {
             if (isEdit) {
                 await api.put(`/companies/${id}`, payload);
             } else {
-                await api.post('/companies', payload);
+                await api.post('/companies', { ...payload, workspace: firm ? workspace : 'personal' });
             }
             setConfirmOpen(false);
             navigate('/dashboard');
@@ -823,6 +829,19 @@ const MinuteBookBuilder: React.FC = () => {
                     {/* ============ Step 0: Company ============ */}
                     {activeStep === 0 && (
                         <Box>
+                            {!isEdit && firm && (
+                                <FormControl sx={{ mb: 2, display: 'block' }}>
+                                    <FormLabel sx={{ fontSize: 13, fontWeight: 600, color: 'text.primary' }}>Create this company for</FormLabel>
+                                    <RadioGroup
+                                        row
+                                        value={workspace}
+                                        onChange={(e) => setWorkspace(e.target.value as 'firm' | 'personal')}
+                                    >
+                                        <FormControlLabel value="firm" control={<Radio size="small" />} label={`${firm.name} (shared with your firm)`} />
+                                        <FormControlLabel value="personal" control={<Radio size="small" />} label="Personal (only you)" />
+                                    </RadioGroup>
+                                </FormControl>
+                            )}
                             {/* ---- Government Registry Search ---- */}
                             <Box
                                 sx={{

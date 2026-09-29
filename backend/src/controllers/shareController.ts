@@ -9,6 +9,7 @@ import { ActivityLog } from '../models/ActivityLog';
 import { generateMinuteBookPDF } from '../services/documentGenerator';
 import { sendShareInviteEmail } from '../services/emailService';
 import { serverError } from '../utils/apiError';
+import { workspaceFor } from '../utils/workspace';
 import { viewerCompany, viewerEvents, redactedForViewer } from '../utils/shareRedaction';
 
 const APP_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -39,10 +40,11 @@ function shareUrlFor(token: string): string {
 export const createShare = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user?.id;
+        const { scope } = await workspaceFor(req);
         const companyId = String(req.params.id);
         const { label, invitedEmail, expiresInDays = 7 } = req.body ?? {};
 
-        const company = await Company.findOne({ _id: companyId, userId, deletedAt: null });
+        const company = await Company.findOne({ _id: companyId, ...scope, deletedAt: null });
         if (!company) return res.status(404).json({ error: 'Company not found.' });
 
         // Cap: sanity-check the caller isn't asking for a 10-year share.
@@ -109,8 +111,9 @@ export const createShare = async (req: AuthRequest, res: Response) => {
 export const listShares = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user?.id;
+        const { scope } = await workspaceFor(req);
         const companyId = String(req.params.id);
-        const company = await Company.findOne({ _id: companyId, userId, deletedAt: null }).lean();
+        const company = await Company.findOne({ _id: companyId, ...scope, deletedAt: null }).lean();
         if (!company) return res.status(404).json({ error: 'Company not found.' });
 
         const shares = await CompanyShare.find({ companyId }).sort({ createdAt: -1 }).lean();
@@ -141,13 +144,14 @@ export const listShares = async (req: AuthRequest, res: Response) => {
 export const revokeShare = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user?.id;
+        const { scope } = await workspaceFor(req);
         const shareId = String(req.params.shareId);
 
         const share = await CompanyShare.findById(shareId);
         if (!share) return res.status(404).json({ error: 'Share not found.' });
 
         // Ownership check via the company.
-        const company = await Company.findOne({ _id: share.companyId, userId, deletedAt: null });
+        const company = await Company.findOne({ _id: share.companyId, ...scope, deletedAt: null });
         if (!company) return res.status(403).json({ error: 'Forbidden.' });
 
         if (!share.revokedAt) {

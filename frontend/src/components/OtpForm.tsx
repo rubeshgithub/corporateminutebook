@@ -60,8 +60,8 @@ const OtpForm: React.FC<Props> = ({
             // — response body only carries public user metadata. Strip any
             // extra one-time flags (justClaimed) so they don't get cached
             // in localStorage across sessions.
-            const { _id, name, email: userEmail, role } = res.data;
-            dispatch(loginSuccess({ _id, name, email: userEmail, role }));
+            const { _id, name, email: userEmail, role, organization } = res.data;
+            dispatch(loginSuccess({ _id, name, email: userEmail, role, organization: organization ?? null }));
             navigate('/dashboard');
         } catch (err: any) {
             setError(err?.response?.data?.error || 'Invalid code. Try again.');

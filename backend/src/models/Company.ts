@@ -1,7 +1,12 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface ICompany extends Document {
+    // The creator. For a personal company this is also the only person with
+    // access; for a firm company access comes from organizationId instead.
     userId: mongoose.Types.ObjectId;
+    // Set when the company belongs to a firm workspace — every member of that
+    // firm can open it. Null (or absent on older records) means personal.
+    organizationId?: mongoose.Types.ObjectId | null;
     name: string;
     corporateAccessNumber?: string;
     businessNumber?: string;
@@ -147,6 +152,7 @@ export interface ICompany extends Document {
 const companySchema: Schema = new Schema(
     {
         userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+        organizationId: { type: Schema.Types.ObjectId, ref: 'Organization', default: null },
         name: { type: String, required: true },
         corporateAccessNumber: { type: String },
         businessNumber: { type: String },
@@ -298,5 +304,6 @@ companySchema.index({
 // check filters on { userId, deletedAt } (often with _id). Without this every
 // one of those is a collection scan.
 companySchema.index({ userId: 1, deletedAt: 1 });
+companySchema.index({ organizationId: 1, deletedAt: 1 });
 
 export const Company = mongoose.model<ICompany>('Company', companySchema);

@@ -8,6 +8,7 @@ import { CorporateEvent } from '../models/CorporateEvent';
 import { CompanyShare } from '../models/CompanyShare';
 import { DocumentModel } from '../models/Document';
 import { ActivityLog } from '../models/ActivityLog';
+import { Organization } from '../models/Organization';
 import { sendOtpEmail } from '../services/emailService';
 import { deleteFile } from '../services/uploadStorage';
 import { AuthRequest } from '../middleware/authMiddleware';
@@ -16,6 +17,13 @@ import { DeleteAccountInput, UpdatePreferencesInput } from '../schemas/auth.sche
 
 const generateToken = (id: string, role: string) =>
     jwt.sign({ id, role }, process.env.JWT_SECRET as string, { expiresIn: '30d' });
+
+/** The firm the SPA should render the shell for, or null for a solo account. */
+const organizationSummary = async (user: { organizationId?: unknown; organizationRole?: string | null }) => {
+    if (!user.organizationId) return null;
+    const org = await Organization.findById(user.organizationId).select('name').lean();
+    return org ? { _id: org._id, name: org.name, role: user.organizationRole ?? 'member' } : null;
+};
 
 const OTP_TTL_MINUTES = 10;
 /** Wrong guesses allowed per issued code before it is burned. */
@@ -149,6 +157,7 @@ export const verifyOtp = async (req: Request, res: Response) => {
             name: user.name,
             email: user.email,
             role: user.role,
+            organization: await organizationSummary(user),
             justClaimed: isFirstLogin,  // frontend uses this to show a welcome flash
         });
     } catch (error: any) {
@@ -208,6 +217,7 @@ export const testMintSession = async (req: Request, res: Response) => {
         name:  user.name,
         email: user.email,
         role:  user.role,
+        organization: await organizationSummary(user),
         testSession: true,
     });
 };
@@ -220,7 +230,7 @@ export const testMintSession = async (req: Request, res: Response) => {
  */
 export const me = async (req: AuthRequest, res: Response) => {
     try {
-        const user = await User.findById(req.user!.id).select('_id name email role reminderOptOut createdAt');
+        const user = await User.findById(req.user!.id).select('_id name email role reminderOptOut createdAt organizationId organizationRole');
         if (!user) return res.status(404).json({ error: 'User not found.' });
         res.json({
             _id:            user._id,
@@ -229,6 +239,7 @@ export const me = async (req: AuthRequest, res: Response) => {
             role:           user.role,
             reminderOptOut: !!user.reminderOptOut,
             createdAt:      user.createdAt,
+            organization:   await organizationSummary(user),
         });
     } catch (error: any) {
         serverError(res, 'me', error);
@@ -286,7 +297,29 @@ export const deleteAccount = async (req: AuthRequest, res: Response) => {
             return res.status(400).json({ error: 'The email you typed does not match this account.' });
         }
 
-        const companies = await Company.find({ userId: user._id })
+        // Firm client files belong to the firm, not to whoever created them —
+        // a legal assistant closing their account must not erase them. The one
+        // exception is a firm the user is alone in: nobody else could ever
+        // reach those records again, so they go with the account.
+        const orgId = user.organizationId;
+        let soleMember = false;
+        if (orgId) {
+            const [memberCount, supervisorCount] = await Promise.all([
+                User.countDocuments({ organizationId: orgId }),
+                User.countDocuments({ organizationId: orgId, organizationRole: 'supervisor' }),
+            ]);
+            soleMember = memberCount <= 1;
+            if (!soleMember && user.organizationRole === 'supervisor' && supervisorCount <= 1) {
+                return res.status(409).json({
+                    error: 'You are the only supervisor of your firm. Make another member a supervisor before deleting your account.',
+                });
+            }
+        }
+        const erasable = soleMember
+            ? { $or: [{ userId: user._id, organizationId: null }, { organizationId: orgId }] }
+            : { userId: user._id, organizationId: null };
+
+        const companies = await Company.find(erasable)
             .select('_id incorporationDocumentFile')
             .lean();
         const companyIds = companies.map((c) => c._id);
@@ -303,13 +336,24 @@ export const deleteAccount = async (req: AuthRequest, res: Response) => {
         // once the rows below are gone (UUID keys, no listing endpoint).
         await Promise.all(fileIds.map((id) => deleteFile(id)));
 
+        // The user's own activity goes, except entries on firm companies that
+        // survive — those are the firm's audit trail.
+        const keptFirmCompanyIds = orgId && !soleMember
+            ? await Company.find({ organizationId: orgId }).distinct('_id')
+            : [];
         await Promise.all([
             CompanyShare.deleteMany({ companyId: { $in: companyIds } }),
             CorporateEvent.deleteMany({ companyId: { $in: companyIds } }),
             DocumentModel.deleteMany({ companyId: { $in: companyIds } }),
-            ActivityLog.deleteMany({ userId: user._id }),
+            ActivityLog.deleteMany({
+                $or: [
+                    { userId: user._id, companyId: { $nin: keptFirmCompanyIds } },
+                    { companyId: { $in: companyIds } },
+                ],
+            }),
         ]);
-        await Company.deleteMany({ userId: user._id });
+        await Company.deleteMany({ _id: { $in: companyIds } });
+        if (orgId && soleMember) await Organization.deleteOne({ _id: orgId });
         await User.deleteOne({ _id: user._id });
 
         clearAuthCookie(res);

@@ -29,7 +29,10 @@ const SessionBootCheck: React.FC = () => {
         api.get('/auth/me')
             .then(({ data }) => {
                 if (cancelled) return;
-                dispatch(loginSuccess({ _id: data._id, name: data.name, email: data.email, role: data.role }));
+                dispatch(loginSuccess({
+                    _id: data._id, name: data.name, email: data.email, role: data.role,
+                    organization: data.organization ?? null,
+                }));
             })
             .catch((err) => {
                 if (cancelled) return;

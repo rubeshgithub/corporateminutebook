@@ -26,6 +26,11 @@ export interface IUser extends Document {
     // opted-out users. Transactional mail (OTP, invites) is unaffected.
     reminderOptOut?: boolean;
     reminderOptOutAt?: Date | null;
+    // Firm membership — at most one firm per user. Null for a business owner
+    // working alone; their companies are personal (Company.organizationId null).
+    organizationId?: mongoose.Types.ObjectId | null;
+    organizationRole?: 'supervisor' | 'member' | null;
+    organizationJoinedAt?: Date | null;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -44,6 +49,9 @@ const userSchema: Schema = new Schema(
         firstLoggedInAt: { type: Date, default: null },
         reminderOptOut: { type: Boolean, default: false },
         reminderOptOutAt: { type: Date, default: null },
+        organizationId: { type: Schema.Types.ObjectId, ref: 'Organization', default: null, index: true },
+        organizationRole: { type: String, enum: ['supervisor', 'member'], default: null },
+        organizationJoinedAt: { type: Date, default: null },
     },
     { timestamps: true }
 );

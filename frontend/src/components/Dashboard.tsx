@@ -20,8 +20,10 @@ import TimelineIcon from '@mui/icons-material/Timeline';
 import ArchiveIcon from '@mui/icons-material/Archive';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import DriveFileMoveIcon from '@mui/icons-material/DriveFileMove';
 import api from '../utils/api';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { useSnackbar } from '../context/SnackbarContext';
 import { formatDateOnly } from '../utils/annualReturns';
 import ShareDialog from './ShareDialog';
@@ -278,6 +280,8 @@ const ComplianceBadge: React.FC<{ c: ComplianceEntry | undefined; onClick: () =>
 const Dashboard: React.FC = () => {
     const navigate = useNavigate();
     const { showSnackbar } = useSnackbar();
+    const currentUser = useSelector((state: any) => state.auth?.user);
+    const firm: { name: string; role: 'supervisor' | 'member' } | null = currentUser?.organization ?? null;
     const [companies, setCompanies] = React.useState<any[]>([]);
     const [compliance, setCompliance] = React.useState<ComplianceEntry[]>([]);
     const [activity, setActivity] = React.useState<any[]>([]);
@@ -345,8 +349,26 @@ const Dashboard: React.FC = () => {
             setCompanies((prev) => prev.filter((c) => c._id !== companyId));
             fetchAll();
             showSnackbar('Company deleted.', 'success');
-        } catch {
-            showSnackbar('Failed to delete company.', 'error');
+        } catch (err: any) {
+            showSnackbar(err?.response?.data?.error || 'Failed to delete company.', 'error');
+        }
+    };
+
+    // Mirrors the backend rule: a firm company can only be deleted by a
+    // supervisor; a personal company by the person who created it.
+    const canDelete = (company: any) =>
+        company.organizationId ? firm?.role === 'supervisor' : company.userId === currentUser?._id;
+
+    const canMoveToFirm = (company: any) =>
+        !!firm && !company.organizationId && company.userId === currentUser?._id;
+
+    const moveToFirm = async (company: any) => {
+        try {
+            await api.post(`/companies/${company._id}/move-to-firm`);
+            showSnackbar(`${company.name} moved into ${firm?.name ?? 'the firm'}.`, 'success');
+            fetchAll();
+        } catch (err: any) {
+            showSnackbar(err?.response?.data?.error || 'Could not move the company.', 'error');
         }
     };
 
@@ -759,7 +781,20 @@ const Dashboard: React.FC = () => {
                                             </TableCell>
 
                                             <TableCell sx={{ py: 0.75 }}>
-                                                <Typography variant="body2" fontWeight={600} lineHeight={1.3}>{company.name}</Typography>
+                                                <Box display="flex" alignItems="center" gap={0.75}>
+                                                    <Typography variant="body2" fontWeight={600} lineHeight={1.3}>{company.name}</Typography>
+                                                    {firm && (
+                                                        <Chip
+                                                            size="small"
+                                                            label={company.organizationId ? 'Firm' : 'Personal'}
+                                                            sx={{
+                                                                height: 18, fontSize: 10, fontWeight: 600,
+                                                                bgcolor: company.organizationId ? '#e8eaf6' : '#f5f5f5',
+                                                                color: company.organizationId ? '#1a237e' : 'text.secondary',
+                                                            }}
+                                                        />
+                                                    )}
+                                                </Box>
                                                 <Typography variant="caption" color="text.secondary">
                                                     {company.corporateAccessNumber
                                                         ? `CAN: ${company.corporateAccessNumber}`
@@ -871,11 +906,20 @@ const Dashboard: React.FC = () => {
                                                         <ShareIcon sx={{ fontSize: 16 }} />
                                                     </IconButton>
                                                 </Tooltip>
-                                                <Tooltip title="Delete corporation" placement="top">
-                                                    <IconButton size="small" onClick={() => handleDelete(company._id, company.name)} sx={{ color: 'text.secondary', '&:hover': { color: 'error.main' } }}>
-                                                        <DeleteIcon sx={{ fontSize: 17 }} />
-                                                    </IconButton>
-                                                </Tooltip>
+                                                {canMoveToFirm(company) && (
+                                                    <Tooltip title={`Move into ${firm?.name ?? 'your firm'}`} placement="top">
+                                                        <IconButton size="small" onClick={() => moveToFirm(company)} sx={{ color: 'text.secondary', '&:hover': { color: '#1a237e' } }}>
+                                                            <DriveFileMoveIcon sx={{ fontSize: 17 }} />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                )}
+                                                {canDelete(company) && (
+                                                    <Tooltip title="Delete corporation" placement="top">
+                                                        <IconButton size="small" onClick={() => handleDelete(company._id, company.name)} sx={{ color: 'text.secondary', '&:hover': { color: 'error.main' } }}>
+                                                            <DeleteIcon sx={{ fontSize: 17 }} />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                )}
                                             </TableCell>
                                         </TableRow>
                                     );

@@ -145,7 +145,11 @@ const withCrossFieldRules = <T extends z.ZodObject<any>>(schema: T) => schema.su
     }
 });
 
-export const createCompanySchema = withCrossFieldRules(companyCore);
+// `workspace` only chooses personal vs the caller's firm; the firm id itself
+// is resolved server-side from the caller's membership.
+export const createCompanySchema = withCrossFieldRules(
+    companyCore.extend({ workspace: z.enum(['personal', 'firm']).optional() }),
+);
 export const updateCompanySchema = withCrossFieldRules(companyCore.partial());
 
 export type CreateCompanyInput = z.infer<typeof createCompanySchema>;

@@ -10,6 +10,7 @@ const NAV_ITEMS = [
     { label: 'Dashboard', path: '/dashboard' },
     { label: 'New Company', path: '/builder' },
     { label: 'Documents', path: '/documents' },
+    { label: 'Firm', path: '/firm' },
     { label: 'Account', path: '/account' },
 ];
 

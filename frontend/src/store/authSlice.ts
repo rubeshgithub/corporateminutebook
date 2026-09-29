@@ -7,11 +7,19 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
  * roundtrip. If the cookie is missing/expired, api.ts's 401 interceptor
  * clears this cache and bounces to the landing page.
  */
+export interface AuthOrganization {
+    _id: string;
+    name: string;
+    role: 'supervisor' | 'member';
+}
+
 interface AuthUser {
     _id: string;
     name: string;
     email: string;
     role: string;
+    // The firm this user works in, or null for a solo account.
+    organization?: AuthOrganization | null;
 }
 
 interface AuthState {
@@ -54,8 +62,13 @@ const authSlice = createSlice({
             state.isAuthenticated = false;
             localStorage.removeItem('user');
         },
+        setOrganization: (state, action: PayloadAction<AuthOrganization | null>) => {
+            if (!state.user) return;
+            state.user.organization = action.payload;
+            localStorage.setItem('user', JSON.stringify(state.user));
+        },
     },
 });
 
-export const { loginSuccess, logout } = authSlice.actions;
+export const { loginSuccess, logout, setOrganization } = authSlice.actions;
 export default authSlice.reducer;

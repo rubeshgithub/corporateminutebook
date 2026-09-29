@@ -6,6 +6,7 @@ import { Company } from '../models/Company';
 import { CorporateEvent } from '../models/CorporateEvent';
 import { generatePDFBuffer, generateMinuteBookPDF, generateInauguralPackagePDF } from '../services/documentGenerator';
 import { serverError } from '../utils/apiError';
+import { workspaceFor } from '../utils/workspace';
 import { annualReturnCompliance } from '../utils/annualReturns';
 
 const TEMPLATE_LABELS: Record<string, string> = {
@@ -94,8 +95,9 @@ export const generateDocument = async (req: AuthRequest, res: Response) => {
     try {
         const { companyId, documentType } = req.body;
         const userId = req.user?.id;
+        const { scope } = await workspaceFor(req);
 
-        const company = await Company.findOne({ _id: companyId, userId, deletedAt: null });
+        const company = await Company.findOne({ _id: companyId, ...scope, deletedAt: null });
         if (!company) return res.status(404).json({ message: 'Company not found' });
 
         if (!TEMPLATE_LABELS[documentType]) {
@@ -137,8 +139,9 @@ export const getDocuments = async (req: AuthRequest, res: Response) => {
     try {
         const { companyId } = req.params;
         const userId = req.user?.id;
+        const { scope } = await workspaceFor(req);
 
-        const company = await Company.findOne({ _id: companyId, userId, deletedAt: null });
+        const company = await Company.findOne({ _id: companyId, ...scope, deletedAt: null });
         if (!company) return res.status(404).json({ message: 'Company not found' });
 
         const documents = await DocumentModel.find({ companyId })
@@ -154,8 +157,9 @@ export const compileMinuteBook = async (req: AuthRequest, res: Response) => {
     try {
         const { companyId, force } = req.body;
         const userId = req.user?.id;
+        const { scope } = await workspaceFor(req);
 
-        const company = await Company.findOne({ _id: companyId, userId, deletedAt: null });
+        const company = await Company.findOne({ _id: companyId, ...scope, deletedAt: null });
         if (!company) return res.status(404).json({ message: 'Company not found' });
 
         const events = await fetchEvents(companyId);
@@ -258,12 +262,13 @@ export const generateBundle = async (req: AuthRequest, res: Response) => {
         const { companyId } = req.body;
         const bundleType = String(req.params.bundleType) as BundleType;
         const userId = req.user?.id;
+        const { scope } = await workspaceFor(req);
 
         if (!(['bank', 'dd', 'cra'] as BundleType[]).includes(bundleType)) {
             return res.status(400).json({ error: 'Unknown bundle type. Use bank / dd / cra.' });
         }
 
-        const company = await Company.findOne({ _id: companyId, userId, deletedAt: null });
+        const company = await Company.findOne({ _id: companyId, ...scope, deletedAt: null });
         if (!company) return res.status(404).json({ message: 'Company not found' });
 
         const allEvents = await fetchEvents(companyId);
@@ -303,8 +308,9 @@ export const generateInauguralPackage = async (req: AuthRequest, res: Response) 
     try {
         const { companyId } = req.body;
         const userId = req.user?.id;
+        const { scope } = await workspaceFor(req);
 
-        const company = await Company.findOne({ _id: companyId, userId, deletedAt: null });
+        const company = await Company.findOne({ _id: companyId, ...scope, deletedAt: null });
         if (!company) return res.status(404).json({ message: 'Company not found' });
 
         const events = await fetchEvents(companyId);

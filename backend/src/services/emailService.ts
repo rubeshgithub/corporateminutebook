@@ -183,6 +183,44 @@ export const sendAnnualReturnReminderEmail = async (opts: {
     });
 };
 
+const escapeHtml = (s: string) =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+/**
+ * Firm invitation — a supervisor has invited someone to their firm
+ * workspace. Transactional: there is no link token; the invitee signs in with
+ * this email address (proving they own it) and accepts from the Firm page.
+ */
+export const sendFirmInviteEmail = async (opts: {
+    to:          string;
+    inviterName: string;
+    firmName:    string;
+    role:        'supervisor' | 'member';
+}) => {
+    const inviter = escapeHtml(opts.inviterName);
+    const firm = escapeHtml(opts.firmName);
+    const roleLabel = opts.role === 'supervisor' ? 'a supervisor' : 'a team member';
+
+    await sendMail({
+        from: FROM,
+        to: opts.to,
+        subject: `${opts.inviterName} invited you to ${opts.firmName} on MinuteBook`,
+        html: `
+            <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#222;line-height:1.6">
+                <h2 style="color:#1a237e;margin-bottom:8px">You've been invited to a firm workspace</h2>
+                <p style="color:#666;margin:0 0 24px 0"><strong>${inviter}</strong> invited you to join <strong>${firm}</strong> on MinuteBook as ${roleLabel}.</p>
+
+                <p>Members of a firm share its client minute books. Sign in with this email address (${escapeHtml(opts.to)}) and accept the invitation from the <strong>Firm</strong> page.</p>
+
+                <div style="margin:28px 0">
+                    <a href="${APP_URL}/login" style="display:inline-block;background:#1a237e;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:600">Sign in to MinuteBook</a>
+                </div>
+
+                <p style="color:#888;font-size:12px;margin-top:32px">Sent via MinuteBook — Corporate Records Management. If you weren't expecting this, you can safely ignore the email.</p>
+            </div>`,
+    });
+};
+
 /**
  * Sharing invitation — a CPA / lawyer / partner has been given read-only
  * access to a company's minute book. The share link IS the credential;

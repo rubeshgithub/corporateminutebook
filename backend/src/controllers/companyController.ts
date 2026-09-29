@@ -5,6 +5,7 @@ import { ActivityLog } from '../models/ActivityLog';
 import { CorporateEvent } from '../models/CorporateEvent';
 import { serverError } from '../utils/apiError';
 import { annualReturnCompliance } from '../utils/annualReturns';
+import { workspaceFor, canDeleteCompany, canMoveToFirm } from '../utils/workspace';
 
 const ACTIVE = { deletedAt: null };
 
@@ -91,13 +92,24 @@ const createFoundingEvents = async (company: any, userId: string) => {
 export const createCompany = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user?.id;
-        const companyData = req.body;
+        const { workspace, ...companyData } = req.body;
+
+        // The firm is resolved from the caller's membership, never taken from
+        // the request — a client can only file into a firm it belongs to.
+        let organizationId: string | null = null;
+        if (workspace === 'firm') {
+            const { ws } = await workspaceFor(req);
+            if (!ws.organizationId) {
+                return res.status(400).json({ error: 'You are not in a firm, so this company can only be personal.' });
+            }
+            organizationId = ws.organizationId;
+        }
 
         if (Array.isArray(companyData.shareholders)) {
             companyData.shareholders = assignCertNumbers(companyData.shareholders, 1);
         }
 
-        const company = await Company.create({ ...companyData, userId });
+        const company = await Company.create({ ...companyData, userId, organizationId });
 
         await createFoundingEvents(company, userId!);
 
@@ -116,8 +128,8 @@ export const createCompany = async (req: AuthRequest, res: Response) => {
 
 export const getCompanies = async (req: AuthRequest, res: Response) => {
     try {
-        const userId = req.user?.id;
-        const companies = await Company.find({ userId, ...ACTIVE });
+        const { scope } = await workspaceFor(req);
+        const companies = await Company.find({ ...scope, ...ACTIVE });
         res.json(companies);
     } catch (error: any) {
         serverError(res, 'getCompanies', error);
@@ -126,8 +138,8 @@ export const getCompanies = async (req: AuthRequest, res: Response) => {
 
 export const getCompany = async (req: AuthRequest, res: Response) => {
     try {
-        const userId = req.user?.id;
-        const company = await Company.findOne({ _id: req.params.id, userId, ...ACTIVE });
+        const { scope } = await workspaceFor(req);
+        const company = await Company.findOne({ _id: req.params.id, ...scope, ...ACTIVE });
         if (!company) {
             return res.status(404).json({ error: 'Company not found' });
         }
@@ -140,10 +152,14 @@ export const getCompany = async (req: AuthRequest, res: Response) => {
 export const updateCompany = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user?.id;
-        const { userId: _ignoreUserId, _id: _ignoreId, deletedAt: _ignoreDeleted, ...updates } = req.body;
+        const { scope } = await workspaceFor(req);
+        const {
+            userId: _ignoreUserId, organizationId: _ignoreOrg, _id: _ignoreId, deletedAt: _ignoreDeleted,
+            ...updates
+        } = req.body;
 
         if (Array.isArray(updates.shareholders)) {
-            const existing = await Company.findOne({ _id: req.params.id, userId, ...ACTIVE });
+            const existing = await Company.findOne({ _id: req.params.id, ...scope, ...ACTIVE });
             const existingShareholders = existing?.shareholders ?? [];
             // A row resubmitted without its certificateNumber reclaims the number
             // already on record for that holder+class — assigning a fresh one here
@@ -162,7 +178,7 @@ export const updateCompany = async (req: AuthRequest, res: Response) => {
         }
 
         const company = await Company.findOneAndUpdate(
-            { _id: req.params.id, userId, ...ACTIVE },
+            { _id: req.params.id, ...scope, ...ACTIVE },
             updates,
             { new: true, runValidators: true }
         );
@@ -187,8 +203,17 @@ export const updateCompany = async (req: AuthRequest, res: Response) => {
 export const deleteCompany = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user?.id;
+        const { ws, scope } = await workspaceFor(req);
+        const existing = await Company.findOne({ _id: req.params.id, ...scope, ...ACTIVE }).select('userId organizationId');
+        if (!existing) {
+            return res.status(404).json({ error: 'Company not found' });
+        }
+        if (!canDeleteCompany(ws, existing)) {
+            return res.status(403).json({ error: 'Only a firm supervisor can delete a firm company.' });
+        }
+
         const company = await Company.findOneAndUpdate(
-            { _id: req.params.id, userId, ...ACTIVE },
+            { _id: existing._id, ...ACTIVE },
             { deletedAt: new Date() },
             { new: true }
         );
@@ -231,8 +256,8 @@ const REGISTRY_REQUIRED = new Set([
 
 export const getComplianceSummary = async (req: AuthRequest, res: Response) => {
     try {
-        const userId = req.user?.id;
-        const companies = await Company.find({ userId, ...ACTIVE }).lean();
+        const { scope } = await workspaceFor(req);
+        const companies = await Company.find({ ...scope, ...ACTIVE }).lean();
         if (companies.length === 0) return res.json([]);
 
         const companyIds = companies.map((c) => c._id);
@@ -336,8 +361,8 @@ const UPSELL_EVENT_THRESHOLD = 2;
 
 export const getUpsellCandidates = async (req: AuthRequest, res: Response) => {
     try {
-        const userId = req.user?.id;
-        const seeded = await Company.find({ userId, origin: 'crs_seeded', ...ACTIVE }).lean();
+        const { scope } = await workspaceFor(req);
+        const seeded = await Company.find({ ...scope, origin: 'crs_seeded', ...ACTIVE }).lean();
         if (seeded.length === 0) return res.json([]);
 
         const companyIds = seeded.map((c) => c._id);
@@ -376,7 +401,8 @@ export const resolveDrift = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user?.id;
         const id = String(req.params.id);
-        const company = await Company.findOne({ _id: id, userId, deletedAt: null });
+        const { scope } = await workspaceFor(req);
+        const company = await Company.findOne({ _id: id, ...scope, deletedAt: null });
         if (!company) return res.status(404).json({ error: 'Company not found.' });
 
         (company as any).drift = {
@@ -397,6 +423,39 @@ export const resolveDrift = async (req: AuthRequest, res: Response) => {
         return res.json({ ok: true });
     } catch (error: any) {
         return serverError(res, 'resolveDrift', error);
+    }
+};
+
+/**
+ * POST /api/companies/:id/move-to-firm
+ *
+ * Hands a personal company over to the creator's firm, e.g. client files a
+ * legal assistant built before the firm workspace existed. One-way from the
+ * creator's side: once it's a firm record, only the firm manages it.
+ */
+export const moveCompanyToFirm = async (req: AuthRequest, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        const { ws, scope } = await workspaceFor(req);
+        const company = await Company.findOne({ _id: req.params.id, ...scope, ...ACTIVE });
+        if (!company) return res.status(404).json({ error: 'Company not found.' });
+        if (!canMoveToFirm(ws, company)) {
+            return res.status(403).json({ error: 'Only the person who created a personal company can move it into their firm.' });
+        }
+
+        company.organizationId = ws.organizationId as any;
+        await company.save();
+
+        await ActivityLog.create({
+            userId,
+            companyId: company._id,
+            action: 'UPDATED_COMPANY',
+            details: `Company ${company.name} moved into the firm workspace.`,
+        });
+
+        return res.json(company);
+    } catch (error: any) {
+        return serverError(res, 'moveCompanyToFirm', error);
     }
 };
 

@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import Anthropic from '@anthropic-ai/sdk';
 import { putFile, getFile } from '../services/uploadStorage';
 import { Company } from '../models/Company';
+import { workspaceFor } from '../utils/workspace';
 
 // Memory storage — we only persist to uploadStorage (S3 or disk) after a
 // successful parse. Old code wrote to backend/uploads/ directly, which
@@ -206,9 +207,10 @@ export const serveIncorporationDocument = async (req: AuthRequest, res: Response
     // of a filename must not grant access. Serve only to the owner of the
     // company the file is attached to; 404 (not 403) so non-owners can't
     // distinguish "exists but not yours" from "doesn't exist".
+    const { scope } = await workspaceFor(req);
     const owned = await Company.findOne({
         incorporationDocumentFile: filename,
-        userId,
+        ...scope,
         deletedAt: null,
     }).select('_id').lean();
     if (!owned) return res.status(404).json({ error: 'File not found.' });

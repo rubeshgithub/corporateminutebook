@@ -1,5 +1,5 @@
 import express from 'express';
-import { createCompany, getCompanies, getCompany, updateCompany, deleteCompany, getComplianceSummary, getUpsellCandidates, resolveDrift } from '../controllers/companyController';
+import { createCompany, getCompanies, getCompany, updateCompany, deleteCompany, getComplianceSummary, getUpsellCandidates, resolveDrift, moveCompanyToFirm } from '../controllers/companyController';
 import { protect } from '../middleware/authMiddleware';
 import { validateBody } from '../middleware/validate';
 import { createCompanySchema, updateCompanySchema } from '../schemas/company.schema';
@@ -21,5 +21,6 @@ router.route('/:id')
 
 // User acknowledgment: "I've reconciled the drift with the registry."
 router.post('/:id/resolve-drift', protect, resolveDrift);
+router.post('/:id/move-to-firm', protect, moveCompanyToFirm);
 
 export default router;
