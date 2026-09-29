@@ -7,6 +7,7 @@ import {
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import api from '../utils/api';
 import { useSnackbar } from '../context/SnackbarContext';
+import PlacesTextField from './PlacesTextField';
 
 type EventType =
     | 'director_appointed' | 'director_resigned' | 'director_address_changed'
@@ -191,7 +192,8 @@ const RecordEventDialog: React.FC<Props> = ({ open, onClose, companyId, company,
                     <TextField label="Middle Name" fullWidth size="small" sx={{ mb: 2 }} value={formData.middleName || ''} onChange={(e) => set('middleName', e.target.value)} />
                     <TextField label="Last Name" fullWidth size="small" sx={{ mb: 2 }} value={formData.lastName || ''} onChange={(e) => set('lastName', e.target.value)} />
                     <TextField label="Email" type="email" fullWidth size="small" sx={{ mb: 2 }} value={formData.email || ''} onChange={(e) => set('email', e.target.value)} />
-                    <TextField label="Residential Address" fullWidth size="small" sx={{ mb: 2 }} value={formData.address || ''} onChange={(e) => set('address', e.target.value)} />
+                    <PlacesTextField label="Residential Address" fullWidth size="small" sx={{ mb: 2 }} worldwide fullAddress value={formData.address || ''} onChange={(e) => set('address', e.target.value)}
+                        onPlaceSelected={(a) => { if (a.country) set('residentCanadian', a.country === 'Canada'); }} />
                     <FormControlLabel control={<Switch checked={formData.residentCanadian ?? true} onChange={(e) => set('residentCanadian', e.target.checked)} />} label="Resident Canadian" />
                 </>;
 
@@ -219,7 +221,7 @@ const RecordEventDialog: React.FC<Props> = ({ open, onClose, companyId, company,
                             })}
                         </Select>
                     </FormControl>
-                    <TextField label="New Address" fullWidth size="small" sx={{ mb: 2 }} value={formData.newAddress || ''} onChange={(e) => set('newAddress', e.target.value)} />
+                    <PlacesTextField label="New Address" fullWidth size="small" sx={{ mb: 2 }} worldwide fullAddress value={formData.newAddress || ''} onChange={(e) => set('newAddress', e.target.value)} />
                 </>;
 
             case 'address_changed':
@@ -232,7 +234,13 @@ const RecordEventDialog: React.FC<Props> = ({ open, onClose, companyId, company,
                             <MenuItem value="service">Address for Service</MenuItem>
                         </Select>
                     </FormControl>
-                    <TextField label="Street" fullWidth size="small" sx={{ mb: 2 }} value={formData.address?.street || ''} onChange={(e) => set('address', { ...formData.address, street: e.target.value })} />
+                    <PlacesTextField label="Street" fullWidth size="small" sx={{ mb: 2 }} value={formData.address?.street || ''} onChange={(e) => set('address', { ...formData.address, street: e.target.value })}
+                        onPlaceSelected={(a) => set('address', {
+                            street: a.street || a.formatted,
+                            city: a.city,
+                            province: PROVINCE_CODES.includes(a.provinceCode) ? a.provinceCode : '',
+                            postalCode: a.postalCode,
+                        })} />
                     <TextField label="City" fullWidth size="small" sx={{ mb: 2 }} value={formData.address?.city || ''} onChange={(e) => set('address', { ...formData.address, city: e.target.value })} />
                     <FormControl fullWidth size="small" sx={{ mb: 2 }}>
                         <InputLabel>Province</InputLabel>
@@ -262,7 +270,7 @@ const RecordEventDialog: React.FC<Props> = ({ open, onClose, companyId, company,
                     </FormControl>
                     <TextField label="Number of Shares" type="number" inputProps={{ min: 1, step: 1 }} fullWidth size="small" sx={{ mb: 2 }} value={formData.numberOfShares || ''} onChange={(e) => set('numberOfShares', Number(e.target.value))} />
                     <TextField label="Consideration Paid ($)" type="number" fullWidth size="small" sx={{ mb: 2 }} value={formData.considerationPaid || ''} onChange={(e) => set('considerationPaid', Number(e.target.value))} />
-                    <TextField label="Address" fullWidth size="small" sx={{ mb: 2 }} value={formData.address || ''} onChange={(e) => set('address', e.target.value)} />
+                    <PlacesTextField label="Address" fullWidth size="small" sx={{ mb: 2 }} worldwide fullAddress value={formData.address || ''} onChange={(e) => set('address', e.target.value)} />
                     <TextField label="Voting %" type="number" fullWidth size="small" sx={{ mb: 2 }} value={formData.votingPercent || ''} onChange={(e) => set('votingPercent', Number(e.target.value))} />
                 </>;
 
@@ -276,7 +284,7 @@ const RecordEventDialog: React.FC<Props> = ({ open, onClose, companyId, company,
                     </FormControl>
                     <TextField label="To Shareholder Name" fullWidth size="small" sx={{ mb: 2 }} value={formData.toName || ''} onChange={(e) => set('toName', e.target.value)} />
                     <TextField label="To Shareholder Email" type="email" fullWidth size="small" sx={{ mb: 2 }} value={formData.toEmail || ''} onChange={(e) => set('toEmail', e.target.value)} />
-                    <TextField label="To Shareholder Address" fullWidth size="small" sx={{ mb: 2 }} value={formData.toAddress || ''} onChange={(e) => set('toAddress', e.target.value)} />
+                    <PlacesTextField label="To Shareholder Address" fullWidth size="small" sx={{ mb: 2 }} worldwide fullAddress value={formData.toAddress || ''} onChange={(e) => set('toAddress', e.target.value)} />
                     <FormControl fullWidth size="small" sx={{ mb: 2 }}>
                         <InputLabel>Share Class</InputLabel>
                         <Select value={formData.sharesClass || ''} label="Share Class" onChange={(e) => set('sharesClass', e.target.value)}>
