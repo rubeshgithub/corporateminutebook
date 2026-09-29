@@ -8,7 +8,7 @@ import api from '../utils/api';
 
 const NAV_ITEMS = [
     { label: 'Dashboard', path: '/dashboard' },
-    { label: 'New Company', path: '/builder' },
+    { label: 'New Company', path: '/new' },
     { label: 'Documents', path: '/documents' },
     { label: 'Firm', path: '/firm' },
     { label: 'Account', path: '/account' },
@@ -56,7 +56,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     };
 
     const isActive = (path: string) => {
-        if (path === '/builder') return location.pathname === '/builder';
+        // The choice screen, the new-company builder and the importer are one menu item.
+        if (path === '/new') return ['/new', '/builder', '/import'].includes(location.pathname);
         return location.pathname === path || location.pathname.startsWith(`${path}/`);
     };
 

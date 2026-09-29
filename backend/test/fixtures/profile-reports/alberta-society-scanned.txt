@@ -1,0 +1,55 @@
+Government Corporation/Non-Profit Search
+of Alberta ■ Corporate Registration System
+Date of Search:
+Time of Search:
+Service Request Number:
+2026/08/06
+01:42 PM
+Search provided by: CorporateRegistryServices.ca
+12345679
+Corporate Access Number: 500000001
+Business Number: 100000002
+Legal Entity Name: EXAMPLE SHELTER SOCIETY
+Legal Entity Status: Active
+Legal Entity Type: Alberta Society
+Registration Date: 1986/07/07 YYYY/MM/DD
+Date of Last Status Change: 2009/01/27 YYYY/MM/DD
+Revival/Restoration Date: 2009/01/27 YYYY/MM/DD
+Registered Office:
+Street:
+City:
+Province:
+Postal Code:
+100 EXAMPLE AVE NW
+EDMONTON
+ALBERTA
+T5H1A1
+Email Address: INFO@EXAMPLE.CA
+Officers:
+Last Name: SMITH
+First Name: JOHN
+Street: 1-100 EXAMPLE AVE
+City: EDMONTON
+Province: ALBERTA
+Postal Code: T5J1A1
+Officer Type: Vice President
+Last Name: JONES
+First Name: MARK
+Street: 2-200 EXAMPLE AVE
+City: EDMONTON
+Province: ALBERTA
+
+-- 1 of 4 --
+
+
+
+-- 2 of 4 --
+
+
+
+-- 3 of 4 --
+
+
+
+-- 4 of 4 --
+

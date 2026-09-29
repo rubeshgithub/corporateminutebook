@@ -144,6 +144,17 @@ export interface ICompany extends Document {
         fields?: string[];                       // which fields differ (e.g. ["name", "status"])
         resolvedAt?: Date | null;                // when user marked drift as resolved
     };
+    // Governing jurisdiction ('ab' | 'bc' | 'on' | 'sk' | 'federal' | …).
+    // Absent on companies created before it was recorded.
+    jurisdiction?: string;
+    // The registry profile report the company was imported from.
+    profileReport?: {
+        fileId: string;
+        registry: string;
+        reportDate?: Date | null;
+        importedAt: Date;
+        source: 'parser' | 'ai';
+    };
     // Minute book approval. Absent on companies created before approvals
     // existed — those print as they always did until someone submits them.
     approval?: {
@@ -303,6 +314,14 @@ const companySchema: Schema = new Schema(
             detectedAt: { type: Date, default: null },
             fields:     { type: [String], default: [] },
             resolvedAt: { type: Date, default: null },
+        },
+        jurisdiction: { type: String },
+        profileReport: {
+            fileId:     { type: String },
+            registry:   { type: String },
+            reportDate: { type: Date, default: null },
+            importedAt: { type: Date },
+            source:     { type: String, enum: ['parser', 'ai'] },
         },
         approval: {
             status:       { type: String, enum: ['draft', 'submitted', 'changes_requested', 'approved'] },
